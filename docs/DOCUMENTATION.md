@@ -1,4 +1,4 @@
-# BHeR CMS — Build Documentation
+# BeHR CMS — Build Documentation
 
 This file is a running log, added to at the end of every phase. It records
 what was built and, more importantly, *why*, so a new developer can pick

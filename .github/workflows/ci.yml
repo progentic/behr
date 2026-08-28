@@ -1,0 +1,55 @@
+name: BeHR CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+        env:
+          POSTGRES_DB: behr_ci
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_USER: behr_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U behr_ci -d behr_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      API_PORT: 3000
+      DATABASE_URL: postgresql://behr_ci:ci-only-password@127.0.0.1:5432/behr_ci
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.0
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Type-check workspaces
+        run: bun run typecheck
+      - name: Run unit tests
+        run: bun run test
+      - name: Check database connectivity
+        run: bun run db:check
+      - name: Run migrations
+        run: bun run db:migrate
+      - name: Verify migration idempotency
+        run: bun run db:migrate
+      - name: Run PostgreSQL integration tests
+        run: bun run test:integration
+      - name: Build workspaces
+        run: bun run build
+      - name: Audit dependencies
+        run: bun audit

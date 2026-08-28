@@ -1,4 +1,4 @@
-# BHeR CMS — Agentic Implementation Execution Brief
+# BeHR CMS — Agentic Implementation Execution Brief
 
 Version: 1.1
 Execution Model: Phase-gated, deterministic, monolith-first
@@ -92,9 +92,9 @@ tsconfig.base.json
 .env.example
 index.html
 README.md
-ARCHITECTURE.md
-PHASE_PLAN.md
-DOCUMENTATION.md
+docs/ARCHITECTURE.md
+docs/PHASE_PLAN.md
+docs/DOCUMENTATION.md
 
 .github/workflows/ci.yml
 

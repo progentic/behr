@@ -1,4 +1,4 @@
-# BHeR CMS — System Architecture
+# BeHR CMS — System Architecture
 
 Version: 1.1
 Deployment Model: Single VPS
@@ -9,7 +9,7 @@ Primary Stack: Bun, Hono, PostgreSQL, React, nginx
 
 # 1. Architectural Overview
 
-BHeR CMS is a multi-tenant content management system designed to operate as a single deployable unit on one VPS. The system is intentionally constrained to reduce operational complexity, minimize infrastructure dependencies, and ensure predictable behavior.
+BeHR CMS is a multi-tenant content management system designed to operate as a single deployable unit on one VPS. The system is intentionally constrained to reduce operational complexity, minimize infrastructure dependencies, and ensure predictable behavior.
 
 The architecture is monolithic at runtime but modular in code structure. All core functionality executes within a single backend process, backed by a single relational database and a local filesystem for asset storage.
 
