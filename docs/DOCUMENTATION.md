@@ -130,3 +130,96 @@ bun run build
 The one thing to watch for later: Phase B introduces PostgreSQL. On macOS
 that will most likely mean `brew install postgresql` or a Docker
 container — that decision is deferred to Phase B, where it belongs.
+
+---
+
+## Phase B — Environment and Persistence Bootstrap
+
+### What this phase delivers
+
+The database package now validates `DATABASE_URL`, constructs Bun's native SQL
+client and a Drizzle database around that same client, verifies PostgreSQL
+connectivity, applies migrations, and closes every connection pool explicitly.
+The API remains independent of the database package, and no application schema
+or business behavior was introduced.
+
+Database-independent validation tests cover missing, empty, malformed, and
+unsupported URLs; both PostgreSQL URL protocols; and credential redaction.
+PostgreSQL integration testing separately proves connectivity, migration
+idempotency, catalog cleanliness, and connection cleanup.
+
+### Dependency decisions
+
+The implementation pins `drizzle-orm` 0.45.2 and `drizzle-kit` 0.31.10, the
+current stable non-prerelease releases selected for Bun 1.4.0 and TypeScript
+7.0.2. `@types/bun` remains pinned to 1.4.0 so the database package type-checks
+against the deployed runtime contract.
+
+`drizzle-orm/bun-sql` accepts an existing Bun `SQL` client, allowing BeHR to
+construct one native pool and expose both the native and Drizzle interfaces
+without `pg`, `postgres.js`, or a second database abstraction. Type-checking,
+unit testing, and live PostgreSQL verification confirm this stable combination.
+
+Drizzle Kit's deprecated transitive `@esbuild-kit/core-utils` dependency asks
+for an esbuild release affected by GHSA-67mh-4wv8-2f99. Bun's top-level
+override pins every esbuild consumer to stable 0.25.12, which is in Drizzle
+Kit's supported `^0.25.4` line and includes the upstream fix. The frozen
+install, migration-history validation, full build, and dependency audit verify
+the override; the final audit reports no vulnerabilities across 74 packages.
+
+### Migration design
+
+Drizzle Kit validates the migration history and owns its journal format. The
+stable Drizzle Kit migration CLI requires a separate PostgreSQL driver, so
+execution uses Drizzle's Bun SQL migrator against the same native client used by
+the application package. This preserves the required Bun-native connection
+boundary without adding an otherwise unused driver.
+
+The migration history contains only Drizzle's required version 7 journal with
+an empty entry list. There is no SQL migration because Phase B has no domain
+schema. On a clean database, migration execution creates only Drizzle's
+`drizzle.__drizzle_migrations` metadata table, its sequence, and its primary-key
+index. A second execution has nothing pending and leaves the catalog unchanged.
+
+### Why seed behavior is deferred
+
+Phase B has no application tables or legitimate seed data. A seed file or
+command would therefore be a no-op scaffold, which conflicts with the project
+rule against fake behavior. Seed support is deferred until a later phase
+introduces tables with real, testable seed requirements.
+
+### Verification performed
+
+The final Phase B verification uses Bun 1.4.0, TypeScript 7.0.2, and the pinned
+PostgreSQL 18 container image declared in CI. The required command sequence is:
+
+```text
+bun --version
+bun install --frozen-lockfile
+bun run typecheck
+bun run test
+bun run db:check
+bun run db:migration:check
+bun run db:migrate
+bun run db:migrate
+bun run test:integration
+bun run build
+bun audit
+```
+
+Final results:
+
+- `bun --version`: 1.4.0.
+- Frozen install: no lockfile changes; 39 installs checked across 83 packages.
+- Type-check: all eight workspaces passed with TypeScript 7.0.2.
+- Unit tests: one API test and seven environment tests passed.
+- Connectivity check: PostgreSQL connection verified.
+- Migration validation: Drizzle Kit reported the history valid.
+- Migration execution: both consecutive runs passed.
+- Integration tests: one test with eleven assertions passed.
+- Build: all eight workspaces passed.
+- Dependency audit: no vulnerabilities across 74 packages.
+- Runtime check: `GET /health` returned HTTP 200 with exactly
+  `{"status":"ok"}`.
+- Catalog inspection: only the Drizzle migration table, sequence, and index
+  exist; no application table or leaked BeHR connection remains.

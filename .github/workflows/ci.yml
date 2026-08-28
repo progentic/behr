@@ -43,6 +43,8 @@ jobs:
         run: bun run test
       - name: Check database connectivity
         run: bun run db:check
+      - name: Validate migration history
+        run: bun run db:migration:check
       - name: Run migrations
         run: bun run db:migrate
       - name: Verify migration idempotency

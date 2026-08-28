@@ -158,13 +158,14 @@ Must:
 * Configure PostgreSQL connection
 * Configure migration tooling
 * Validate environment variables
-* Provide seed mechanism
+* Keep seed behavior deferred until a phase introduces real seedable tables
 
 Must not:
 
 * Create application domain tables
 * Implement business logic
 * Implement auth
+* Create no-op seed behavior
 
 ## Files / Functions
 
@@ -172,6 +173,8 @@ packages/db
 
 client.ts
 env.ts
+check.ts
+migrate.ts
 drizzle.config.ts
 migrations/
 
@@ -183,11 +186,12 @@ Root
 
 Database connection succeeds.
 
-Migration command executes.
-
-Seed command executes.
+Migration validation succeeds.
+Migration execution succeeds twice without pending work on the second run.
 
 No application tables exist.
+
+Seed behavior remains deferred until real seedable tables exist.
 
 ## Output Format
 
