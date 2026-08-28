@@ -1,0 +1,3 @@
+[install]
+# Exact versions keep every developer and CI run on the same dependency graph.
+exact = true

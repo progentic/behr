@@ -1,0 +1,908 @@
+# BHeR CMS — Agentic Implementation Execution Brief
+
+Version: 1.1
+Execution Model: Phase-gated, deterministic, monolith-first
+Deployment Target: Single VPS
+Architecture Constraint: No distributed systems assumptions
+
+---
+
+# Global Execution Rules
+
+These rules apply to every phase.
+
+1. One phase at a time.
+2. Do not implement future-phase behavior.
+3. Do not create speculative abstractions.
+4. Do not modify files outside the declared phase surface.
+5. All schema and contract changes must be explicit.
+6. All behavior must be testable.
+7. All exits must be verifiable.
+8. System must remain deployable on a single VPS.
+9. Runtime behavior must remain request-driven and awaited. Do not introduce background workers, fire-and-forget operations, or distributed execution unless explicitly approved.
+10. The system must remain monolithic with clean internal boundaries.
+11. Unimplemented behavior must be documented. Do not represent it with future-work markers, fake readiness exports, stub functions, or speculative code.
+
+---
+
+# Phase Execution Order
+
+A — Repository Spine
+B — Environment and Persistence Bootstrap
+C — Identity and Session Core
+D — Tenant and Membership Core
+E — Site Core
+F — Canonical Content Contracts
+G — Page Persistence and Version Storage
+H — Published Read Model and Public Renderer
+I — Preview Surface
+J — Publish Workflow
+K — Editor Foundation
+L — Asset Storage Core
+M — Asset Integration
+N — Theme Runtime Contract
+O — Theme and Settings UI
+P — UX Refinement
+Q — Production Operations Lock
+
+---
+
+# Phase A — Repository Spine
+
+## Task
+
+Initialize deterministic monorepo structure and build pipeline.
+
+## Objective
+
+Establish a stable repository spine that builds successfully with status-only applications.
+
+No business logic.
+
+## Guidelines
+
+Must:
+
+* Use Bun workspaces
+* Support Bun 1.4.x
+* Support TypeScript 7.0 or newer
+* Maintain strict package boundaries
+* Build all apps
+* Provide CI skeleton
+* Provide infra skeleton
+* Provide a valid root index.html that documents the unimplemented landing experience
+
+Must not:
+
+* Implement auth
+* Implement database schema
+* Implement API behavior
+* Implement content model
+
+## Files / Functions
+
+Root
+
+package.json
+.bun-version
+bunfig.toml
+tsconfig.json
+tsconfig.base.json
+.gitignore
+.env.example
+index.html
+README.md
+ARCHITECTURE.md
+PHASE_PLAN.md
+DOCUMENTATION.md
+
+.github/workflows/ci.yml
+
+Apps
+
+apps/admin
+apps/api
+apps/web
+
+Packages
+
+packages/contracts
+packages/db
+packages/ui
+packages/editor
+packages/config
+
+Infra
+
+infra/nginx
+infra/systemd
+infra/scripts
+
+## Acceptance Criteria
+
+All workspaces build.
+
+bun install succeeds.
+bun run typecheck succeeds using TypeScript 7.0.
+bun run test succeeds.
+bun run build succeeds.
+API exposes GET /health.
+Root index.html exists and describes the Phase A implementation status.
+
+No business logic exists.
+No fake readiness exports, stub functions, or future-work markers exist.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Verification results
+
+---
+
+# Phase B — Environment and Persistence Bootstrap
+
+## Task
+
+Establish database connectivity and migration capability.
+
+## Objective
+
+Create a functioning persistence layer without application tables.
+
+## Guidelines
+
+Must:
+
+* Configure PostgreSQL connection
+* Configure migration tooling
+* Validate environment variables
+* Provide seed mechanism
+
+Must not:
+
+* Create application domain tables
+* Implement business logic
+* Implement auth
+
+## Files / Functions
+
+packages/db
+
+client.ts
+env.ts
+drizzle.config.ts
+migrations/
+
+Root
+
+.env.example
+
+## Acceptance Criteria
+
+Database connection succeeds.
+
+Migration command executes.
+
+Seed command executes.
+
+No application tables exist.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Migration status
+
+---
+
+# Phase C — Identity and Session Core
+
+## Task
+
+Implement authentication and session resolution.
+
+## Objective
+
+Establish secure user authentication.
+
+## Guidelines
+
+Must:
+
+* Implement users table
+* Implement login/logout
+* Implement session resolution middleware
+* Implement authenticated admin shell
+
+Must not:
+
+* Implement tenants
+* Implement sites
+* Implement RBAC roles
+* Implement content
+
+## Files / Functions
+
+packages/db
+
+schema/users.ts
+
+apps/api
+
+lib/auth.ts
+middleware/auth.ts
+routes/auth.ts
+
+apps/admin
+
+LoginPage.tsx
+AuthGuard.tsx
+
+## Acceptance Criteria
+
+User can authenticate.
+
+Session resolves server-side.
+
+Unauthorized access is denied.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Auth test results
+
+---
+
+# Phase D — Tenant and Membership Core
+
+## Task
+
+Implement tenant ownership boundaries.
+
+## Objective
+
+Establish multi-tenant isolation.
+
+## Guidelines
+
+Must:
+
+* Implement tenants table
+* Implement memberships table
+* Enforce tenant resolution
+* Enforce membership validation
+
+Must not:
+
+* Implement sites
+* Implement page content
+* Implement rendering
+
+## Files / Functions
+
+packages/db
+
+schema/tenants.ts
+schema/memberships.ts
+
+apps/api
+
+middleware/tenant.ts
+routes/tenants.ts
+
+## Acceptance Criteria
+
+Tenant context resolves correctly.
+
+Cross-tenant access is denied.
+
+Membership enforcement works.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Tenant isolation test results
+
+---
+
+# Phase E — Site Core
+
+## Task
+
+Implement site ownership and domain mapping.
+
+## Objective
+
+Allow tenants to create and manage sites.
+
+## Guidelines
+
+Must:
+
+* Implement sites table
+* Implement domains table
+* Implement site creation route
+* Implement site listing route
+
+Must not:
+
+* Implement page editing
+* Implement content model
+* Implement publishing
+
+## Files / Functions
+
+packages/db
+
+schema/sites.ts
+schema/domains.ts
+
+apps/api
+
+routes/sites.ts
+
+apps/admin
+
+SitesPage.tsx
+SiteCreateForm.tsx
+
+## Acceptance Criteria
+
+Authorized user can create site.
+
+Unauthorized user cannot create site.
+
+Site listing returns correct tenant sites.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Site tests
+
+---
+
+# Phase F — Canonical Content Contracts
+
+## Task
+
+Define content schema and block system.
+
+## Objective
+
+Establish deterministic content contract.
+
+## Guidelines
+
+Must:
+
+* Define PageDocument schema
+* Define Section schema
+* Define Block union
+* Define Style token schema
+
+Must not:
+
+* Implement database tables
+* Implement editor UI
+* Implement renderer
+
+## Files / Functions
+
+packages/contracts
+
+page.ts
+section.ts
+block.ts
+style.ts
+
+## Acceptance Criteria
+
+Valid documents pass validation.
+
+Invalid documents fail validation.
+
+Document serialization round-trips correctly.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Validation results
+
+---
+
+# Phase G — Page Persistence and Version Storage
+
+## Task
+
+Implement page storage and versioning.
+
+## Objective
+
+Store draft versions safely.
+
+## Guidelines
+
+Must:
+
+* Implement pages table
+* Implement page_versions table
+* Implement draft pointer behavior
+
+Must not:
+
+* Implement preview
+* Implement publish
+* Implement renderer
+
+## Files / Functions
+
+packages/db
+
+schema/pages.ts
+schema/page_versions.ts
+
+apps/api
+
+routes/pages.ts
+
+## Acceptance Criteria
+
+Saving page creates version.
+
+Draft pointer updates correctly.
+
+Version records are immutable.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Persistence tests
+
+---
+
+# Phase H — Published Read Model and Public Renderer
+
+## Task
+
+Render published pages.
+
+## Objective
+
+Serve public content safely.
+
+## Guidelines
+
+Must:
+
+* Resolve host and slug
+* Fetch published version
+* Render blocks deterministically
+
+Must not:
+
+* Expose draft content
+* Implement preview
+* Implement publishing
+
+## Files / Functions
+
+apps/web
+
+router.ts
+renderer.ts
+
+## Acceptance Criteria
+
+Published page renders correctly.
+
+Draft content is not accessible.
+
+Rendering is deterministic.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Renderer tests
+
+---
+
+# Phase I — Preview Surface
+
+## Task
+
+Implement preview capability.
+
+## Objective
+
+Allow safe draft viewing.
+
+## Guidelines
+
+Must:
+
+* Implement preview_tokens table usage
+* Validate preview tokens
+* Allow draft rendering via token
+
+Must not:
+
+* Modify published content
+* Bypass token validation
+
+## Files / Functions
+
+packages/db
+
+schema/preview_tokens.ts
+
+apps/api
+
+routes/preview.ts
+
+## Acceptance Criteria
+
+Valid preview token renders draft.
+
+Invalid token is rejected.
+
+Public routes remain protected.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Preview tests
+
+---
+
+# Phase J — Publish Workflow
+
+## Task
+
+Implement publish behavior.
+
+## Objective
+
+Switch public content safely.
+
+## Guidelines
+
+Must:
+
+* Implement publish route
+* Update published pointer
+* Record publish event
+
+Must not:
+
+* Modify draft version
+* Delete previous versions
+
+## Files / Functions
+
+packages/db
+
+schema/page_publications.ts
+
+apps/api
+
+routes/publish.ts
+
+## Acceptance Criteria
+
+Publish switches public version.
+
+Previous versions remain intact.
+
+Audit event recorded.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Publish tests
+
+---
+
+# Phase K — Editor Foundation
+
+## Task
+
+Implement basic page editor.
+
+## Objective
+
+Allow structured page authoring.
+
+## Guidelines
+
+Must:
+
+* Add/remove sections
+* Add/remove blocks
+* Edit block properties
+* Save draft
+
+Must not:
+
+* Implement drag-and-drop
+* Implement autosave
+
+## Files / Functions
+
+apps/admin
+
+PageList.tsx
+PageEditor.tsx
+
+## Acceptance Criteria
+
+User can create valid page.
+
+Document validates successfully.
+
+Saved document persists.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Editor tests
+
+---
+
+# Phase L — Asset Storage Core
+
+## Task
+
+Implement file storage system.
+
+## Objective
+
+Store assets reliably.
+
+## Guidelines
+
+Must:
+
+* Implement upload endpoint
+* Store files on disk
+* Record metadata
+
+Must not:
+
+* Implement editor asset picker
+* Implement image processing pipeline
+
+## Files / Functions
+
+packages/db
+
+schema/assets.ts
+
+apps/api
+
+routes/assets.ts
+
+## Acceptance Criteria
+
+File uploads succeed.
+
+File metadata recorded.
+
+Files persist on disk.
+
+## Output Format
+
+Files created
+Files modified
+Commands executed
+Upload tests
+
+---
+
+# Phase M — Asset Integration
+
+## Task
+
+Integrate assets into content.
+
+## Objective
+
+Allow blocks to reference assets.
+
+## Guidelines
+
+Must:
+
+* Implement asset picker
+* Record asset usage
+* Render asset-backed blocks
+
+Must not:
+
+* Implement media pipelines
+
+## Acceptance Criteria
+
+Asset references persist.
+
+Renderer displays asset correctly.
+
+Asset usage recorded.
+
+---
+
+# Phase N — Theme Runtime Contract
+
+## Task
+
+Implement theme token system.
+
+## Objective
+
+Control site appearance via tokens.
+
+## Guidelines
+
+Must:
+
+* Implement themes table
+* Resolve active theme
+* Apply tokens in renderer
+
+Must not:
+
+* Implement theme editor UI
+
+## Acceptance Criteria
+
+Theme changes affect rendering.
+
+Tokens apply consistently.
+
+---
+
+# Phase O — Theme and Settings UI
+
+## Task
+
+Implement theme and settings management.
+
+## Objective
+
+Expose controlled customization.
+
+## Guidelines
+
+Must:
+
+* Implement theme selection
+* Implement site settings editor
+
+Must not:
+
+* Allow arbitrary CSS injection
+
+## Acceptance Criteria
+
+User can change theme.
+
+Renderer reflects theme.
+
+---
+
+# Phase P — UX Refinement
+
+## Task
+
+Improve usability.
+
+## Objective
+
+Enhance workflow efficiency.
+
+## Guidelines
+
+Must:
+
+* Improve validation UX
+* Add optional drag-and-drop
+
+Must not:
+
+* Change persistence model
+* Change content contract
+
+## Acceptance Criteria
+
+UX improvements function correctly.
+
+No schema changes occur.
+
+---
+
+# Phase Q — Production Operations Lock
+
+## Task
+
+Finalize operational readiness.
+
+## Objective
+
+Make system deployable and recoverable.
+
+## Guidelines
+
+Must:
+
+* Implement backup script
+* Implement restore script
+* Integrate the existing health endpoint with deployment monitoring
+* Configure nginx
+* Configure systemd
+
+Must not:
+
+* Introduce new runtime behavior
+
+## Files / Functions
+
+infra/scripts
+
+backup.sh
+restore.sh
+deploy.sh
+
+infra/nginx
+
+bhr-cms.conf
+
+infra/systemd
+
+bhr-api.service
+
+## Acceptance Criteria
+
+Deployment succeeds.
+
+Backup executes successfully.
+
+Restore executes successfully.
+
+Health endpoint responds.
+
+---
+
+# Final Agent Execution Directive
+
+The agent must stop after completing the assigned phase.
+
+The agent must not:
+
+* Implement future-phase behavior
+* Modify unrelated files
+* Introduce architecture changes
+* Expand scope beyond the defined phase
+
+Each phase must be verified before the next begins.
+
+This preserves the monolithic architecture, deterministic content contracts, and single-VPS operational model defined for the system.
