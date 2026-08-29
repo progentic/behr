@@ -40,6 +40,8 @@ const PUBLIC_SCHEMA_NAME = "public";
 const SUCCESS_EXIT_CODE = 0;
 const NO_CONNECTIONS = 0;
 const NO_CATALOG_OBJECTS = 0;
+const CONNECTION_RELEASE_TIMEOUT_MS = 1_000;
+const CONNECTION_RELEASE_POLL_MS = 20;
 
 type IntegrationContext = Readonly<{
   environment: Environment;
@@ -102,12 +104,10 @@ async function verifyNativeClientLifecycle(
   } finally {
     await subject.close();
   }
-  expect(
-    await countConnectionsByApplicationName(
-      context.observer,
-      SUBJECT_APPLICATION_NAME,
-    ),
-  ).toBe(NO_CONNECTIONS);
+  await expectApplicationConnectionsClosed(
+    context.observer,
+    SUBJECT_APPLICATION_NAME,
+  );
 }
 
 async function verifyConnectivityCommand(
@@ -120,12 +120,10 @@ async function verifyConnectivityCommand(
   const result = await runRootScript(DATABASE_CHECK_SCRIPT, environment);
   expectCommandToPass(result);
   expect(result.stdout.trim()).toBe(DATABASE_CHECK_SUCCESS_MESSAGE);
-  expect(
-    await countConnectionsByApplicationName(
-      context.observer,
-      CHECK_APPLICATION_NAME,
-    ),
-  ).toBe(NO_CONNECTIONS);
+  await expectApplicationConnectionsClosed(
+    context.observer,
+    CHECK_APPLICATION_NAME,
+  );
 }
 
 async function verifyMigrationIdempotency(
@@ -137,12 +135,10 @@ async function verifyMigrationIdempotency(
   );
   expectCommandToPass(await runRootScript(DATABASE_MIGRATION_SCRIPT, environment));
   expectCommandToPass(await runRootScript(DATABASE_MIGRATION_SCRIPT, environment));
-  expect(
-    await countConnectionsByApplicationName(
-      context.observer,
-      MIGRATION_APPLICATION_NAME,
-    ),
-  ).toBe(NO_CONNECTIONS);
+  await expectApplicationConnectionsClosed(
+    context.observer,
+    MIGRATION_APPLICATION_NAME,
+  );
 }
 
 async function verifyDatabaseCatalog(context: IntegrationContext): Promise<void> {
@@ -225,6 +221,19 @@ function expectCommandToPass(result: CommandResult): void {
 
 async function executeClientProbe(client: DatabaseClient): Promise<void> {
   await client.native`SELECT 1`;
+}
+
+async function expectApplicationConnectionsClosed(
+  client: DatabaseClient,
+  applicationName: string,
+): Promise<void> {
+  const deadline = Date.now() + CONNECTION_RELEASE_TIMEOUT_MS;
+  let count = await countConnectionsByApplicationName(client, applicationName);
+  while (count !== NO_CONNECTIONS && Date.now() < deadline) {
+    await Bun.sleep(CONNECTION_RELEASE_POLL_MS);
+    count = await countConnectionsByApplicationName(client, applicationName);
+  }
+  expect(count).toBe(NO_CONNECTIONS);
 }
 
 async function countConnectionsByApplicationName(

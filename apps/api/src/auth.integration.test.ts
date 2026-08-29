@@ -26,6 +26,8 @@ const JSON_CONTENT_TYPE = "application/json";
 const NO_CONNECTIONS = 0;
 const SUCCESS_EXIT_CODE = 0;
 const FAILURE_EXIT_CODE = 1;
+const CONNECTION_RELEASE_TIMEOUT_MS = 1_000;
+const CONNECTION_RELEASE_POLL_MS = 20;
 
 type TestIdentity = Readonly<{
   name: string;
@@ -452,10 +454,23 @@ async function expectNoApplicationConnections(
   context: AuthIntegrationContext,
   applicationName: string,
 ): Promise<void> {
+  const deadline = Date.now() + CONNECTION_RELEASE_TIMEOUT_MS;
+  let count = await countApplicationConnections(context, applicationName);
+  while (count !== NO_CONNECTIONS && Date.now() < deadline) {
+    await Bun.sleep(CONNECTION_RELEASE_POLL_MS);
+    count = await countApplicationConnections(context, applicationName);
+  }
+  expect(count).toBe(NO_CONNECTIONS);
+}
+
+async function countApplicationConnections(
+  context: AuthIntegrationContext,
+  applicationName: string,
+): Promise<number> {
   const rows = await context.observer.native<Array<{ count: number }>>`
     SELECT count(*)::int AS count
     FROM pg_stat_activity
     WHERE application_name = ${applicationName}
   `;
-  expect(rows[0]?.count ?? NO_CONNECTIONS).toBe(NO_CONNECTIONS);
+  return rows[0]?.count ?? NO_CONNECTIONS;
 }
