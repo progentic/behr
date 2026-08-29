@@ -26,6 +26,7 @@
     "test": "bun run --cwd apps/api test && bun run --cwd packages/db test:unit",
     "test:auth:integration": "bun run --cwd apps/api test:auth:integration",
     "test:integration": "bun run --cwd packages/db test:integration",
+    "test:tenant:integration": "bun run --cwd apps/api test:tenant:integration",
     "typecheck": "bun run --filter '*' typecheck"
   },
   "devDependencies": {

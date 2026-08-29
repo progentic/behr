@@ -369,7 +369,7 @@ Phase C does not create any table, route, contract, or navigation for them.
 
 ### Verification performed
 
-Current verification, including the one-origin correction, uses Bun 1.4.0,
+Phase C verification after the one-origin correction used Bun 1.4.0,
 TypeScript 7.0.2, and a fresh PostgreSQL 18 database from the immutable CI
 image digest.
 
@@ -413,3 +413,89 @@ Final results:
   origin.
 - Catalog inspection found only Drizzle migration metadata and the four Phase C
   identity/authentication tables. No BeHR database connection remained open.
+
+---
+
+## Phase D — Tenant and Membership Core
+
+### What this phase delivers
+
+Authenticated users can create tenants and list only tenants where they hold a
+membership. Tenant-scoped requests resolve the tenant ID from the URL and the
+user ID from the authoritative server session. A missing membership returns the
+same HTTP 404 response whether the tenant exists or not.
+
+The public Phase D route surface is exactly:
+
+```text
+POST /tenants
+GET  /tenants
+GET  /tenants/:tenantId
+```
+
+All three routes require authentication. Tenant creation additionally requires
+the configured trusted origin. There are no invitation, membership mutation,
+tenant update, tenant deletion, owner-transfer, active-tenant, site, or admin UI
+routes.
+
+### Tenant persistence contract
+
+Migration `0001_tenant_membership_core.sql` adds only:
+
+* `tenants`, with a database-generated UUID, name, and creation/update
+  timestamps.
+* `memberships`, with tenant ID, user ID, `owner | member` role, and creation
+  timestamp.
+
+The membership table uses tenant ID and user ID as its composite primary key;
+it has no surrogate ID. Both foreign keys cascade on deletion, and user ID is
+indexed for accessible-tenant listing. Tenant creation inserts the tenant and
+creator's `owner` membership in one Drizzle transaction through the existing
+Bun SQL-backed client.
+
+### Membership authority
+
+The route layer never accepts a user ID as tenant authority. Authentication
+middleware resolves the current session, and tenant middleware queries the
+membership using that server-resolved user ID together with the `tenantId` path
+parameter. A custom user or tenant header cannot override either value.
+
+The `owner | member` role is deliberately descriptive at this phase. No
+permission registry, role inheritance, configurable role model, or general
+RBAC framework exists. Membership administration, invitations, active-tenant
+selection, sites, domains, content, and billing remain unimplemented.
+
+### Verification performed
+
+Phase D verification used Bun 1.4.0, TypeScript 7.0.2, and a fresh PostgreSQL
+18 database from the immutable CI image digest.
+
+```text
+bun --version
+bun install --frozen-lockfile
+bun run typecheck
+bun run test
+bun run db:check
+bun run db:migration:check
+bun run db:migrate
+bun run db:migrate
+bun run test:integration
+bun run test:auth:integration
+bun run test:tenant:integration
+bun run build
+bun audit
+```
+
+Final local results:
+
+* Frozen install checked 64 installs across 106 packages with no changes.
+* All eight workspaces type-checked and built.
+* Unit tests passed: 36 tests with 70 assertions.
+* Persistence integration passed with 13 assertions.
+* Authentication integration passed with 51 assertions.
+* Tenant isolation integration passed with 22 assertions.
+* Fresh and repeat migration runs passed.
+* PostgreSQL contained only the four authentication tables plus `tenants` and
+  `memberships`; tenant test records and application connections were zero
+  after cleanup.
+* Dependency audit reported no vulnerabilities across 96 packages.

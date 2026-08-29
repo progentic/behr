@@ -12,3 +12,14 @@ export {
   loginRequestSchema,
   sessionResponseSchema,
 } from "./auth";
+export {
+  type CreateTenantRequest,
+  type TenantAccess,
+  type TenantListResponse,
+  type TenantRole,
+  createTenantRequestSchema,
+  tenantAccessSchema,
+  tenantIdSchema,
+  tenantListResponseSchema,
+  tenantRoleSchema,
+} from "./tenant";

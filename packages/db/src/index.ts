@@ -10,6 +10,10 @@ export { createAuthPersistence, identityExists } from "./auth-persistence";
 export { checkDatabaseConnection } from "./check";
 export { migrateDatabase } from "./migrate";
 export {
+  type TenantPersistence,
+  createTenantPersistence,
+} from "./tenant-persistence";
+export {
   DatabaseConfigurationError,
   type DatabaseConfig,
   type Environment,
@@ -19,7 +23,10 @@ export {
   account,
   authSchema,
   databaseSchema,
+  memberships,
   session,
+  tenantRole,
+  tenants,
   user,
   verification,
 } from "./schema";

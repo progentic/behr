@@ -6,7 +6,17 @@ import { createApiRoutes } from "./index";
 const ADMIN_ORIGIN = "http://localhost:3001";
 
 test("allows credentialed auth requests only for the configured admin origin", async () => {
-  const routes = createApiRoutes(createFakeAuthService(), ADMIN_ORIGIN);
+  const routes = createApiRoutes(
+    createFakeAuthService(),
+    {
+      createTenantWithOwner: async () => {
+        throw new Error("Tenant creation is not used by this CORS test.");
+      },
+      listTenantAccess: async () => [],
+      resolveTenantAccess: async () => null,
+    },
+    ADMIN_ORIGIN,
+  );
   const response = await routes.request("/auth/login", {
     method: "OPTIONS",
     headers: {

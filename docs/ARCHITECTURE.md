@@ -46,15 +46,15 @@ flowchart LR
 
     Browser -->|HTTP localhost:3000| Dev[Bun development listener]
     Dev -->|GET / and assets| AdminApp[React admin]
-    Dev -->|/health and /auth/*| API[Hono API]
+    Dev -->|/health, /auth/*, /tenants, /tenants/*| API[Hono API]
     API --> Postgres[(PostgreSQL)]
 ```
 
 The Phase Q production target keeps the same public route paths: nginx will
-serve static application assets and forward `/health` and `/auth/*` to the Bun
-API. It must not invent an `/api` prefix unless the application routes are
-changed in a separately reviewed phase. Reverse-proxy configuration, SSR, and
-tenant-aware public rendering remain unimplemented.
+serve static application assets and forward `/health`, `/auth/*`, `/tenants`,
+and `/tenants/*` to the Bun API. It must not invent an `/api` prefix unless the
+application routes are changed in a separately reviewed phase. Reverse-proxy
+configuration, SSR, and tenant-aware public rendering remain unimplemented.
 
 ---
 
@@ -76,6 +76,9 @@ flowchart TD
     Request --> Login[POST /auth/login]
     Request --> Session[GET /auth/session]
     Request --> Logout[POST /auth/logout]
+    Request --> CreateTenant[POST /tenants]
+    Request --> ListTenants[GET /tenants]
+    Request --> TenantAccess[GET /tenants/:tenantId]
 ```
 
 Interpretation:
@@ -142,12 +145,11 @@ The API backend is stateful only through the database and filesystem.
 The Hono application does not render UI components. The development listener
 serves the imported admin document before delegating API requests to Hono.
 
-Phase C implements the authentication responsibility through Hono, Better
-Auth, and the existing Bun SQL-backed Drizzle client. A one-time command owns
-identity bootstrap; the API exposes only login, logout, and authoritative
-current-session boundaries. Tenant resolution, role checks, content behavior,
-publishing, assets, preview, and domain routing remain deferred to their
-declared phases.
+Phase C implements authentication through Hono, Better Auth, and the existing
+Bun SQL-backed Drizzle client. Phase D adds tenant creation, membership-based
+listing, and path-based tenant access resolution. Every tenant decision uses
+the user resolved from the authoritative database session. Content behavior,
+publishing, assets, preview, sites, and domain routing remain deferred.
 
 The currently implemented public API routes are exactly:
 
@@ -155,6 +157,9 @@ The currently implemented public API routes are exactly:
 * `POST /auth/login`
 * `GET /auth/session`
 * `POST /auth/logout`
+* `POST /tenants`
+* `GET /tenants`
+* `GET /tenants/:tenantId`
 
 ---
 
@@ -228,9 +233,24 @@ Phase C adds four provider-compatible identity tables owned by the BeHR schema:
 * `session` — opaque server-side sessions with bounded expiration
 * `verification` — provider verification records
 
+Phase D adds two application tables:
+
+* `tenants` — UUID identity, name, and creation/update timestamps
+* `memberships` — composite tenant/user identity, `owner | member` role, and
+  creation timestamp
+
+Tenant creation and its creator's `owner` membership commit in one database
+transaction. Both membership foreign keys cascade on deletion, and the
+composite primary key prevents duplicate membership for one user and tenant.
+
 The database remains the sole session authority. Browser cookies contain only
 the opaque session identifier; they do not authorize a user without a valid
 database session.
+
+Tenant routes use a path parameter, never a client-selected active-tenant
+cookie or header. The API resolves membership with both the path tenant ID and
+the authenticated session user ID. Invalid, nonexistent, and inaccessible
+tenant IDs all return HTTP 404 without disclosing tenant existence.
 
 ---
 
@@ -347,7 +367,8 @@ Security rules:
 * Session cookies use SameSite Lax and become Secure in production
 * Sessions have a bounded seven-day lifetime and no client-side session cache
 * The initial identity is created only through the one-time bootstrap command
-* Tenant context and role checks remain deferred to Phase D
+* Tenant access requires an authoritative `owner` or `member` membership
+* Tenant IDs from custom headers or cookies are not authorization inputs
 * Draft content cannot be publicly exposed
 * Preview access requires token validation
 

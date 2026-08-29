@@ -3,7 +3,9 @@ import {
   type Environment,
   createAuthPersistence,
   createDatabaseClient,
+  createTenantPersistence,
   loadDatabaseConfig,
+  type TenantPersistence,
 } from "@bher/db";
 import { Hono } from "hono";
 
@@ -31,17 +33,23 @@ export function createApiApplication(environment: Environment): ApiApplication {
   const apiConfig = loadApiConfig(environment);
   const databaseConfig = loadDatabaseConfig(environment);
   const database = createDatabaseClient(databaseConfig);
-  const persistence = createAuthPersistence(database);
-  const auth = createAuthService(apiConfig.auth, persistence);
-  return composeApiApplication(apiConfig, database, auth);
+  const authPersistence = createAuthPersistence(database);
+  const auth = createAuthService(apiConfig.auth, authPersistence);
+  const tenantPersistence = createTenantPersistence(database);
+  return composeApiApplication(apiConfig, database, auth, tenantPersistence);
 }
 
 function composeApiApplication(
   config: ApiConfig,
   database: DatabaseClient,
   auth: AuthService,
+  tenantPersistence: TenantPersistence,
 ): ApiApplication {
-  const app = createHttpApplication(auth, config.auth.adminOrigin);
+  const app = createHttpApplication(
+    auth,
+    tenantPersistence,
+    config.auth.adminOrigin,
+  );
   return Object.freeze({
     app,
     auth,
@@ -52,11 +60,15 @@ function composeApiApplication(
 
 function createHttpApplication(
   auth: AuthService,
+  tenantPersistence: TenantPersistence,
   adminOrigin: string,
 ): Hono<ApiBindings> {
   const app = new Hono<ApiBindings>();
   app.get(HEALTH_ROUTE, (context) => context.json({ status: "ok" }));
-  app.route(ROUTE_ROOT, createApiRoutes(auth, adminOrigin));
+  app.route(
+    ROUTE_ROOT,
+    createApiRoutes(auth, tenantPersistence, adminOrigin),
+  );
   app.onError(() =>
     createJsonResponse(
       { error: "Internal server error." },

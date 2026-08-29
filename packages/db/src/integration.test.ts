@@ -19,16 +19,28 @@ const MIGRATION_APPLICATION_NAME = "behr_integration_migration";
 const DRIZZLE_SCHEMA_NAME = "drizzle";
 const DRIZZLE_OBJECT_PREFIX = "__drizzle_migrations";
 const TABLE_OBJECT_KINDS = new Set(["r", "p"]);
-const PHASE_C_TABLE_NAMES = ["account", "session", "user", "verification"];
-const PHASE_C_CATALOG_OBJECTS = new Set([
+const PHASE_D_TABLE_NAMES = [
+  "account",
+  "memberships",
+  "session",
+  "tenants",
+  "user",
+  "verification",
+];
+const PHASE_D_CATALOG_OBJECTS = new Set([
   "account",
   "account_issuer_account_id_uidx",
   "account_pkey",
   "account_user_id_idx",
+  "memberships",
+  "memberships_tenant_id_user_id_pk",
+  "memberships_user_id_idx",
   "session",
   "session_pkey",
   "session_token_unique",
   "session_user_id_idx",
+  "tenants",
+  "tenants_pkey",
   "user",
   "user_email_unique",
   "user_pkey",
@@ -73,7 +85,7 @@ async function verifyPersistenceBootstrap(): Promise<void> {
     await verifyConnectivityCommand(context);
     await verifyMigrationIdempotency(context);
     await verifyDatabaseCatalog(context);
-    await verifyAuthConstraints(context);
+    await verifyDatabaseConstraints(context);
     await verifyConnectionCleanup(context);
   } finally {
     await closeIntegrationContext(context);
@@ -144,20 +156,27 @@ async function verifyMigrationIdempotency(
 async function verifyDatabaseCatalog(context: IntegrationContext): Promise<void> {
   const objects = await listCatalogObjects(context.observer);
   expect(objects.length).toBeGreaterThan(NO_CATALOG_OBJECTS);
-  expect(objects.every(isAllowedPhaseCCatalogObject)).toBe(true);
-  expect(findApplicationTableNames(objects)).toEqual(PHASE_C_TABLE_NAMES);
+  expect(objects.every(isAllowedPhaseDCatalogObject)).toBe(true);
+  expect(findApplicationTableNames(objects)).toEqual(PHASE_D_TABLE_NAMES);
 }
 
-async function verifyAuthConstraints(context: IntegrationContext): Promise<void> {
-  const constraints = await listAuthConstraints(context.observer);
+async function verifyDatabaseConstraints(
+  context: IntegrationContext,
+): Promise<void> {
+  const constraints = await listDatabaseConstraints(context.observer);
   expect(constraints).toEqual([
     { name: "account_user_id_user_id_fk", type: "FOREIGN KEY" },
+    { name: "memberships_tenant_id_tenants_id_fk", type: "FOREIGN KEY" },
+    { name: "memberships_tenant_id_user_id_pk", type: "PRIMARY KEY" },
+    { name: "memberships_user_id_user_id_fk", type: "FOREIGN KEY" },
     { name: "session_token_unique", type: "UNIQUE" },
     { name: "session_user_id_user_id_fk", type: "FOREIGN KEY" },
     { name: "user_email_unique", type: "UNIQUE" },
   ]);
   expect(await listCascadeForeignKeys(context.observer)).toEqual([
     "account_user_id_user_id_fk",
+    "memberships_tenant_id_tenants_id_fk",
+    "memberships_user_id_user_id_fk",
     "session_user_id_user_id_fk",
   ]);
 }
@@ -277,7 +296,7 @@ async function listCatalogObjects(
   `;
 }
 
-async function listAuthConstraints(
+async function listDatabaseConstraints(
   client: DatabaseClient,
 ): Promise<Array<{ name: string; type: string }>> {
   return await client.native<Array<{ name: string; type: string }>>`
@@ -286,6 +305,9 @@ async function listAuthConstraints(
     WHERE table_schema = 'public'
       AND constraint_name IN (
         'account_user_id_user_id_fk',
+        'memberships_tenant_id_tenants_id_fk',
+        'memberships_tenant_id_user_id_pk',
+        'memberships_user_id_user_id_fk',
         'session_token_unique',
         'session_user_id_user_id_fk',
         'user_email_unique'
@@ -302,6 +324,8 @@ async function listCascadeForeignKeys(client: DatabaseClient): Promise<string[]>
       AND delete_rule = 'CASCADE'
       AND constraint_name IN (
         'account_user_id_user_id_fk',
+        'memberships_tenant_id_tenants_id_fk',
+        'memberships_user_id_user_id_fk',
         'session_user_id_user_id_fk'
       )
     ORDER BY constraint_name
@@ -332,11 +356,11 @@ function isApplicationTable(object: CatalogObject): boolean {
   );
 }
 
-function isAllowedPhaseCCatalogObject(object: CatalogObject): boolean {
+function isAllowedPhaseDCatalogObject(object: CatalogObject): boolean {
   return (
     isDrizzleMigrationObject(object) ||
     (object.schemaName === PUBLIC_SCHEMA_NAME &&
-      PHASE_C_CATALOG_OBJECTS.has(object.objectName))
+      PHASE_D_CATALOG_OBJECTS.has(object.objectName))
   );
 }
 
