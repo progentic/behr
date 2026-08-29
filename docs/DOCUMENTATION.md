@@ -328,6 +328,38 @@ entry document applies a restrictive same-origin meta CSP; clickjacking headers
 remain assigned to the nginx response boundary in Phase Q because
 `frame-ancestors` cannot be enforced through a meta CSP.
 
+### One-origin local development
+
+The normal local workflow is the root command `bun run dev`. It starts one Bun
+listener at `http://localhost:3000`, registers `apps/admin/index.html` at `/`,
+serves Bun's generated frontend assets, and delegates every unmatched request
+to the existing Hono application. The admin's relative `/auth/*` requests
+therefore reach the API without a proxy, a browser-specific base URL, or a
+second port.
+
+Prepare a local environment and start the application with:
+
+```bash
+cp .env.example .env
+# Set DATABASE_URL and generate a private BETTER_AUTH_SECRET in .env.
+# Set BOOTSTRAP_NAME, BOOTSTRAP_EMAIL, and BOOTSTRAP_PASSWORD only when
+# creating the first local identity.
+bun install --frozen-lockfile
+bun run db:migrate
+bun run auth:bootstrap # first identity only
+bun run dev
+```
+
+Open `http://localhost:3000/`. The example values intentionally make
+`BETTER_AUTH_URL` and `ADMIN_ORIGIN` the same origin: the former is Better
+Auth's public API origin, while the latter is the browser origin trusted for
+credentialed authentication requests.
+
+`bun run dev:api-only` and `bun run dev:admin-only` remain isolated diagnostic
+commands. Each uses port 3000 by default and they must not be run together; they
+are not the normal application workflow. Production nginx routing remains
+deferred to Phase Q.
+
 ### Deferred work
 
 Tenant identity, memberships, active tenant selection, roles, RBAC, sites,
@@ -337,8 +369,9 @@ Phase C does not create any table, route, contract, or navigation for them.
 
 ### Verification performed
 
-The final Phase C verification used Bun 1.4.0, TypeScript 7.0.2, and a fresh
-PostgreSQL 18 database from the immutable CI image digest.
+Current verification, including the one-origin correction, uses Bun 1.4.0,
+TypeScript 7.0.2, and a fresh PostgreSQL 18 database from the immutable CI
+image digest.
 
 ```text
 bun --version
@@ -359,7 +392,7 @@ Final results:
 
 - Frozen install: no lockfile changes; 64 installs checked across 106 packages.
 - Type-check: all eight workspaces passed.
-- Unit tests: 32 tests with 47 assertions passed.
+- Unit tests: 34 tests with 62 assertions passed.
 - Persistence integration: one PostgreSQL test with 13 assertions passed.
 - Authentication integration: one PostgreSQL test with 51 assertions passed.
 - Connectivity and migration-history checks passed.
@@ -369,11 +402,14 @@ Final results:
   and connection cleanup passed through Better Auth and PostgreSQL.
 - All eight workspaces built, including the authenticated admin application.
 - Dependency audit: no vulnerabilities across 96 packages.
+- The focused development test loaded `/`, fetched Bun's generated assets,
+  reached `/health` and all three `/auth/*` routes, preserved API 404 behavior,
+  and rebound the listener port immediately after shutdown.
 - Bundled API runtime: `GET /health` returned HTTP 200 with exactly
   `{"status":"ok"}`; unauthenticated `GET /auth/session` returned HTTP 401.
-- Browser acceptance: the compiled admin displayed the login surface and a
-  generic error for invalid credentials, transitioned to the authenticated
-  shell using a provider-created HttpOnly session, preserved the session after
-  reload, and returned to the login surface after logout.
+- Browser acceptance: `bun run dev` served the admin and API at
+  `http://localhost:3000`; a provider-created HttpOnly session entered the
+  authenticated shell and logout returned to the login surface on that same
+  origin.
 - Catalog inspection found only Drizzle migration metadata and the four Phase C
   identity/authentication tables. No BeHR database connection remained open.

@@ -96,6 +96,19 @@ describe("loadApiConfig", () => {
     );
   });
 
+  test("allows the shared HTTP origin in development", () => {
+    const config = loadApiConfig(
+      createEnvironment({
+        ADMIN_ORIGIN: "http://localhost:3000",
+        BETTER_AUTH_URL: "http://localhost:3000",
+        NODE_ENV: "development",
+      }),
+    );
+
+    expect(config.auth.secureCookies).toBe(false);
+    expect(config.auth.trustedOrigins).toEqual(["http://localhost:3000"]);
+  });
+
   test("enables secure cookies for HTTPS", () => {
     expect(
       loadApiConfig(

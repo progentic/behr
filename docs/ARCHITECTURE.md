@@ -19,7 +19,9 @@ The system is composed of three primary runtime surfaces:
 * Admin Panel
 * API Backend
 
-All surfaces are served through a single reverse proxy entrypoint.
+The implemented local development workflow serves the admin and API through
+one Bun listener. A single nginx entrypoint remains the Phase Q production
+target; no nginx configuration is implemented yet.
 
 The architecture explicitly avoids distributed infrastructure assumptions such as:
 
@@ -33,50 +35,59 @@ The architecture explicitly avoids distributed infrastructure assumptions such a
 
 # 2. High-Level System Topology
 
-The system is accessed through a single web entrypoint and routes requests to the appropriate application surface based on domain, path, and authentication context.
+The current local entrypoint is `http://localhost:3000`. Bun serves the admin
+document and its bundled assets directly, then delegates unmatched requests to
+the existing Hono application.
 
 ```mermaid
 flowchart LR
 
     Browser[User Browser]
 
-    Browser -->|HTTPS Request| Nginx
-
-    Nginx -->|Serve Static| AdminApp
-    Nginx -->|Serve Static / SSR| PublicWeb
-    Nginx -->|Proxy /api| API
-
-    API --> Postgres[(PostgreSQL Database)]
-    API --> Storage[(Local File Storage)]
+    Browser -->|HTTP localhost:3000| Dev[Bun development listener]
+    Dev -->|GET / and assets| AdminApp[React admin]
+    Dev -->|/health and /auth/*| API[Hono API]
+    API --> Postgres[(PostgreSQL)]
 ```
 
-Phase A implements only static entry documents for the root, admin, and public web surfaces. Reverse-proxy routing, SSR, and tenant-aware public rendering are not implemented until their declared phases.
+The Phase Q production target keeps the same public route paths: nginx will
+serve static application assets and forward `/health` and `/auth/*` to the Bun
+API. It must not invent an `/api` prefix unless the application routes are
+changed in a separately reviewed phase. Reverse-proxy configuration, SSR, and
+tenant-aware public rendering remain unimplemented.
 
 ---
 
 # 3. Root Entry Document and Major Function Paths
 
-The root `index.html` is the default document a web server returns when a user navigates to the base URL. In Phase A it contains only a clear statement that the landing experience is not implemented. It does not contain routing logic, a customer portal, or links that imply later-phase behavior already exists.
+The integrated development listener registers `apps/admin/index.html` at `/`.
+Bun bundles the document's referenced React entry and exposes the resulting
+development assets on the same origin. The fallback delegates to Hono, so an
+unknown API path remains an API 404 instead of becoming admin HTML.
 
 The target request paths are:
 
 ```mermaid
 flowchart TD
 
-    Request[HTTPS Request]
-    Request --> Root[Default index.html]
-    Request --> Admin[Admin surface]
-    Request --> Website[Public site]
-    Request --> API[API routes]
+    Request[HTTP request]
+    Request --> Root[GET / → admin index.html]
+    Request --> Health[GET /health]
+    Request --> Login[POST /auth/login]
+    Request --> Session[GET /auth/session]
+    Request --> Logout[POST /auth/logout]
 ```
 
 Interpretation:
 
-The root document is a valid deployable entry file, not a universal application router. nginx will eventually select the root, admin, public, or API surface using host and path rules in Phase Q.
+The admin document is an explicit `/` route, not a universal fallback. nginx
+will eventually reproduce this public topology in Phase Q without changing the
+implemented Hono route paths.
 
 Admin Panel
 
-The Phase A app displays only an implementation-status message. Administrative workflows are added by their declared phases.
+The Phase C admin provides login, session restoration, logout, and the minimal
+authenticated shell. Later administrative workflows remain deferred.
 
 Public Website
 
@@ -90,7 +101,7 @@ A separate customer portal is not implemented and is not part of the current v1 
 
 # 4. Runtime Components
 
-## 4.1 Reverse Proxy — nginx
+## 4.1 Reverse Proxy — nginx (Phase Q)
 
 Responsibilities:
 
@@ -101,7 +112,10 @@ Responsibilities:
 * Rate limiting for sensitive endpoints
 * Request logging
 
-The reverse proxy is the single externally exposed service.
+These are future production responsibilities. The reverse proxy is not part of
+the implemented local workflow and no production nginx configuration exists.
+When Phase Q implements it, nginx will be the single externally exposed
+service.
 
 No application service is directly internet-facing.
 
@@ -125,7 +139,8 @@ Responsibilities:
 
 The API backend is stateful only through the database and filesystem.
 
-The API does not render UI components.
+The Hono application does not render UI components. The development listener
+serves the imported admin document before delegating API requests to Hono.
 
 Phase C implements the authentication responsibility through Hono, Better
 Auth, and the existing Bun SQL-backed Drizzle client. A one-time command owns
@@ -133,6 +148,13 @@ identity bootstrap; the API exposes only login, logout, and authoritative
 current-session boundaries. Tenant resolution, role checks, content behavior,
 publishing, assets, preview, and domain routing remain deferred to their
 declared phases.
+
+The currently implemented public API routes are exactly:
+
+* `GET /health`
+* `POST /auth/login`
+* `GET /auth/session`
+* `POST /auth/logout`
 
 ---
 
@@ -231,34 +253,40 @@ Constraints:
 
 # 5. Request Lifecycle
 
-The following sequence describes a typical authenticated workflow.
+The following sequence describes the implemented one-origin development path.
+Phase Q will place nginx in front of the same routes without changing them.
 
 ```mermaid
 sequenceDiagram
 
     participant User
     participant Browser
-    participant Nginx
-    participant API
+    participant Listener as Bun listener
+    participant API as Hono API
     participant DB
 
     User->>Browser: Submit login form
-    Browser->>Nginx: POST /auth/login
-    Nginx->>API: Forward request
+    Browser->>Listener: POST /auth/login
+    Listener->>API: Delegate request
 
     API->>DB: Verify provider account credentials
     DB-->>API: User identity
     API->>DB: Create bounded session
-    API-->>Browser: HttpOnly session cookie
+    API-->>Listener: HttpOnly session cookie
+    Listener-->>Browser: Login response
 
-    Browser->>API: GET /auth/session + cookie
+    Browser->>Listener: GET /auth/session + cookie
+    Listener->>API: Delegate request
     API->>DB: Resolve authoritative session and user
     DB-->>API: Current identity
-    API-->>Browser: Authenticated user DTO
+    API-->>Listener: Authenticated user DTO
+    Listener-->>Browser: Session response
 
-    Browser->>API: POST /auth/logout + cookie
+    Browser->>Listener: POST /auth/logout + cookie
+    Listener->>API: Delegate request
     API->>DB: Invalidate session
-    API-->>Browser: Expired session cookie
+    API-->>Listener: Expired session cookie
+    Listener-->>Browser: Logout response
 ```
 
 ---
@@ -294,9 +322,9 @@ Client Layer
 
 Untrusted
 
-Reverse Proxy
+Reverse Proxy (Phase Q)
 
-Network enforcement boundary
+Future network enforcement boundary
 
 API Backend
 
@@ -334,7 +362,7 @@ must be delivered as an HTTP header by the reverse proxy in Phase Q because
 
 The system runs as a single logical deployment.
 
-Recommended process layout:
+Target Phase Q process layout:
 
 nginx
 Bun API service
@@ -353,7 +381,7 @@ No horizontal scaling assumptions exist in version 1.
 
 The system defines clear operational failure boundaries.
 
-Reverse Proxy Failure
+Reverse Proxy Failure (Phase Q)
 
 Requests cannot reach application services.
 
