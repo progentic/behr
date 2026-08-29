@@ -1,8 +1,7 @@
 import { expect, test } from "bun:test";
 import { resolve } from "node:path";
 
-import type { DatabaseClient } from "./client";
-import { createDatabaseClient } from "./database";
+import { createDatabaseClient, type DatabaseClient } from "./client";
 import {
   type DatabaseConfig,
   type Environment,

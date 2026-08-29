@@ -1,5 +1,4 @@
-import type { DatabaseClient } from "./client";
-import { createDatabaseClient } from "./database";
+import { createDatabaseClient, type DatabaseClient } from "./client";
 import {
   DatabaseConfigurationError,
   type Environment,

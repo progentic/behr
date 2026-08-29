@@ -18,7 +18,7 @@ export type DatabaseClient = Readonly<{
   close: () => Promise<void>;
 }>;
 
-export function constructDatabaseClient(config: DatabaseConfig): DatabaseClient {
+export function createDatabaseClient(config: DatabaseConfig): DatabaseClient {
   const nativeClient = createNativeClient(config.databaseUrl);
   const drizzleDatabase = createDrizzleClient(nativeClient);
   return createClientFacade(nativeClient, drizzleDatabase);

@@ -148,6 +148,11 @@ unsupported URLs; both PostgreSQL URL protocols; and credential redaction.
 PostgreSQL integration testing separately proves connectivity, migration
 idempotency, catalog cleanliness, and connection cleanup.
 
+The technical `createDatabaseClient` constructor lives directly in
+`packages/db/src/client.ts`. It owns Bun SQL and Drizzle construction and does
+not sit behind a pass-through policy wrapper; higher-level policy remains in
+the operations that validate configuration and own the client lifecycle.
+
 ### Dependency decisions
 
 The implementation pins `drizzle-orm` 0.45.2 and `drizzle-kit` 0.31.10, the
