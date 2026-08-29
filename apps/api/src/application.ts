@@ -1,5 +1,4 @@
 import {
-  type DatabaseClient,
   type Environment,
   createAuthPersistence,
   createDatabaseClient,
@@ -9,7 +8,7 @@ import {
 } from "@bher/db";
 import { Hono } from "hono";
 
-import { type ApiConfig, loadApiConfig } from "./env";
+import { loadApiConfig } from "./env";
 import { type AuthService, createAuthService } from "./lib/auth";
 import { createJsonResponse } from "./lib/http";
 import { createApiRoutes } from "./routes";
@@ -36,25 +35,16 @@ export function createApiApplication(environment: Environment): ApiApplication {
   const authPersistence = createAuthPersistence(database);
   const auth = createAuthService(apiConfig.auth, authPersistence);
   const tenantPersistence = createTenantPersistence(database);
-  return composeApiApplication(apiConfig, database, auth, tenantPersistence);
-}
-
-function composeApiApplication(
-  config: ApiConfig,
-  database: DatabaseClient,
-  auth: AuthService,
-  tenantPersistence: TenantPersistence,
-): ApiApplication {
   const app = createHttpApplication(
     auth,
     tenantPersistence,
-    config.auth.adminOrigin,
+    apiConfig.auth.adminOrigin,
   );
   return Object.freeze({
     app,
     auth,
-    close: () => closeApplication(database),
-    server: Object.freeze({ port: config.port, fetch: app.fetch }),
+    close: () => database.close(),
+    server: Object.freeze({ port: apiConfig.port, fetch: app.fetch }),
   });
 }
 
@@ -76,8 +66,4 @@ function createHttpApplication(
     ),
   );
   return app;
-}
-
-async function closeApplication(database: DatabaseClient): Promise<void> {
-  await database.close();
 }
