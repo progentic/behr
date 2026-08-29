@@ -1,30 +1,80 @@
-import { AuthGuard } from "./components/AuthGuard";
-import { Layout } from "./components/Layout";
-import { useAuthentication } from "./lib/auth";
-import { DashboardPage } from "./routes/DashboardPage";
-import { LoginPage } from "./routes/LoginPage";
+import type { AuthenticatedSession, SessionResponse } from "@bher/contracts";
+
+import { AuthGuard } from "./AuthGuard";
+import { LoginPage } from "./LoginPage";
+import {
+  type AuthenticationState,
+  useAuthentication,
+} from "./lib/auth";
 
 export function App() {
   const authentication = useAuthentication();
-  if (authentication.loading) {
-    return <p role="status">Checking your BeHR session…</p>;
+  return renderAuthenticationView(authentication);
+}
+
+function renderAuthenticationView(authentication: AuthenticationState) {
+  const { view } = authentication;
+  switch (view.status) {
+    case "loading":
+      return <p role="status">Checking your BeHR session…</p>;
+    case "unauthenticated":
+      return renderSessionView(
+        authentication,
+        { status: "unauthenticated" },
+        null,
+      );
+    case "authenticated":
+      return renderSessionView(authentication, view.session, null);
+    case "error":
+      return renderSessionView(authentication, view.previous, view.message);
   }
+}
+
+function renderSessionView(
+  authentication: AuthenticationState,
+  session: SessionResponse,
+  error: string | null,
+) {
   return (
     <AuthGuard
-      session={authentication.session}
-      unauthenticated={
-        <LoginPage error={authentication.error} onLogin={authentication.login} />
-      }
+      session={session}
+      unauthenticated={<LoginPage error={error} onLogin={authentication.login} />}
     >
-      {(user) => (
-        <Layout
-          error={authentication.error}
+      {(authenticatedSession) => (
+        <AuthenticatedShell
+          error={error}
           onLogout={authentication.logout}
-          user={user}
-        >
-          <DashboardPage user={user} />
-        </Layout>
+          session={authenticatedSession}
+        />
       )}
     </AuthGuard>
+  );
+}
+
+function AuthenticatedShell({
+  error,
+  onLogout,
+  session,
+}: Readonly<{
+  error: string | null;
+  onLogout: () => Promise<void>;
+  session: AuthenticatedSession;
+}>) {
+  const { user } = session;
+  return (
+    <>
+      <header>
+        <strong>BeHR</strong>
+        <span>{user.email}</span>
+        <button type="button" onClick={() => void onLogout()}>
+          Log out
+        </button>
+      </header>
+      {error ? <p role="alert">{error}</p> : null}
+      <main>
+        <h1>Welcome, {user.displayName}</h1>
+        <p>Authenticated until {new Date(session.expiresAt).toLocaleString()}.</p>
+      </main>
+    </>
   );
 }

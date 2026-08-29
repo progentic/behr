@@ -6,7 +6,7 @@ export {
 export {
   type AuthPersistenceAdapter,
 } from "./auth-adapter";
-export { createAuthPersistence } from "./auth-persistence";
+export { createAuthPersistence, identityExists } from "./auth-persistence";
 export { checkDatabaseConnection } from "./check";
 export { migrateDatabase } from "./migrate";
 export {

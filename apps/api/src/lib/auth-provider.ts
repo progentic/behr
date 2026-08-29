@@ -6,14 +6,9 @@ import { betterAuth } from "better-auth/minimal";
 import type { AuthConfig } from "../env";
 
 const APP_NAME = "BeHR";
-const AUTH_BASE_PATH = "/api/auth";
+const AUTH_BASE_PATH = "/auth";
 const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;
-const GENERAL_RATE_LIMIT_WINDOW_SECONDS = 60;
-const GENERAL_RATE_LIMIT_MAXIMUM = 100;
-const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 60;
-const LOGIN_RATE_LIMIT_MAXIMUM = 5;
-const LOGIN_PROVIDER_PATH = "/sign-in/email";
-const MINIMUM_PASSWORD_LENGTH = 8;
+const MINIMUM_PASSWORD_LENGTH = 12;
 const MAXIMUM_PASSWORD_LENGTH = 128;
 
 export type IdentityRegistration = Readonly<{
@@ -30,7 +25,13 @@ export type ProviderUser = Readonly<{
 
 export type ProviderMutation = Readonly<{
   user: ProviderUser;
+  expiresAt: Date;
   headers: Headers;
+}>;
+
+export type ProviderSession = Readonly<{
+  user: ProviderUser;
+  expiresAt: Date;
 }>;
 
 export type ProviderSignOut = Readonly<{
@@ -54,7 +55,6 @@ export function constructAuthProvider(
     database: persistence,
     emailAndPassword: createEmailPasswordConfig(),
     session: createSessionConfig(),
-    rateLimit: createRateLimitConfig(),
     advanced: createAdvancedConfig(config),
     logger: { level: "error" },
     telemetry: { enabled: false },
@@ -69,8 +69,10 @@ export async function authenticateProviderCredentials(
   headers: Headers,
 ): Promise<ProviderAuthenticationAttempt> {
   try {
-    return acceptProviderSignIn(
+    return await acceptProviderSignIn(
+      provider,
       await callProviderSignIn(provider, request, headers),
+      headers,
     );
   } catch (error) {
     return rejectProviderSignIn(error);
@@ -91,21 +93,6 @@ function createSessionConfig() {
     expiresIn: SESSION_EXPIRES_IN_SECONDS,
     disableSessionRefresh: true,
     cookieCache: { enabled: false },
-  } as const;
-}
-
-function createRateLimitConfig() {
-  return {
-    enabled: true,
-    storage: "memory",
-    window: GENERAL_RATE_LIMIT_WINDOW_SECONDS,
-    max: GENERAL_RATE_LIMIT_MAXIMUM,
-    customRules: {
-      [LOGIN_PROVIDER_PATH]: {
-        window: LOGIN_RATE_LIMIT_WINDOW_SECONDS,
-        max: LOGIN_RATE_LIMIT_MAXIMUM,
-      },
-    },
   } as const;
 }
 
@@ -134,13 +121,23 @@ async function callProviderSignIn(
   });
 }
 
-function acceptProviderSignIn(
+async function acceptProviderSignIn(
+  provider: AuthProvider,
   result: Awaited<ReturnType<typeof callProviderSignIn>>,
-): ProviderAuthenticationAttempt {
+  requestHeaders: Headers,
+): Promise<ProviderAuthenticationAttempt> {
+  const session = await resolveProviderSession(
+    provider,
+    createSessionHeaders(requestHeaders, result.headers),
+  );
+  if (!session) {
+    throw new Error("Authentication provider did not create a session.");
+  }
   return {
     accepted: true,
     mutation: {
-      user: toProviderUser(result.response.user),
+      user: session.user,
+      expiresAt: session.expiresAt,
       headers: result.headers,
     },
   };
@@ -168,7 +165,7 @@ export async function registerProviderIdentity(
 export async function resolveProviderSession(
   provider: AuthProvider,
   headers: Headers,
-): Promise<ProviderUser | null> {
+): Promise<ProviderSession | null> {
   const result = await provider.api.getSession({
     headers,
     query: {
@@ -176,7 +173,9 @@ export async function resolveProviderSession(
       disableRefresh: true,
     },
   });
-  return result ? toProviderUser(result.user) : null;
+  return result
+    ? { user: toProviderUser(result.user), expiresAt: result.session.expiresAt }
+    : null;
 }
 
 export async function signOutProviderSession(
@@ -196,4 +195,21 @@ function toProviderUser(user: ProviderUser): ProviderUser {
     email: user.email,
     name: user.name,
   };
+}
+
+function createSessionHeaders(
+  requestHeaders: Headers,
+  providerHeaders: Headers,
+): Headers {
+  const headers = new Headers(requestHeaders);
+  const cookies = providerHeaders
+    .getSetCookie()
+    .map(readCookiePair)
+    .join("; ");
+  headers.set("cookie", cookies);
+  return headers;
+}
+
+function readCookiePair(setCookie: string): string {
+  return setCookie.split(";", 1)[0] ?? "";
 }

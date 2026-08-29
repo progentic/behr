@@ -128,10 +128,11 @@ The API backend is stateful only through the database and filesystem.
 The API does not render UI components.
 
 Phase C implements the authentication responsibility through Hono, Better
-Auth, and the existing Bun SQL-backed Drizzle client. The API exposes only
-login, logout, and authoritative current-session routes. Tenant resolution,
-role checks, content behavior, publishing, assets, preview, and domain routing
-remain deferred to their declared phases.
+Auth, and the existing Bun SQL-backed Drizzle client. A one-time command owns
+identity bootstrap; the API exposes only login, logout, and authoritative
+current-session boundaries. Tenant resolution, role checks, content behavior,
+publishing, assets, preview, and domain routing remain deferred to their
+declared phases.
 
 ---
 
@@ -154,9 +155,9 @@ Constraints:
 * No business logic authority
 * All mutations occur through the API
 
-Phase C implements only the login page, current-session resolution, logout,
-and a minimal authenticated shell. Site, page, asset, theme, preview, and
-publishing interfaces remain unimplemented.
+Phase C implements only the login page, four explicit authentication states,
+current-session resolution, logout, and a minimal authenticated shell. Site,
+page, asset, theme, preview, and publishing interfaces remain unimplemented.
 
 ---
 
@@ -242,7 +243,7 @@ sequenceDiagram
     participant DB
 
     User->>Browser: Submit login form
-    Browser->>Nginx: POST /api/auth/login
+    Browser->>Nginx: POST /auth/login
     Nginx->>API: Forward request
 
     API->>DB: Verify provider account credentials
@@ -250,12 +251,12 @@ sequenceDiagram
     API->>DB: Create bounded session
     API-->>Browser: HttpOnly session cookie
 
-    Browser->>API: GET /api/auth/session + cookie
+    Browser->>API: GET /auth/session + cookie
     API->>DB: Resolve authoritative session and user
     DB-->>API: Current identity
     API-->>Browser: Authenticated user DTO
 
-    Browser->>API: POST /api/auth/logout + cookie
+    Browser->>API: POST /auth/logout + cookie
     API->>DB: Invalidate session
     API-->>Browser: Expired session cookie
 ```
@@ -314,8 +315,10 @@ Security rules:
 * All authentication is server-authoritative
 * Session identifiers are stored only in HttpOnly cookies
 * Authentication state changes require an explicitly trusted origin
+* Credentialed cross-origin responses allow only the configured admin origin
 * Session cookies use SameSite Lax and become Secure in production
 * Sessions have a bounded seven-day lifetime and no client-side session cache
+* The initial identity is created only through the one-time bootstrap command
 * Tenant context and role checks remain deferred to Phase D
 * Draft content cannot be publicly exposed
 * Preview access requires token validation

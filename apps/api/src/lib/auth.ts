@@ -1,4 +1,5 @@
 import type {
+  AuthenticatedSession,
   AuthenticatedUser,
   LoginRequest,
   SessionResponse,
@@ -33,7 +34,7 @@ export type AuthMutation = Readonly<{
 export type AuthService = Readonly<{
   login: (request: LoginRequest, headers: Headers) => Promise<AuthMutation>;
   logout: (headers: Headers) => Promise<AuthMutation>;
-  resolveSession: (headers: Headers) => Promise<AuthenticatedUser | null>;
+  resolveSession: (headers: Headers) => Promise<AuthenticatedSession | null>;
   registerIdentity: (
     identity: IdentityRegistration,
     headers: Headers,
@@ -93,9 +94,11 @@ async function logout(
 async function resolveSession(
   provider: AuthProvider,
   headers: Headers,
-): Promise<AuthenticatedUser | null> {
-  const user = await resolveProviderSession(provider, headers);
-  return user ? toAuthenticatedUser(user) : null;
+): Promise<AuthenticatedSession | null> {
+  const session = await resolveProviderSession(provider, headers);
+  return session
+    ? createAuthenticatedSession(session.user, session.expiresAt)
+    : null;
 }
 
 async function registerIdentity(
@@ -109,7 +112,7 @@ async function registerIdentity(
 
 function createAuthenticatedMutation(result: ProviderMutation): AuthMutation {
   return {
-    session: createAuthenticatedSession(result.user),
+    session: createAuthenticatedSession(result.user, result.expiresAt),
     headers: extractCookieHeaders(result.headers),
   };
 }

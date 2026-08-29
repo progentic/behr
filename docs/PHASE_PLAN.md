@@ -218,9 +218,12 @@ Must:
 
 * Implement the Better Auth identity, account, session, and verification tables
 * Integrate Better Auth through the existing Bun SQL-backed Drizzle client
+* Implement a one-time initial identity bootstrap command
 * Implement login, logout, and authoritative session resolution
-* Validate authentication secrets and the public authentication origin
+* Validate `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and `ADMIN_ORIGIN`
+* Enforce a 12-character minimum password
 * Enforce trusted origins on state-changing authentication requests
+* Allow credentialed CORS only for the configured admin origin
 * Implement typed authentication middleware
 * Implement the minimal login and authenticated admin shell
 
@@ -237,7 +240,6 @@ Must not:
 
 packages/db
 
-schema/users.ts
 schema/auth.ts
 auth-persistence.ts
 
@@ -248,6 +250,7 @@ auth.ts
 apps/api
 
 env.ts
+bootstrap.ts
 lib/auth.ts
 lib/session.ts
 middleware/auth.ts
@@ -258,15 +261,17 @@ apps/admin
 
 App.tsx
 LoginPage.tsx
-DashboardPage.tsx
 AuthGuard.tsx
-Layout.tsx
 
 ## Acceptance Criteria
 
 User can authenticate.
 
+Bootstrap creates the first identity once and refuses a second attempt.
+
 Session resolves server-side.
+
+Session responses include the database-backed expiry.
 
 Unauthorized access is denied.
 

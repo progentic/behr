@@ -44,7 +44,7 @@ export function LoginPage({ error, onLogin }: LoginPageProps) {
           name="password"
           type="password"
           autoComplete="current-password"
-          minLength={8}
+          minLength={12}
           maxLength={128}
           required
           value={password}

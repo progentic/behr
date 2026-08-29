@@ -71,6 +71,7 @@ async function verifyPersistenceBootstrap(): Promise<void> {
     await verifyConnectivityCommand(context);
     await verifyMigrationIdempotency(context);
     await verifyDatabaseCatalog(context);
+    await verifyAuthConstraints(context);
     await verifyConnectionCleanup(context);
   } finally {
     await closeIntegrationContext(context);
@@ -149,6 +150,20 @@ async function verifyDatabaseCatalog(context: IntegrationContext): Promise<void>
   expect(objects.length).toBeGreaterThan(NO_CATALOG_OBJECTS);
   expect(objects.every(isAllowedPhaseCCatalogObject)).toBe(true);
   expect(findApplicationTableNames(objects)).toEqual(PHASE_C_TABLE_NAMES);
+}
+
+async function verifyAuthConstraints(context: IntegrationContext): Promise<void> {
+  const constraints = await listAuthConstraints(context.observer);
+  expect(constraints).toEqual([
+    { name: "account_user_id_user_id_fk", type: "FOREIGN KEY" },
+    { name: "session_token_unique", type: "UNIQUE" },
+    { name: "session_user_id_user_id_fk", type: "FOREIGN KEY" },
+    { name: "user_email_unique", type: "UNIQUE" },
+  ]);
+  expect(await listCascadeForeignKeys(context.observer)).toEqual([
+    "account_user_id_user_id_fk",
+    "session_user_id_user_id_fk",
+  ]);
 }
 
 async function verifyConnectionCleanup(
@@ -251,6 +266,38 @@ async function listCatalogObjects(
       AND catalog.relkind IN ('r', 'p', 'i', 'S', 'v', 'm', 'f')
     ORDER BY namespace.nspname, catalog.relname
   `;
+}
+
+async function listAuthConstraints(
+  client: DatabaseClient,
+): Promise<Array<{ name: string; type: string }>> {
+  return await client.native<Array<{ name: string; type: string }>>`
+    SELECT constraint_name AS name, constraint_type AS type
+    FROM information_schema.table_constraints
+    WHERE table_schema = 'public'
+      AND constraint_name IN (
+        'account_user_id_user_id_fk',
+        'session_token_unique',
+        'session_user_id_user_id_fk',
+        'user_email_unique'
+      )
+    ORDER BY constraint_name
+  `;
+}
+
+async function listCascadeForeignKeys(client: DatabaseClient): Promise<string[]> {
+  const rows = await client.native<Array<{ name: string }>>`
+    SELECT constraint_name AS name
+    FROM information_schema.referential_constraints
+    WHERE constraint_schema = 'public'
+      AND delete_rule = 'CASCADE'
+      AND constraint_name IN (
+        'account_user_id_user_id_fk',
+        'session_user_id_user_id_fk'
+      )
+    ORDER BY constraint_name
+  `;
+  return rows.map(({ name }) => name);
 }
 
 function readCount(rows: CountRow[]): number {

@@ -246,14 +246,23 @@ shell after login.
 The public API surface is intentionally limited to:
 
 ```text
-POST /api/auth/login
-GET  /api/auth/session
-POST /api/auth/logout
+POST /auth/login
+GET  /auth/session
+POST /auth/logout
 ```
 
 Better Auth's larger provider handler is not mounted. Provider sign-up is used
-only as an internal identity bootstrap in integration testing; no registration,
+only behind the one-time `bun run auth:bootstrap` command; no registration,
 password reset, OAuth, MFA, SSO, tenant, site, or content UI is exposed.
+
+### Initial identity bootstrap
+
+The bootstrap command requires `BOOTSTRAP_NAME`, `BOOTSTRAP_EMAIL`, and
+`BOOTSTRAP_PASSWORD` with no defaults. It connects through the existing BeHR
+database client, refuses to run when any identity exists, calls Better Auth's
+supported server API, prints no identity or credential material, and closes the
+client on success or failure. A second attempt cannot rename, reset, or replace
+the initial identity.
 
 ### Authentication integration decision
 
@@ -270,7 +279,9 @@ called. Provider session tokens never appear in BeHR JSON responses.
 
 ### Identity schema and migration
 
-Migration `0000_identity_session_core.sql` creates only the four Better Auth
+The cohesive `packages/db/src/schema/auth.ts` contract was reviewed against
+Better Auth's generated Drizzle schema. Migration
+`0000_identity_session_core.sql` creates only the four Better Auth
 models reconciled with BeHR's identity needs:
 
 * `user` owns stable IDs, normalized email, display name, verification state,
@@ -287,10 +298,10 @@ outside these four models and Drizzle migration metadata.
 
 ### Session and cookie security
 
-`AUTH_SECRET` is mandatory, never defaulted, must contain at least 32
-non-padded characters, and is not included in errors. `AUTH_BASE_URL` must be an
-HTTP(S) origin without credentials, path, query, or fragment; production
-configuration requires HTTPS.
+`BETTER_AUTH_SECRET` is mandatory, never defaulted, must contain at least 32
+non-padded characters, and is not included in errors. `BETTER_AUTH_URL` and
+`ADMIN_ORIGIN` must be HTTP(S) origins without credentials, paths, queries, or
+fragments; production configuration requires HTTPS for both.
 
 Sessions use:
 
@@ -302,10 +313,11 @@ Sessions use:
 * no cookie session cache, forcing server-state resolution on every request
 * explicit database deletion and cookie expiry on logout
 
-State-changing authentication routes require the exact configured origin and
-JSON requests. Better Auth's CSRF/origin checks remain enabled, its in-process
-rate limiter is enabled for the single Bun runtime, telemetry is disabled, and
-only error-level provider logs are emitted.
+State-changing authentication routes require the exact configured origin, and
+login parses a strict JSON contract. Credentialed CORS responses name only
+`ADMIN_ORIGIN`; wildcard credentialed CORS is never used. Better Auth's
+CSRF/origin checks remain enabled, telemetry is disabled, and only error-level
+provider logs are emitted.
 
 ### Admin security boundary
 
@@ -338,6 +350,7 @@ bun run db:migration:check
 bun run db:migrate
 bun run db:migrate
 bun run test:integration
+bun run test:auth:integration
 bun run build
 bun audit
 ```
@@ -346,8 +359,9 @@ Final results:
 
 - Frozen install: no lockfile changes; 64 installs checked across 106 packages.
 - Type-check: all eight workspaces passed.
-- Unit tests: 27 tests with 39 assertions passed.
-- Integration tests: two PostgreSQL tests with 36 assertions passed.
+- Unit tests: 32 tests with 47 assertions passed.
+- Persistence integration: one PostgreSQL test with 13 assertions passed.
+- Authentication integration: one PostgreSQL test with 51 assertions passed.
 - Connectivity and migration-history checks passed.
 - Fresh and repeat migration runs passed.
 - Valid and invalid login, authoritative session resolution, missing/invalid/
@@ -356,10 +370,10 @@ Final results:
 - All eight workspaces built, including the authenticated admin application.
 - Dependency audit: no vulnerabilities across 96 packages.
 - Bundled API runtime: `GET /health` returned HTTP 200 with exactly
-  `{"status":"ok"}`; unauthenticated `GET /api/auth/session` returned HTTP 401.
-- Browser acceptance: the compiled admin displayed the login surface,
-  transitioned to the authenticated shell using a provider-created HttpOnly
-  session, preserved the session after reload, and emitted no console warning
-  or error.
+  `{"status":"ok"}`; unauthenticated `GET /auth/session` returned HTTP 401.
+- Browser acceptance: the compiled admin displayed the login surface and a
+  generic error for invalid credentials, transitioned to the authenticated
+  shell using a provider-created HttpOnly session, preserved the session after
+  reload, and returned to the login surface after logout.
 - Catalog inspection found only Drizzle migration metadata and the four Phase C
   identity/authentication tables. No BeHR database connection remained open.

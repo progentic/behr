@@ -27,7 +27,8 @@ jobs:
           --health-retries 10
     env:
       API_PORT: 3000
-      AUTH_BASE_URL: http://localhost:3000
+      ADMIN_ORIGIN: http://localhost:3000
+      BETTER_AUTH_URL: http://localhost:3000
       DATABASE_URL: postgresql://behr_ci:ci-only-password@127.0.0.1:5432/behr_ci
     steps:
       - name: Check out repository
@@ -37,7 +38,7 @@ jobs:
         with:
           bun-version: 1.4.0
       - name: Generate ephemeral authentication secret
-        run: echo "AUTH_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
+        run: echo "BETTER_AUTH_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Type-check workspaces
@@ -52,8 +53,10 @@ jobs:
         run: bun run db:migrate
       - name: Verify migration idempotency
         run: bun run db:migrate
-      - name: Run PostgreSQL integration tests
+      - name: Run persistence integration tests
         run: bun run test:integration
+      - name: Run authentication integration tests
+        run: bun run test:auth:integration
       - name: Build workspaces
         run: bun run build
       - name: Audit dependencies

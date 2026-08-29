@@ -13,6 +13,11 @@ const AUTHENTICATED_USER: AuthenticatedUser = {
   email: "route@example.com",
   displayName: "Route User",
 };
+const AUTHENTICATED_SESSION = {
+  status: "authenticated" as const,
+  user: AUTHENTICATED_USER,
+  expiresAt: "2026-09-05T00:00:00.000Z",
+};
 
 test("rejects login bodies that assert a user identity", async () => {
   const routes = createAuthRoutes(createSuccessfulAuthService());
@@ -58,14 +63,14 @@ test("returns a narrow session response and an HttpOnly cookie", async () => {
   const body = await response.json();
 
   expect(response.status).toBe(200);
-  expect(body).toEqual({ status: "authenticated", user: AUTHENTICATED_USER });
+  expect(body).toEqual(AUTHENTICATED_SESSION);
   expect(body).not.toHaveProperty("token");
   expect(response.headers.get("set-cookie")).toContain("HttpOnly");
 });
 
 function createSuccessfulAuthService(): AuthService {
   return createAuthService(async () => ({
-    session: { status: "authenticated", user: AUTHENTICATED_USER },
+    session: AUTHENTICATED_SESSION,
     headers: new Headers({
       "set-cookie": "behr.session_token=opaque; HttpOnly; SameSite=Lax; Path=/",
     }),
@@ -85,7 +90,7 @@ function createAuthService(login: AuthService["login"]): AuthService {
       session: { status: "unauthenticated" },
       headers: new Headers(),
     }),
-    resolveSession: async () => AUTHENTICATED_USER,
+    resolveSession: async () => AUTHENTICATED_SESSION,
     registerIdentity: async () => AUTHENTICATED_USER,
     isTrustedOrigin: (origin) => origin === TRUSTED_ORIGIN,
   };

@@ -1,4 +1,4 @@
-const AUTH_API_BASE_PATH = "/api/auth";
+const AUTH_API_BASE_PATH = "/auth";
 const JSON_CONTENT_TYPE = "application/json";
 
 export type AuthEndpoint = "/login" | "/logout" | "/session";

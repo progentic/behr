@@ -1,4 +1,5 @@
 import {
+  type AuthenticatedSession,
   type LoginRequest,
   type SessionResponse,
   authErrorResponseSchema,
@@ -12,12 +13,20 @@ import { requestAuthApi } from "./api";
 const UNAUTHORIZED_STATUS = 401;
 const GENERIC_AUTH_ERROR = "Authentication request failed.";
 
+export type AuthenticationView =
+  | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "unauthenticated" }>
+  | Readonly<{ status: "authenticated"; session: AuthenticatedSession }>
+  | Readonly<{
+      status: "error";
+      message: string;
+      previous: SessionResponse;
+    }>;
+
 export type AuthenticationState = Readonly<{
-  error: string | null;
-  loading: boolean;
   login: (request: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
-  session: SessionResponse;
+  view: AuthenticationView;
 }>;
 
 export class AuthApiError extends Error {
@@ -28,33 +37,35 @@ export class AuthApiError extends Error {
 }
 
 export function useAuthentication(): AuthenticationState {
-  const [session, setSession] = useState<SessionResponse>({
-    status: "unauthenticated",
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<AuthenticationView>({ status: "loading" });
 
-  useEffect(() => createSessionRefreshEffect(setSession, setLoading, setError), []);
+  useEffect(() => createSessionRefreshEffect(setView), []);
 
   const login = useCallback(async (request: LoginRequest) => {
-    setError(null);
     try {
-      setSession(await authenticate(request));
+      setView(createSessionView(await authenticate(request)));
     } catch (failure) {
-      setError(readAuthError(failure));
+      setView({
+        status: "error",
+        message: readAuthError(failure),
+        previous: { status: "unauthenticated" },
+      });
     }
   }, []);
 
   const logout = useCallback(async () => {
-    setError(null);
     try {
-      setSession(await invalidateSession());
+      setView(createSessionView(await invalidateSession()));
     } catch (failure) {
-      setError(readAuthError(failure));
+      setView((current) => ({
+        status: "error",
+        message: readAuthError(failure),
+        previous: readPreviousSession(current),
+      }));
     }
   }, []);
 
-  return { error, loading, login, logout, session };
+  return { login, logout, view };
 }
 
 async function authenticate(request: LoginRequest): Promise<SessionResponse> {
@@ -80,15 +91,18 @@ async function invalidateSession(): Promise<SessionResponse> {
 }
 
 function createSessionRefreshEffect(
-  setSession: (session: SessionResponse) => void,
-  setLoading: (loading: boolean) => void,
-  setError: (error: string | null) => void,
+  setView: (view: AuthenticationView) => void,
 ): () => void {
   let active = true;
   void resolveSession()
-    .then((session) => updateActiveSession(active, setSession, session))
-    .catch((failure) => updateActiveError(active, setError, failure))
-    .finally(() => updateActiveLoading(active, setLoading));
+    .then((session) => updateActiveView(active, setView, createSessionView(session)))
+    .catch((failure) =>
+      updateActiveView(active, setView, {
+        status: "error",
+        message: readAuthError(failure),
+        previous: { status: "unauthenticated" },
+      }),
+    );
   return () => {
     active = false;
   };
@@ -107,31 +121,27 @@ function readAuthError(error: unknown): string {
   return error instanceof AuthApiError ? error.message : GENERIC_AUTH_ERROR;
 }
 
-function updateActiveSession(
-  active: boolean,
-  setSession: (session: SessionResponse) => void,
-  session: SessionResponse,
-): void {
-  if (active) {
-    setSession(session);
-  }
+function createSessionView(session: SessionResponse): AuthenticationView {
+  return session.status === "authenticated"
+    ? { status: "authenticated", session }
+    : { status: "unauthenticated" };
 }
 
-function updateActiveError(
-  active: boolean,
-  setError: (error: string | null) => void,
-  error: unknown,
-): void {
-  if (active) {
-    setError(readAuthError(error));
+function readPreviousSession(view: AuthenticationView): SessionResponse {
+  if (view.status === "authenticated") {
+    return view.session;
   }
+  return view.status === "error"
+    ? view.previous
+    : { status: "unauthenticated" };
 }
 
-function updateActiveLoading(
+function updateActiveView(
   active: boolean,
-  setLoading: (loading: boolean) => void,
+  setView: (view: AuthenticationView) => void,
+  view: AuthenticationView,
 ): void {
   if (active) {
-    setLoading(false);
+    setView(view);
   }
 }

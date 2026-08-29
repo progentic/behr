@@ -15,6 +15,7 @@
   ],
   "scripts": {
     "build": "bun run --filter '*' build",
+    "auth:bootstrap": "bun run --cwd apps/api auth:bootstrap",
     "db:check": "bun run --cwd packages/db db:check",
     "db:migrate": "bun run --cwd packages/db db:migrate",
     "db:migration:check": "bun run --cwd packages/db db:migration:check",
@@ -22,7 +23,8 @@
     "dev:admin": "bun run --cwd apps/admin dev",
     "dev:web": "bun run --cwd apps/web dev",
     "test": "bun run --cwd apps/api test && bun run --cwd packages/db test:unit",
-    "test:integration": "bun run --cwd packages/db test:integration && bun run --cwd apps/api test:integration",
+    "test:auth:integration": "bun run --cwd apps/api test:auth:integration",
+    "test:integration": "bun run --cwd packages/db test:integration",
     "typecheck": "bun run --filter '*' typecheck"
   },
   "devDependencies": {

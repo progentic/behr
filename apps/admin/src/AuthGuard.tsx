@@ -1,8 +1,8 @@
-import type { AuthenticatedUser, SessionResponse } from "@bher/contracts";
+import type { AuthenticatedSession, SessionResponse } from "@bher/contracts";
 import type { ReactNode } from "react";
 
 type AuthGuardProps = Readonly<{
-  children: (user: AuthenticatedUser) => ReactNode;
+  children: (session: AuthenticatedSession) => ReactNode;
   session: SessionResponse;
   unauthenticated: ReactNode;
 }>;
@@ -15,5 +15,5 @@ export function AuthGuard({
   if (session.status === "unauthenticated") {
     return unauthenticated;
   }
-  return children(session.user);
+  return children(session);
 }

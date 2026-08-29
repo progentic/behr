@@ -1,7 +1,7 @@
-import type { AuthenticatedUser } from "@bher/contracts";
+import type { AuthenticatedSession } from "@bher/contracts";
 
 export type ApiBindings = {
   Variables: {
-    authenticatedUser: AuthenticatedUser;
+    authenticatedSession: AuthenticatedSession;
   };
 };

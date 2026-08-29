@@ -14,7 +14,7 @@ import { createApiRoutes } from "./routes";
 import type { ApiBindings } from "./types";
 
 const HEALTH_ROUTE = "/health";
-const API_ROUTE = "/api";
+const ROUTE_ROOT = "/";
 const INTERNAL_ERROR_STATUS = 500;
 
 export type ApiApplication = Readonly<{
@@ -41,7 +41,7 @@ function composeApiApplication(
   database: DatabaseClient,
   auth: AuthService,
 ): ApiApplication {
-  const app = createHttpApplication(auth);
+  const app = createHttpApplication(auth, config.auth.adminOrigin);
   return Object.freeze({
     app,
     auth,
@@ -50,10 +50,13 @@ function composeApiApplication(
   });
 }
 
-function createHttpApplication(auth: AuthService): Hono<ApiBindings> {
+function createHttpApplication(
+  auth: AuthService,
+  adminOrigin: string,
+): Hono<ApiBindings> {
   const app = new Hono<ApiBindings>();
   app.get(HEALTH_ROUTE, (context) => context.json({ status: "ok" }));
-  app.route(API_ROUTE, createApiRoutes(auth));
+  app.route(ROUTE_ROOT, createApiRoutes(auth, adminOrigin));
   app.onError(() =>
     createJsonResponse(
       { error: "Internal server error." },

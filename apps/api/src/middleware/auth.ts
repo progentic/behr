@@ -11,11 +11,11 @@ export function createRequireAuthentication(
   auth: AuthService,
 ): MiddlewareHandler<ApiBindings> {
   return async (context, next) => {
-    const user = await auth.resolveSession(context.req.raw.headers);
-    if (!user) {
+    const session = await auth.resolveSession(context.req.raw.headers);
+    if (!session) {
       return createUnauthenticatedResponse();
     }
-    context.set("authenticatedUser", user);
+    context.set("authenticatedSession", session);
     await next();
   };
 }

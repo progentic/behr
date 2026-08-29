@@ -1,8 +1,6 @@
-export { account, session, verification } from "./auth";
-export { user } from "./users";
+export { account, session, user, verification } from "./auth";
 
-import { account, session, verification } from "./auth";
-import { user } from "./users";
+import { account, session, user, verification } from "./auth";
 
 export const authSchema = {
   user,

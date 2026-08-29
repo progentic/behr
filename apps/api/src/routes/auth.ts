@@ -57,10 +57,7 @@ async function handleLogin(
 }
 
 function handleSession(context: Context<ApiBindings>): Response {
-  const body: SessionResponse = {
-    status: "authenticated",
-    user: context.get("authenticatedUser"),
-  };
+  const body: SessionResponse = context.get("authenticatedSession");
   return createJsonResponse(body, OK_STATUS);
 }
 

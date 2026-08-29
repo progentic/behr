@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { Environment } from "@bher/db";
 
 import { ApiConfigurationError, loadApiConfig } from "./env";
 
@@ -6,59 +7,44 @@ const VALID_SECRET = "phase-c-test-secret-with-at-least-32-characters";
 const SECRET_FRAGMENT = "must-not-appear";
 
 describe("loadApiConfig", () => {
-  test("loads development authentication configuration", () => {
-    expect(
-      loadApiConfig({
-        AUTH_BASE_URL: "http://localhost:3000",
-        AUTH_SECRET: VALID_SECRET,
-      }),
-    ).toEqual({
+  test("loads separate API and admin origins", () => {
+    expect(loadApiConfig(createEnvironment())).toEqual({
       port: 3000,
       auth: {
+        adminOrigin: "http://localhost:3001",
         baseUrl: "http://localhost:3000",
         secret: VALID_SECRET,
         secureCookies: false,
-        trustedOrigins: ["http://localhost:3000"],
+        trustedOrigins: ["http://localhost:3000", "http://localhost:3001"],
       },
     });
   });
 
   test("accepts an explicit API port", () => {
-    expect(
-      loadApiConfig({
-        API_PORT: "4100",
-        AUTH_BASE_URL: "https://behr.example",
-        AUTH_SECRET: VALID_SECRET,
-      }).port,
-    ).toBe(4100);
+    expect(loadApiConfig(createEnvironment({ API_PORT: "4100" })).port).toBe(
+      4100,
+    );
   });
 
   test("rejects an invalid API port", () => {
-    expect(() =>
-      loadApiConfig({
-        API_PORT: "invalid",
-        AUTH_BASE_URL: "http://localhost:3000",
-        AUTH_SECRET: VALID_SECRET,
-      }),
-    ).toThrow(new ApiConfigurationError("API_PORT must be a valid TCP port."));
+    expect(() => loadApiConfig(createEnvironment({ API_PORT: "invalid" }))).toThrow(
+      new ApiConfigurationError("API_PORT must be a valid TCP port."),
+    );
   });
 
   test("rejects a missing authentication secret", () => {
     expect(() =>
-      loadApiConfig({ AUTH_BASE_URL: "http://localhost:3000" }),
-    ).toThrow(new ApiConfigurationError("AUTH_SECRET is required."));
+      loadApiConfig(createEnvironment({ BETTER_AUTH_SECRET: undefined })),
+    ).toThrow(new ApiConfigurationError("BETTER_AUTH_SECRET is required."));
   });
 
   test("rejects a short authentication secret without exposing it", () => {
     const operation = () =>
-      loadApiConfig({
-        AUTH_BASE_URL: "http://localhost:3000",
-        AUTH_SECRET: SECRET_FRAGMENT,
-      });
+      loadApiConfig(createEnvironment({ BETTER_AUTH_SECRET: SECRET_FRAGMENT }));
 
     expect(operation).toThrow(
       new ApiConfigurationError(
-        "AUTH_SECRET must contain at least 32 characters.",
+        "BETTER_AUTH_SECRET must contain at least 32 characters.",
       ),
     );
     expect(captureErrorMessage(operation)).not.toContain(SECRET_FRAGMENT);
@@ -66,55 +52,70 @@ describe("loadApiConfig", () => {
 
   test("rejects an authentication secret padded with whitespace", () => {
     expect(() =>
-      loadApiConfig({
-        AUTH_BASE_URL: "http://localhost:3000",
-        AUTH_SECRET: ` ${VALID_SECRET} `,
-      }),
+      loadApiConfig(
+        createEnvironment({ BETTER_AUTH_SECRET: ` ${VALID_SECRET} ` }),
+      ),
     ).toThrow(
       new ApiConfigurationError(
-        "AUTH_SECRET must contain at least 32 characters.",
+        "BETTER_AUTH_SECRET must contain at least 32 characters.",
       ),
     );
   });
 
   test("rejects a malformed authentication base URL", () => {
     expect(() =>
-      loadApiConfig({ AUTH_BASE_URL: "not-a-url", AUTH_SECRET: VALID_SECRET }),
-    ).toThrow(new ApiConfigurationError("AUTH_BASE_URL must be a valid URL."));
+      loadApiConfig(createEnvironment({ BETTER_AUTH_URL: "not-a-url" })),
+    ).toThrow(new ApiConfigurationError("BETTER_AUTH_URL must be a valid URL."));
   });
 
-  test("rejects authentication base URLs containing credentials", () => {
+  test("rejects a malformed admin origin", () => {
     expect(() =>
-      loadApiConfig({
-        AUTH_BASE_URL: "https://user:password@behr.example",
-        AUTH_SECRET: VALID_SECRET,
-      }),
+      loadApiConfig(createEnvironment({ ADMIN_ORIGIN: "not-a-url" })),
+    ).toThrow(new ApiConfigurationError("ADMIN_ORIGIN must be a valid URL."));
+  });
+
+  test("rejects authentication URLs containing credentials", () => {
+    expect(() =>
+      loadApiConfig(
+        createEnvironment({
+          BETTER_AUTH_URL: "https://user:password@behr.example",
+        }),
+      ),
     ).toThrow(
-      new ApiConfigurationError("AUTH_BASE_URL must contain only an origin."),
+      new ApiConfigurationError("BETTER_AUTH_URL must contain only an origin."),
     );
   });
 
-  test("requires HTTPS in production", () => {
+  test("requires HTTPS origins in production", () => {
     expect(() =>
-      loadApiConfig({
-        AUTH_BASE_URL: "http://behr.example",
-        AUTH_SECRET: VALID_SECRET,
-        NODE_ENV: "production",
-      }),
+      loadApiConfig(createEnvironment({ NODE_ENV: "production" })),
     ).toThrow(
-      new ApiConfigurationError("AUTH_BASE_URL must use HTTPS in production."),
+      new ApiConfigurationError(
+        "Authentication origins must use HTTPS in production.",
+      ),
     );
   });
 
   test("enables secure cookies for HTTPS", () => {
     expect(
-      loadApiConfig({
-        AUTH_BASE_URL: "https://behr.example",
-        AUTH_SECRET: VALID_SECRET,
-      }).auth.secureCookies,
+      loadApiConfig(
+        createEnvironment({
+          ADMIN_ORIGIN: "https://admin.behr.example",
+          BETTER_AUTH_URL: "https://api.behr.example",
+        }),
+      ).auth.secureCookies,
     ).toBe(true);
   });
 });
+
+function createEnvironment(overrides: Environment = {}): Environment {
+  return {
+    ADMIN_ORIGIN: "http://localhost:3001",
+    BETTER_AUTH_SECRET: VALID_SECRET,
+    BETTER_AUTH_URL: "http://localhost:3000",
+    ...overrides,
+  };
+}
 
 function captureErrorMessage(operation: () => unknown): string {
   try {

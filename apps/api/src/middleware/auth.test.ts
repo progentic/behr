@@ -12,6 +12,11 @@ const AUTHENTICATED_USER: AuthenticatedUser = {
   email: "user@example.com",
   displayName: "Server User",
 };
+const AUTHENTICATED_SESSION = {
+  status: "authenticated" as const,
+  user: AUTHENTICATED_USER,
+  expiresAt: "2026-09-05T00:00:00.000Z",
+};
 const TRUSTED_ORIGIN = "https://behr.example";
 
 test("rejects a protected request without a server session", async () => {
@@ -24,18 +29,18 @@ test("rejects a protected request without a server session", async () => {
 
 test("uses server session identity instead of a client assertion", async () => {
   const app = createProtectedApplication(
-    createFakeAuthService(AUTHENTICATED_USER),
+    createFakeAuthService(AUTHENTICATED_SESSION),
   );
   const response = await app.request("/protected", {
     headers: { "x-user-id": "client-forged-id" },
   });
 
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ user: AUTHENTICATED_USER });
+  expect(await response.json()).toEqual({ session: AUTHENTICATED_SESSION });
 });
 
 test("rejects state changes from an untrusted origin", async () => {
-  const auth = createFakeAuthService(AUTHENTICATED_USER);
+  const auth = createFakeAuthService(AUTHENTICATED_SESSION);
   const app = new Hono<ApiBindings>();
   app.post("/mutation", createRequireTrustedOrigin(auth), (context) =>
     context.json({ accepted: true }),
@@ -55,13 +60,13 @@ function createProtectedApplication(auth: AuthService): Hono<ApiBindings> {
   const app = new Hono<ApiBindings>();
   app.use("/protected", createRequireAuthentication(auth));
   app.get("/protected", (context) =>
-    context.json({ user: context.get("authenticatedUser") }),
+    context.json({ session: context.get("authenticatedSession") }),
   );
   return app;
 }
 
 function createFakeAuthService(
-  resolvedUser: AuthenticatedUser | null,
+  resolvedSession: typeof AUTHENTICATED_SESSION | null,
 ): AuthService {
   return {
     login: async () => {
@@ -71,7 +76,7 @@ function createFakeAuthService(
       session: { status: "unauthenticated" },
       headers: new Headers(),
     }),
-    resolveSession: async () => resolvedUser,
+    resolveSession: async () => resolvedSession,
     registerIdentity: async () => AUTHENTICATED_USER,
     isTrustedOrigin: (origin) => origin === TRUSTED_ORIGIN,
   };
