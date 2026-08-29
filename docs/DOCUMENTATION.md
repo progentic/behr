@@ -223,3 +223,138 @@ Final results:
   `{"status":"ok"}`.
 - Catalog inspection: only the Drizzle migration table, sequence, and index
   exist; no application table or leaked BeHR connection remains.
+
+---
+
+## Phase C — Identity and Session Core
+
+### What this phase delivers
+
+Phase C adds a complete identity and server-session boundary without entering
+tenant or site scope. A BeHR user can be registered internally, authenticate
+with email and password, receive a bounded opaque session cookie, resolve the
+current identity through Hono middleware, and invalidate the session on logout.
+The React admin application resolves the same server session on load, displays
+the login surface when unauthenticated, and renders only a minimal authenticated
+shell after login.
+
+The public API surface is intentionally limited to:
+
+```text
+POST /api/auth/login
+GET  /api/auth/session
+POST /api/auth/logout
+```
+
+Better Auth's larger provider handler is not mounted. Provider sign-up is used
+only as an internal identity bootstrap in integration testing; no registration,
+password reset, OAuth, MFA, SSO, tenant, site, or content UI is exposed.
+
+### Authentication integration decision
+
+BeHR pins `better-auth` 1.7.2 and `@better-auth/drizzle-adapter` 1.7.2. The
+published adapter accepts an existing Drizzle database, declares compatibility
+with Drizzle ORM 0.45.2, and explicitly supports Bun SQL's result shape. The
+adapter receives the Drizzle instance constructed by BeHR's existing database
+boundary, so no `pg`, `postgres.js`, Kysely PostgreSQL dialect, or second Bun SQL
+client was added.
+
+Application request contracts use `zod` 4.5.2. Login parsing is strict, so a
+client-supplied user ID or unknown field is rejected before the provider is
+called. Provider session tokens never appear in BeHR JSON responses.
+
+### Identity schema and migration
+
+Migration `0000_identity_session_core.sql` creates only the four Better Auth
+models reconciled with BeHR's identity needs:
+
+* `user` owns stable IDs, normalized email, display name, verification state,
+  optional image, and creation/update timestamps.
+* `account` owns password hashes and provider account material, avoiding a
+  duplicate credential authority on `user`.
+* `session` owns unique opaque tokens, bounded expiry, request metadata, and the
+  user foreign key.
+* `verification` owns provider verification records.
+
+Drizzle Kit generated the SQL, journal entry, and snapshot. A fresh migration
+and a repeat migration both succeed, and catalog inspection rejects any table
+outside these four models and Drizzle migration metadata.
+
+### Session and cookie security
+
+`AUTH_SECRET` is mandatory, never defaulted, must contain at least 32
+non-padded characters, and is not included in errors. `AUTH_BASE_URL` must be an
+HTTP(S) origin without credentials, path, query, or fragment; production
+configuration requires HTTPS.
+
+Sessions use:
+
+* HttpOnly cookies
+* SameSite Lax
+* Secure cookies in production or whenever the public origin is HTTPS
+* host-only scope with no cross-subdomain sharing
+* a seven-day absolute expiration with refresh disabled
+* no cookie session cache, forcing server-state resolution on every request
+* explicit database deletion and cookie expiry on logout
+
+State-changing authentication routes require the exact configured origin and
+JSON requests. Better Auth's CSRF/origin checks remain enabled, its in-process
+rate limiter is enabled for the single Bun runtime, telemetry is disabled, and
+only error-level provider logs are emitted.
+
+### Admin security boundary
+
+The admin app sends credentials only to fixed same-origin paths with
+`credentials: include`. It stores no token or session identifier in Web
+Storage. React renders identity data through normal escaped JSX. The static
+entry document applies a restrictive same-origin meta CSP; clickjacking headers
+remain assigned to the nginx response boundary in Phase Q because
+`frame-ancestors` cannot be enforced through a meta CSP.
+
+### Deferred work
+
+Tenant identity, memberships, active tenant selection, roles, RBAC, sites,
+domains, content, customer portal behavior, account registration UX, password
+reset UX, email-verification UX, OAuth, MFA, passkeys, and SSO remain deferred.
+Phase C does not create any table, route, contract, or navigation for them.
+
+### Verification performed
+
+The final Phase C verification used Bun 1.4.0, TypeScript 7.0.2, and a fresh
+PostgreSQL 18 database from the immutable CI image digest.
+
+```text
+bun --version
+bun install --frozen-lockfile
+bun run typecheck
+bun run test
+bun run db:check
+bun run db:migration:check
+bun run db:migrate
+bun run db:migrate
+bun run test:integration
+bun run build
+bun audit
+```
+
+Final results:
+
+- Frozen install: no lockfile changes; 64 installs checked across 106 packages.
+- Type-check: all eight workspaces passed.
+- Unit tests: 27 tests with 39 assertions passed.
+- Integration tests: two PostgreSQL tests with 36 assertions passed.
+- Connectivity and migration-history checks passed.
+- Fresh and repeat migration runs passed.
+- Valid and invalid login, authoritative session resolution, missing/invalid/
+  expired session rejection, forged identity rejection, logout invalidation,
+  and connection cleanup passed through Better Auth and PostgreSQL.
+- All eight workspaces built, including the authenticated admin application.
+- Dependency audit: no vulnerabilities across 96 packages.
+- Bundled API runtime: `GET /health` returned HTTP 200 with exactly
+  `{"status":"ok"}`; unauthenticated `GET /api/auth/session` returned HTTP 401.
+- Browser acceptance: the compiled admin displayed the login surface,
+  transitioned to the authenticated shell using a provider-created HttpOnly
+  session, preserved the session after reload, and emitted no console warning
+  or error.
+- Catalog inspection found only Drizzle migration metadata and the four Phase C
+  identity/authentication tables. No BeHR database connection remained open.

@@ -7,10 +7,14 @@
     "dev": "bun run --watch src/index.ts",
     "build": "bun build ./src/index.ts --outdir dist --target bun",
     "start": "bun run dist/index.js",
-    "test": "bun test",
+    "test": "bun test src/index.test.ts src/env.test.ts src/middleware/auth.test.ts src/routes/auth.test.ts",
+    "test:integration": "bun test src/auth.integration.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bher/contracts": "workspace:0.1.0",
+    "@bher/db": "workspace:0.1.0",
+    "better-auth": "1.7.2",
     "hono": "4.13.5"
   },
   "devDependencies": {

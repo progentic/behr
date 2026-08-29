@@ -216,34 +216,51 @@ Establish secure user authentication.
 
 Must:
 
-* Implement users table
-* Implement login/logout
-* Implement session resolution middleware
-* Implement authenticated admin shell
+* Implement the Better Auth identity, account, session, and verification tables
+* Integrate Better Auth through the existing Bun SQL-backed Drizzle client
+* Implement login, logout, and authoritative session resolution
+* Validate authentication secrets and the public authentication origin
+* Enforce trusted origins on state-changing authentication requests
+* Implement typed authentication middleware
+* Implement the minimal login and authenticated admin shell
 
 Must not:
 
 * Implement tenants
+* Implement memberships
 * Implement sites
 * Implement RBAC roles
 * Implement content
+* Expose provider sign-up, password-reset, OAuth, MFA, or SSO user interfaces
 
 ## Files / Functions
 
 packages/db
 
 schema/users.ts
+schema/auth.ts
+auth-persistence.ts
+
+packages/contracts
+
+auth.ts
 
 apps/api
 
+env.ts
 lib/auth.ts
+lib/session.ts
 middleware/auth.ts
 routes/auth.ts
+routes/index.ts
 
 apps/admin
 
+App.tsx
 LoginPage.tsx
+DashboardPage.tsx
 AuthGuard.tsx
+Layout.tsx
 
 ## Acceptance Criteria
 
@@ -252,6 +269,15 @@ User can authenticate.
 Session resolves server-side.
 
 Unauthorized access is denied.
+
+Logout invalidates the server session.
+
+Expired and invalid sessions are rejected.
+
+The admin app resolves session state, displays login when unauthenticated, and
+displays only a minimal authenticated shell after login.
+
+Only identity/authentication tables exist; no Phase D or later table exists.
 
 ## Output Format
 

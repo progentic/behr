@@ -22,7 +22,7 @@
     "dev:admin": "bun run --cwd apps/admin dev",
     "dev:web": "bun run --cwd apps/web dev",
     "test": "bun run --cwd apps/api test && bun run --cwd packages/db test:unit",
-    "test:integration": "bun run --cwd packages/db test:integration",
+    "test:integration": "bun run --cwd packages/db test:integration && bun run --cwd apps/api test:integration",
     "typecheck": "bun run --filter '*' typecheck"
   },
   "devDependencies": {

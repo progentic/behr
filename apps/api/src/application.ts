@@ -1,0 +1,68 @@
+import {
+  type DatabaseClient,
+  type Environment,
+  createAuthPersistence,
+  createDatabaseClient,
+  loadDatabaseConfig,
+} from "@bher/db";
+import { Hono } from "hono";
+
+import { type ApiConfig, loadApiConfig } from "./env";
+import { type AuthService, createAuthService } from "./lib/auth";
+import { createJsonResponse } from "./lib/http";
+import { createApiRoutes } from "./routes";
+import type { ApiBindings } from "./types";
+
+const HEALTH_ROUTE = "/health";
+const API_ROUTE = "/api";
+const INTERNAL_ERROR_STATUS = 500;
+
+export type ApiApplication = Readonly<{
+  app: Hono<ApiBindings>;
+  auth: AuthService;
+  close: () => Promise<void>;
+  server: Readonly<{
+    port: number;
+    fetch: Hono<ApiBindings>["fetch"];
+  }>;
+}>;
+
+export function createApiApplication(environment: Environment): ApiApplication {
+  const apiConfig = loadApiConfig(environment);
+  const databaseConfig = loadDatabaseConfig(environment);
+  const database = createDatabaseClient(databaseConfig);
+  const persistence = createAuthPersistence(database);
+  const auth = createAuthService(apiConfig.auth, persistence);
+  return composeApiApplication(apiConfig, database, auth);
+}
+
+function composeApiApplication(
+  config: ApiConfig,
+  database: DatabaseClient,
+  auth: AuthService,
+): ApiApplication {
+  const app = createHttpApplication(auth);
+  return Object.freeze({
+    app,
+    auth,
+    close: () => closeApplication(database),
+    server: Object.freeze({ port: config.port, fetch: app.fetch }),
+  });
+}
+
+function createHttpApplication(auth: AuthService): Hono<ApiBindings> {
+  const app = new Hono<ApiBindings>();
+  app.get(HEALTH_ROUTE, (context) => context.json({ status: "ok" }));
+  app.route(API_ROUTE, createApiRoutes(auth));
+  app.onError(() =>
+    createJsonResponse(
+      { error: "Internal server error." },
+      INTERNAL_ERROR_STATUS,
+    ),
+  );
+  return app;
+}
+
+async function closeApplication(database: DatabaseClient): Promise<void> {
+  await database.close();
+}

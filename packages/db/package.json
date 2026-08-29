@@ -14,7 +14,7 @@
     "db:migrate": "bun run src/migrate.ts",
     "db:migration:check": "drizzle-kit check --config=drizzle.config.ts",
     "test:integration": "bun test src/integration.test.ts",
-    "test:unit": "bun test src/env.test.ts",
+    "test:unit": "bun test src/env.test.ts src/schema/auth.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -23,6 +23,7 @@
     "typescript": "7.0.2"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.2",
     "drizzle-orm": "0.45.2"
   }
 }

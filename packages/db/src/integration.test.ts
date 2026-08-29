@@ -20,6 +20,24 @@ const MIGRATION_APPLICATION_NAME = "behr_integration_migration";
 const DRIZZLE_SCHEMA_NAME = "drizzle";
 const DRIZZLE_OBJECT_PREFIX = "__drizzle_migrations";
 const TABLE_OBJECT_KINDS = new Set(["r", "p"]);
+const PHASE_C_TABLE_NAMES = ["account", "session", "user", "verification"];
+const PHASE_C_CATALOG_OBJECTS = new Set([
+  "account",
+  "account_issuer_account_id_uidx",
+  "account_pkey",
+  "account_user_id_idx",
+  "session",
+  "session_pkey",
+  "session_token_unique",
+  "session_user_id_idx",
+  "user",
+  "user_email_unique",
+  "user_pkey",
+  "verification",
+  "verification_identifier_idx",
+  "verification_pkey",
+]);
+const PUBLIC_SCHEMA_NAME = "public";
 const SUCCESS_EXIT_CODE = 0;
 const NO_CONNECTIONS = 0;
 const NO_CATALOG_OBJECTS = 0;
@@ -45,7 +63,7 @@ type CatalogObject = {
   objectKind: string;
 };
 
-test("verifies the PostgreSQL persistence bootstrap", verifyPersistenceBootstrap);
+test("verifies the PostgreSQL identity persistence boundary", verifyPersistenceBootstrap);
 
 async function verifyPersistenceBootstrap(): Promise<void> {
   const context = await createIntegrationContext(process.env);
@@ -130,8 +148,8 @@ async function verifyMigrationIdempotency(
 async function verifyDatabaseCatalog(context: IntegrationContext): Promise<void> {
   const objects = await listCatalogObjects(context.observer);
   expect(objects.length).toBeGreaterThan(NO_CATALOG_OBJECTS);
-  expect(allObjectsAreDrizzleMigrationMetadata(objects)).toBe(true);
-  expect(findApplicationTables(objects)).toEqual([]);
+  expect(objects.every(isAllowedPhaseCCatalogObject)).toBe(true);
+  expect(findApplicationTableNames(objects)).toEqual(PHASE_C_TABLE_NAMES);
 }
 
 async function verifyConnectionCleanup(
@@ -240,14 +258,8 @@ function readCount(rows: CountRow[]): number {
   return rows[0]?.count ?? NO_CONNECTIONS;
 }
 
-function allObjectsAreDrizzleMigrationMetadata(
-  objects: CatalogObject[],
-): boolean {
-  return objects.every(isDrizzleMigrationObject);
-}
-
-function findApplicationTables(objects: CatalogObject[]): CatalogObject[] {
-  return objects.filter(isApplicationTable);
+function findApplicationTableNames(objects: CatalogObject[]): string[] {
+  return objects.filter(isApplicationTable).map(readObjectName).sort();
 }
 
 function isDrizzleMigrationObject(object: CatalogObject): boolean {
@@ -259,7 +271,20 @@ function isDrizzleMigrationObject(object: CatalogObject): boolean {
 
 function isApplicationTable(object: CatalogObject): boolean {
   return (
+    object.schemaName === PUBLIC_SCHEMA_NAME &&
     TABLE_OBJECT_KINDS.has(object.objectKind) &&
     !isDrizzleMigrationObject(object)
   );
+}
+
+function isAllowedPhaseCCatalogObject(object: CatalogObject): boolean {
+  return (
+    isDrizzleMigrationObject(object) ||
+    (object.schemaName === PUBLIC_SCHEMA_NAME &&
+      PHASE_C_CATALOG_OBJECTS.has(object.objectName))
+  );
+}
+
+function readObjectName(object: CatalogObject): string {
+  return object.objectName;
 }

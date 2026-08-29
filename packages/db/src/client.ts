@@ -5,8 +5,9 @@ import {
 } from "drizzle-orm/bun-sql";
 
 import type { DatabaseConfig } from "./env";
+import { databaseSchema } from "./schema";
 
-export type DrizzleDatabase = BunSQLDatabase<Record<string, never>> & {
+export type DrizzleDatabase = BunSQLDatabase<typeof databaseSchema> & {
   $client: SQL;
 };
 
@@ -28,7 +29,7 @@ function createNativeClient(databaseUrl: string): SQL {
 }
 
 function createDrizzleClient(nativeClient: SQL): DrizzleDatabase {
-  return createDrizzleDatabase({ client: nativeClient });
+  return createDrizzleDatabase({ client: nativeClient, schema: databaseSchema });
 }
 
 function createClientFacade(

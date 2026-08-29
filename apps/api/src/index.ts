@@ -1,20 +1,20 @@
-import { Hono } from "hono";
+import { createApiApplication } from "./application";
 
-const app = new Hono();
-
-app.get("/health", (context) => {
-  return context.json({ status: "ok" });
-});
-
-const port = Number(process.env.API_PORT ?? 3000);
+const application = createApiApplication(process.env);
+const SUCCESS_EXIT_CODE = 0;
 
 if (import.meta.main) {
-  console.log(`API listening on port ${port}`);
+  console.log(`API listening on port ${application.server.port}`);
+  process.once("SIGINT", () => void shutDownApplication());
+  process.once("SIGTERM", () => void shutDownApplication());
 }
 
-export default {
-  port,
-  fetch: app.fetch,
-};
+export default application.server;
 
-export { app };
+export const app = application.app;
+export const closeApplication = application.close;
+
+async function shutDownApplication(): Promise<void> {
+  await application.close();
+  process.exit(SUCCESS_EXIT_CODE);
+}

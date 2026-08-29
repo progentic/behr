@@ -27,6 +27,7 @@ jobs:
           --health-retries 10
     env:
       API_PORT: 3000
+      AUTH_BASE_URL: http://localhost:3000
       DATABASE_URL: postgresql://behr_ci:ci-only-password@127.0.0.1:5432/behr_ci
     steps:
       - name: Check out repository
@@ -35,6 +36,8 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.4.0
+      - name: Generate ephemeral authentication secret
+        run: echo "AUTH_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Type-check workspaces

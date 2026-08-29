@@ -3,7 +3,7 @@
 Version: 1.1
 Deployment Model: Single VPS
 Architecture Style: Monolithic application with strict internal boundaries
-Primary Stack: Bun, Hono, PostgreSQL, React, nginx
+Primary Stack: Bun, Hono, Better Auth, Drizzle, PostgreSQL, React, nginx
 
 ---
 
@@ -127,6 +127,12 @@ The API backend is stateful only through the database and filesystem.
 
 The API does not render UI components.
 
+Phase C implements the authentication responsibility through Hono, Better
+Auth, and the existing Bun SQL-backed Drizzle client. The API exposes only
+login, logout, and authoritative current-session routes. Tenant resolution,
+role checks, content behavior, publishing, assets, preview, and domain routing
+remain deferred to their declared phases.
+
 ---
 
 ## 4.3 Admin Application — React
@@ -147,6 +153,10 @@ Constraints:
 * No direct database access
 * No business logic authority
 * All mutations occur through the API
+
+Phase C implements only the login page, current-session resolution, logout,
+and a minimal authenticated shell. Site, page, asset, theme, preview, and
+publishing interfaces remain unimplemented.
 
 ---
 
@@ -188,6 +198,17 @@ Content documents are stored as JSONB.
 
 Identity and workflow relationships remain relational.
 
+Phase C adds four provider-compatible identity tables owned by the BeHR schema:
+
+* `user` — stable identity, email, display name, and timestamps
+* `account` — credential/provider material, including password hashes
+* `session` — opaque server-side sessions with bounded expiration
+* `verification` — provider verification records
+
+The database remains the sole session authority. Browser cookies contain only
+the opaque session identifier; they do not authorize a user without a valid
+database session.
+
 ---
 
 ## 4.6 Local File Storage
@@ -224,10 +245,19 @@ sequenceDiagram
     Browser->>Nginx: POST /api/auth/login
     Nginx->>API: Forward request
 
-    API->>DB: Validate credentials
-    DB-->>API: User record
+    API->>DB: Verify provider account credentials
+    DB-->>API: User identity
+    API->>DB: Create bounded session
+    API-->>Browser: HttpOnly session cookie
 
-    API-->>Browser: Session cookie
+    Browser->>API: GET /api/auth/session + cookie
+    API->>DB: Resolve authoritative session and user
+    DB-->>API: Current identity
+    API-->>Browser: Authenticated user DTO
+
+    Browser->>API: POST /api/auth/logout + cookie
+    API->>DB: Invalidate session
+    API-->>Browser: Expired session cookie
 ```
 
 ---
@@ -282,10 +312,18 @@ Binary storage boundary
 Security rules:
 
 * All authentication is server-authoritative
-* Tenant context is resolved server-side
-* Role checks occur in API middleware
+* Session identifiers are stored only in HttpOnly cookies
+* Authentication state changes require an explicitly trusted origin
+* Session cookies use SameSite Lax and become Secure in production
+* Sessions have a bounded seven-day lifetime and no client-side session cache
+* Tenant context and role checks remain deferred to Phase D
 * Draft content cannot be publicly exposed
 * Preview access requires token validation
+
+The Phase C admin entry document includes a restrictive meta-delivered CSP for
+same-origin scripts, connections, and form actions. Clickjacking protection
+must be delivered as an HTTP header by the reverse proxy in Phase Q because
+`frame-ancestors` is not enforced from a meta CSP.
 
 ---
 
