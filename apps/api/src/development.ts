@@ -1,7 +1,7 @@
 import adminDocument from "../../admin/index.html";
 import type { Environment } from "@bher/db";
 
-import { type ApiApplication, createApiApplication } from "./application";
+import { createApiApplication } from "./application";
 
 const DEVELOPMENT_HOSTNAME = "localhost";
 const ADMIN_ROUTE = "/";
@@ -16,7 +16,14 @@ export type DevelopmentServer = Readonly<{
 async function runDevelopmentServer(): Promise<void> {
   const server = await startDevelopmentServer(process.env);
   console.log(`BeHR development server ready at ${server.origin}/`);
-  registerShutdownSignals(server);
+  process.once("SIGINT", async () => {
+    await server.close();
+    process.exit(SUCCESS_EXIT_CODE);
+  });
+  process.once("SIGTERM", async () => {
+    await server.close();
+    process.exit(SUCCESS_EXIT_CODE);
+  });
 }
 
 export async function startDevelopmentServer(
@@ -24,48 +31,27 @@ export async function startDevelopmentServer(
 ): Promise<DevelopmentServer> {
   const application = createApiApplication(environment);
   try {
-    const listener = startDevelopmentListener(application);
+    const listener = Bun.serve({
+      development: true,
+      hostname: DEVELOPMENT_HOSTNAME,
+      port: application.server.port,
+      routes: { [ADMIN_ROUTE]: adminDocument },
+      fetch: (request) => application.app.fetch(request),
+    });
     return Object.freeze({
-      close: () => closeDevelopmentServer(listener, application),
+      close: async () => {
+        try {
+          await listener.stop(true);
+        } finally {
+          await application.close();
+        }
+      },
       origin: listener.url.origin,
       port: application.server.port,
     });
   } catch (error) {
     await application.close();
     throw error;
-  }
-}
-
-function registerShutdownSignals(server: DevelopmentServer): void {
-  process.once("SIGINT", () => void shutDownProcess(server));
-  process.once("SIGTERM", () => void shutDownProcess(server));
-}
-
-async function shutDownProcess(server: DevelopmentServer): Promise<void> {
-  await server.close();
-  process.exit(SUCCESS_EXIT_CODE);
-}
-
-function startDevelopmentListener(
-  application: ApiApplication,
-): Bun.Server<undefined> {
-  return Bun.serve({
-    development: true,
-    hostname: DEVELOPMENT_HOSTNAME,
-    port: application.server.port,
-    routes: { [ADMIN_ROUTE]: adminDocument },
-    fetch: (request) => application.app.fetch(request),
-  });
-}
-
-async function closeDevelopmentServer(
-  listener: Bun.Server<undefined>,
-  application: ApiApplication,
-): Promise<void> {
-  try {
-    await listener.stop(true);
-  } finally {
-    await application.close();
   }
 }
 
