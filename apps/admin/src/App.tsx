@@ -2,6 +2,7 @@ import type { AuthenticatedSession, SessionResponse } from "@bher/contracts";
 
 import { AuthGuard } from "./AuthGuard";
 import { LoginPage } from "./LoginPage";
+import { SitesPage } from "./SitesPage";
 import {
   type AuthenticationState,
   useAuthentication,
@@ -72,8 +73,7 @@ function AuthenticatedShell({
       </header>
       {error ? <p role="alert">{error}</p> : null}
       <main>
-        <h1>Welcome, {user.displayName}</h1>
-        <p>Authenticated until {new Date(session.expiresAt).toLocaleString()}.</p>
+        <SitesPage />
       </main>
     </>
   );

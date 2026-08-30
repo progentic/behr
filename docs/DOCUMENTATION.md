@@ -499,3 +499,93 @@ Final local results:
   `memberships`; tenant test records and application connections were zero
   after cleanup.
 * Dependency audit reported no vulnerabilities across 96 packages.
+
+---
+
+## Phase E — Site Core
+
+### What this phase delivers
+
+Authenticated tenant members can list sites, and tenant owners can create a
+site with one globally unique normalized hostname. The exact route surface is:
+
+```text
+POST /tenants/:tenantId/sites
+GET  /tenants/:tenantId/sites
+```
+
+Both routes reuse authoritative authentication and tenant-membership
+resolution. Owners may create and list; members may list but receive HTTP 403
+for creation. Invalid or inaccessible tenants retain the Phase D HTTP 404
+boundary.
+
+### Site and hostname persistence
+
+Migration `0002_site_domain_core.sql` adds only:
+
+* `sites`, containing a generated UUID, tenant foreign key, name, and
+  timestamps.
+* `domains`, containing a normalized hostname primary key, unique site foreign
+  key, and creation timestamp.
+
+`sites.tenant_id` is the sole tenant ownership link. Domain rows do not repeat
+tenant identity. The hostname primary key prevents reuse across all tenants,
+while the unique site foreign key limits each Phase E site to one hostname.
+Creation inserts both rows in one Drizzle transaction. A conflict-aware domain
+insert converts duplicate hostnames into HTTP 409 and rolls back the site row.
+
+### Admin workflow
+
+The authenticated admin loads memberships from `GET /tenants`, keeps the
+selected tenant only in React component state, and loads that tenant's site
+list. Users with multiple memberships receive a basic tenant selector. Owners
+receive the site creation form; members receive only the list. Users without
+memberships receive an honest empty state rather than tenant-creation UI.
+
+The workflow uses the existing same-origin credentialed HTTP boundary and
+parses successful responses with shared Zod contracts. It adds no router,
+state library, form library, persistent tenant selection, or new dependency.
+
+### Deferred work
+
+Stored hostnames are not publicly resolved or served. Public `Host`-header
+resolution remains Phase H work. Multiple domains, domain editing, deletion,
+verification, redirects, DNS or TLS automation, site mutation, pages, content,
+preview, publishing, and rendering remain unimplemented.
+
+### Verification performed
+
+Phase E verification uses Bun 1.4.0, TypeScript 7.0.2, and a fresh PostgreSQL
+18 database from the immutable CI image digest.
+
+```text
+bun --version
+bun install --frozen-lockfile
+bun run typecheck
+bun run test
+bun run db:check
+bun run db:migration:check
+bun run db:migrate
+bun run db:migrate
+bun run test:integration
+bun run test:auth:integration
+bun run test:tenant:integration
+bun run test:site:integration
+bun run build
+bun audit
+```
+
+Final local results:
+
+* Frozen install checked 64 installs across 106 packages with no changes.
+* All eight workspaces type-checked and built.
+* Unit tests passed: 38 tests with 83 assertions.
+* Persistence integration passed with 13 assertions.
+* Authentication integration passed with 51 assertions.
+* Tenant isolation integration passed with 22 assertions.
+* Site isolation integration passed with 29 assertions.
+* Fresh and repeat migration runs passed.
+* Owner browser acceptance passed from empty state through site creation,
+  normalized list display, and logout on the one-origin development server.
+* Test cleanup left zero site rows, domain rows, and application connections.
+* Dependency audit reported no vulnerabilities across 96 packages.

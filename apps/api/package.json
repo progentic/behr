@@ -9,9 +9,10 @@
     "build": "bun build ./src/index.ts --outdir dist --target bun",
     "auth:bootstrap": "bun run src/bootstrap.ts",
     "start": "bun run dist/index.js",
-    "test": "bun test src/index.test.ts src/development.test.ts src/env.test.ts src/bootstrap.test.ts src/tenant-contract.test.ts src/middleware/auth.test.ts src/routes/auth.test.ts src/routes/index.test.ts",
+    "test": "bun test src/index.test.ts src/development.test.ts src/env.test.ts src/bootstrap.test.ts src/tenant-contract.test.ts src/site-contract.test.ts src/middleware/auth.test.ts src/routes/auth.test.ts src/routes/index.test.ts",
     "test:auth:integration": "bun test src/auth.integration.test.ts",
     "test:tenant:integration": "bun test src/tenant.integration.test.ts",
+    "test:site:integration": "bun test src/site.integration.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

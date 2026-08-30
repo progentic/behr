@@ -46,15 +46,16 @@ flowchart LR
 
     Browser -->|HTTP localhost:3000| Dev[Bun development listener]
     Dev -->|GET / and assets| AdminApp[React admin]
-    Dev -->|/health, /auth/*, /tenants, /tenants/*| API[Hono API]
+    Dev -->|/health, /auth/*, /tenants/*| API[Hono API]
     API --> Postgres[(PostgreSQL)]
 ```
 
 The Phase Q production target keeps the same public route paths: nginx will
 serve static application assets and forward `/health`, `/auth/*`, `/tenants`,
-and `/tenants/*` to the Bun API. It must not invent an `/api` prefix unless the
-application routes are changed in a separately reviewed phase. Reverse-proxy
-configuration, SSR, and tenant-aware public rendering remain unimplemented.
+and `/tenants/*`—including nested site routes—to the Bun API. It must not
+invent an `/api` prefix unless the application routes are changed in a
+separately reviewed phase. Reverse-proxy configuration, SSR, and tenant-aware
+public rendering remain unimplemented.
 
 ---
 
@@ -79,6 +80,8 @@ flowchart TD
     Request --> CreateTenant[POST /tenants]
     Request --> ListTenants[GET /tenants]
     Request --> TenantAccess[GET /tenants/:tenantId]
+    Request --> CreateSite[POST /tenants/:tenantId/sites]
+    Request --> ListSites[GET /tenants/:tenantId/sites]
 ```
 
 Interpretation:
@@ -147,9 +150,11 @@ serves the imported admin document before delegating API requests to Hono.
 
 Phase C implements authentication through Hono, Better Auth, and the existing
 Bun SQL-backed Drizzle client. Phase D adds tenant creation, membership-based
-listing, and path-based tenant access resolution. Every tenant decision uses
-the user resolved from the authoritative database session. Content behavior,
-publishing, assets, preview, sites, and domain routing remain deferred.
+listing, and path-based tenant access resolution. Phase E adds owner-authorized
+site creation and membership-authorized site listing beneath that same tenant
+boundary. Every decision uses the user resolved from the authoritative database
+session. Content behavior, publishing, assets, preview, and public hostname
+resolution remain deferred.
 
 The currently implemented public API routes are exactly:
 
@@ -160,6 +165,8 @@ The currently implemented public API routes are exactly:
 * `POST /tenants`
 * `GET /tenants`
 * `GET /tenants/:tenantId`
+* `POST /tenants/:tenantId/sites`
+* `GET /tenants/:tenantId/sites`
 
 ---
 
@@ -183,8 +190,10 @@ Constraints:
 * All mutations occur through the API
 
 Phase C implements only the login page, four explicit authentication states,
-current-session resolution, logout, and a minimal authenticated shell. Site,
-page, asset, theme, preview, and publishing interfaces remain unimplemented.
+current-session resolution, and logout. Phase E adds a minimal authenticated
+site workflow: component-local tenant selection, site loading, and owner-only
+site creation. Page, asset, theme, domain-administration, preview, and
+publishing interfaces remain unimplemented.
 
 ---
 
@@ -243,6 +252,18 @@ Tenant creation and its creator's `owner` membership commit in one database
 transaction. Both membership foreign keys cascade on deletion, and the
 composite primary key prevents duplicate membership for one user and tenant.
 
+Phase E adds:
+
+* `sites` — UUID identity, tenant foreign key, name, and timestamps
+* `domains` — normalized hostname primary key, unique site foreign key, and
+  creation timestamp
+
+Tenant ownership is stored only on `sites.tenant_id`; domains do not duplicate
+tenant identity. The hostname primary key makes mappings globally unique, and
+the unique site foreign key limits each Phase E site to one hostname. Site and
+domain insertion occurs in one transaction, and tenant deletion cascades
+through sites to domain mappings.
+
 The database remains the sole session authority. Browser cookies contain only
 the opaque session identifier; they do not authorize a user without a valid
 database session.
@@ -251,6 +272,10 @@ Tenant routes use a path parameter, never a client-selected active-tenant
 cookie or header. The API resolves membership with both the path tenant ID and
 the authenticated session user ID. Invalid, nonexistent, and inaccessible
 tenant IDs all return HTTP 404 without disclosing tenant existence.
+
+Site routes reuse this tenant context. Owners may create and list sites;
+members may list sites but receive HTTP 403 for creation. Stored hostnames are
+not resolved from public `Host` headers and are not publicly served in Phase E.
 
 ---
 
@@ -369,6 +394,9 @@ Security rules:
 * The initial identity is created only through the one-time bootstrap command
 * Tenant access requires an authoritative `owner` or `member` membership
 * Tenant IDs from custom headers or cookies are not authorization inputs
+* Site creation requires an `owner` membership and a trusted origin
+* Site listing permits both `owner` and `member` memberships
+* Hostname uniqueness is enforced atomically by PostgreSQL
 * Draft content cannot be publicly exposed
 * Preview access requires token validation
 

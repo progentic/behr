@@ -15,6 +15,12 @@ test("allows credentialed auth requests only for the configured admin origin", a
       listTenantAccess: async () => [],
       resolveTenantAccess: async () => null,
     },
+    {
+      createSite: async () => {
+        throw new Error("Site creation is not used by this CORS test.");
+      },
+      listSites: async () => [],
+    },
     ADMIN_ORIGIN,
   );
   const response = await routes.request("/auth/login", {

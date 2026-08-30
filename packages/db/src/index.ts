@@ -10,6 +10,11 @@ export { createAuthPersistence, identityExists } from "./auth-persistence";
 export { checkDatabaseConnection } from "./check";
 export { migrateDatabase } from "./migrate";
 export {
+  type SitePersistence,
+  SiteHostnameConflictError,
+  createSitePersistence,
+} from "./site-persistence";
+export {
   type TenantPersistence,
   createTenantPersistence,
 } from "./tenant-persistence";
@@ -23,8 +28,10 @@ export {
   account,
   authSchema,
   databaseSchema,
+  domains,
   memberships,
   session,
+  sites,
   tenantRole,
   tenants,
   user,

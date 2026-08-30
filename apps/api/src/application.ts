@@ -2,9 +2,11 @@ import {
   type Environment,
   createAuthPersistence,
   createDatabaseClient,
+  createSitePersistence,
   createTenantPersistence,
   loadDatabaseConfig,
   type TenantPersistence,
+  type SitePersistence,
 } from "@bher/db";
 import { Hono } from "hono";
 
@@ -35,9 +37,11 @@ export function createApiApplication(environment: Environment): ApiApplication {
   const authPersistence = createAuthPersistence(database);
   const auth = createAuthService(apiConfig.auth, authPersistence);
   const tenantPersistence = createTenantPersistence(database);
+  const sitePersistence = createSitePersistence(database);
   const app = createHttpApplication(
     auth,
     tenantPersistence,
+    sitePersistence,
     apiConfig.auth.adminOrigin,
   );
   return Object.freeze({
@@ -51,13 +55,14 @@ export function createApiApplication(environment: Environment): ApiApplication {
 function createHttpApplication(
   auth: AuthService,
   tenantPersistence: TenantPersistence,
+  sitePersistence: SitePersistence,
   adminOrigin: string,
 ): Hono<ApiBindings> {
   const app = new Hono<ApiBindings>();
   app.get(HEALTH_ROUTE, (context) => context.json({ status: "ok" }));
   app.route(
     ROUTE_ROOT,
-    createApiRoutes(auth, tenantPersistence, adminOrigin),
+    createApiRoutes(auth, tenantPersistence, sitePersistence, adminOrigin),
   );
   app.onError(() =>
     createJsonResponse(

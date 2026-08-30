@@ -19,19 +19,24 @@ const MIGRATION_APPLICATION_NAME = "behr_integration_migration";
 const DRIZZLE_SCHEMA_NAME = "drizzle";
 const DRIZZLE_OBJECT_PREFIX = "__drizzle_migrations";
 const TABLE_OBJECT_KINDS = new Set(["r", "p"]);
-const PHASE_D_TABLE_NAMES = [
+const PHASE_E_TABLE_NAMES = [
   "account",
+  "domains",
   "memberships",
   "session",
+  "sites",
   "tenants",
   "user",
   "verification",
 ];
-const PHASE_D_CATALOG_OBJECTS = new Set([
+const PHASE_E_CATALOG_OBJECTS = new Set([
   "account",
   "account_issuer_account_id_uidx",
   "account_pkey",
   "account_user_id_idx",
+  "domains",
+  "domains_pkey",
+  "domains_site_id_unique",
   "memberships",
   "memberships_tenant_id_user_id_pk",
   "memberships_user_id_idx",
@@ -39,6 +44,9 @@ const PHASE_D_CATALOG_OBJECTS = new Set([
   "session_pkey",
   "session_token_unique",
   "session_user_id_idx",
+  "sites",
+  "sites_pkey",
+  "sites_tenant_id_idx",
   "tenants",
   "tenants_pkey",
   "user",
@@ -156,8 +164,8 @@ async function verifyMigrationIdempotency(
 async function verifyDatabaseCatalog(context: IntegrationContext): Promise<void> {
   const objects = await listCatalogObjects(context.observer);
   expect(objects.length).toBeGreaterThan(NO_CATALOG_OBJECTS);
-  expect(objects.every(isAllowedPhaseDCatalogObject)).toBe(true);
-  expect(findApplicationTableNames(objects)).toEqual(PHASE_D_TABLE_NAMES);
+  expect(objects.every(isAllowedPhaseECatalogObject)).toBe(true);
+  expect(findApplicationTableNames(objects)).toEqual(PHASE_E_TABLE_NAMES);
 }
 
 async function verifyDatabaseConstraints(
@@ -166,18 +174,23 @@ async function verifyDatabaseConstraints(
   const constraints = await listDatabaseConstraints(context.observer);
   expect(constraints).toEqual([
     { name: "account_user_id_user_id_fk", type: "FOREIGN KEY" },
+    { name: "domains_site_id_sites_id_fk", type: "FOREIGN KEY" },
+    { name: "domains_site_id_unique", type: "UNIQUE" },
     { name: "memberships_tenant_id_tenants_id_fk", type: "FOREIGN KEY" },
     { name: "memberships_tenant_id_user_id_pk", type: "PRIMARY KEY" },
     { name: "memberships_user_id_user_id_fk", type: "FOREIGN KEY" },
     { name: "session_token_unique", type: "UNIQUE" },
     { name: "session_user_id_user_id_fk", type: "FOREIGN KEY" },
+    { name: "sites_tenant_id_tenants_id_fk", type: "FOREIGN KEY" },
     { name: "user_email_unique", type: "UNIQUE" },
   ]);
   expect(await listCascadeForeignKeys(context.observer)).toEqual([
     "account_user_id_user_id_fk",
+    "domains_site_id_sites_id_fk",
     "memberships_tenant_id_tenants_id_fk",
     "memberships_user_id_user_id_fk",
     "session_user_id_user_id_fk",
+    "sites_tenant_id_tenants_id_fk",
   ]);
 }
 
@@ -305,11 +318,14 @@ async function listDatabaseConstraints(
     WHERE table_schema = 'public'
       AND constraint_name IN (
         'account_user_id_user_id_fk',
+        'domains_site_id_sites_id_fk',
+        'domains_site_id_unique',
         'memberships_tenant_id_tenants_id_fk',
         'memberships_tenant_id_user_id_pk',
         'memberships_user_id_user_id_fk',
         'session_token_unique',
         'session_user_id_user_id_fk',
+        'sites_tenant_id_tenants_id_fk',
         'user_email_unique'
       )
     ORDER BY constraint_name
@@ -324,9 +340,11 @@ async function listCascadeForeignKeys(client: DatabaseClient): Promise<string[]>
       AND delete_rule = 'CASCADE'
       AND constraint_name IN (
         'account_user_id_user_id_fk',
+        'domains_site_id_sites_id_fk',
         'memberships_tenant_id_tenants_id_fk',
         'memberships_user_id_user_id_fk',
-        'session_user_id_user_id_fk'
+        'session_user_id_user_id_fk',
+        'sites_tenant_id_tenants_id_fk'
       )
     ORDER BY constraint_name
   `;
@@ -356,11 +374,11 @@ function isApplicationTable(object: CatalogObject): boolean {
   );
 }
 
-function isAllowedPhaseDCatalogObject(object: CatalogObject): boolean {
+function isAllowedPhaseECatalogObject(object: CatalogObject): boolean {
   return (
     isDrizzleMigrationObject(object) ||
     (object.schemaName === PUBLIC_SCHEMA_NAME &&
-      PHASE_D_CATALOG_OBJECTS.has(object.objectName))
+      PHASE_E_CATALOG_OBJECTS.has(object.objectName))
   );
 }
 

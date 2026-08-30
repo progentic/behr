@@ -59,6 +59,8 @@ jobs:
         run: bun run test:auth:integration
       - name: Run tenant integration tests
         run: bun run test:tenant:integration
+      - name: Run site integration tests
+        run: bun run test:site:integration
       - name: Build workspaces
         run: bun run build
       - name: Audit dependencies

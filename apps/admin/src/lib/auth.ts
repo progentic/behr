@@ -8,7 +8,7 @@ import {
 } from "@bher/contracts";
 import { useCallback, useEffect, useState } from "react";
 
-import { requestAuthApi } from "./api";
+import { requestApi } from "./api";
 
 const UNAUTHORIZED_STATUS = 401;
 const GENERIC_AUTH_ERROR = "Authentication request failed.";
@@ -70,7 +70,7 @@ export function useAuthentication(): AuthenticationState {
 
 async function authenticate(request: LoginRequest): Promise<SessionResponse> {
   const body = loginRequestSchema.parse(request);
-  const response = await requestAuthApi("/login", {
+  const response = await requestApi("/auth/login", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -78,7 +78,7 @@ async function authenticate(request: LoginRequest): Promise<SessionResponse> {
 }
 
 async function resolveSession(): Promise<SessionResponse> {
-  const response = await requestAuthApi("/session");
+  const response = await requestApi("/auth/session");
   if (response.status === UNAUTHORIZED_STATUS) {
     return { status: "unauthenticated" };
   }
@@ -86,7 +86,7 @@ async function resolveSession(): Promise<SessionResponse> {
 }
 
 async function invalidateSession(): Promise<SessionResponse> {
-  const response = await requestAuthApi("/logout", { method: "POST" });
+  const response = await requestApi("/auth/logout", { method: "POST" });
   return await readSessionResponse(response);
 }
 
