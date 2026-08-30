@@ -52,6 +52,13 @@ export class AuthenticationRejectedError extends Error {
   }
 }
 
+export class IdentityRegistrationConflictError extends Error {
+  constructor() {
+    super("Identity registration conflicted with an existing identity.");
+    this.name = "IdentityRegistrationConflictError";
+  }
+}
+
 export function createAuthService(
   config: AuthConfig,
   persistence: AuthPersistenceAdapter,
@@ -106,8 +113,11 @@ async function registerIdentity(
   identity: IdentityRegistration,
   headers: Headers,
 ): Promise<AuthenticatedUser> {
-  const user = await registerProviderIdentity(provider, identity, headers);
-  return toAuthenticatedUser(user);
+  const attempt = await registerProviderIdentity(provider, identity, headers);
+  if (!attempt.accepted) {
+    throw new IdentityRegistrationConflictError();
+  }
+  return toAuthenticatedUser(attempt.user);
 }
 
 function createAuthenticatedMutation(result: ProviderMutation): AuthMutation {

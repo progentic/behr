@@ -589,3 +589,80 @@ Final local results:
   normalized list display, and logout on the one-origin development server.
 * Test cleanup left zero site rows, domain rows, and application connections.
 * Dependency audit reported no vulnerabilities across 96 packages.
+
+---
+
+## Pre-Phase G — Multi-user Identity and Membership Decision
+
+### Selected v1 model
+
+BeHR v1 supports multi-user tenants with the existing `owner | member` roles.
+The Version 1.2 decision gate is resolved through two bounded onboarding paths:
+
+* An authenticated tenant owner may add an existing BeHR identity directly by
+  normalized email. The new membership always has the `member` role.
+* When the normalized email has no identity, the owner creates or reissues a
+  one-time tenant invitation. Possession of that invitation token authorizes
+  creation of the email-bound identity and `member` access to the stored tenant.
+
+There is no unrestricted public registration. BeHR does not send invitation
+email; the owner must share the token through an appropriately secure external
+channel. The raw token appears only in the successful owner response and
+transient owner UI state. Reloading the page loses it, and reissue invalidates
+the previous token.
+
+### Security boundary and accepted tradeoff
+
+BeHR v1 does not independently prove mailbox ownership. Invitation possession
+is treated as a bearer authorization credential for the email and tenant
+already stored with that invitation. This is not described as email
+verification.
+
+Invitation tokens contain 256 bits of cryptographically secure random material,
+use a URL-safe representation, expire after seven days, and are stored only as
+SHA-256 digests. Successful completion removes the invitation. The database
+enforces globally unique token hashes and one current invitation per
+tenant/email pair.
+
+An invitation cannot reset or replace an existing identity or credential. If
+the invitation email already exists, registration returns a generic conflict
+and directs the user to sign in and have the owner add that account. A provider
+existing-email race is reclassified only after authoritative database
+re-resolution, and the losing request cannot attach membership.
+
+The owner-only provisioning result intentionally discloses identity existence
+through `member_added` versus `invitation_created`. This disclosure is accepted
+because the authenticated tenant owner needs materially different next steps
+and the raw token only in the missing-identity case. No unauthenticated route
+receives that disclosure.
+
+Identity creation and invitation completion are not represented as one
+transaction because Better Auth owns identity creation separately. Invitation
+claim and membership insertion are atomic. If completion fails after identity
+creation, the identity is not destructively removed; a retry follows the
+existing-account path and the owner can add it directly.
+
+### Deliberately deferred
+
+Role selection, ownership transfer, member removal, role mutation, general user
+administration, password reset, invitation email delivery, mailbox
+verification, unrestricted signup, OAuth, MFA, and SSO remain unimplemented.
+Phase G has not started.
+
+### Verification performed
+
+The final local verification used Bun 1.4.0, TypeScript 7.0.2, Better Auth
+1.7.2, and a fresh PostgreSQL 18 database.
+
+* Unit tests passed: 44 tests with 98 assertions.
+* Persistence integration passed with 13 assertions.
+* Authentication integration passed with 51 assertions.
+* Tenant integration passed with 22 assertions.
+* Site integration passed with 29 assertions.
+* Membership onboarding integration passed with 44 assertions.
+* Fresh and repeat migration runs passed.
+* Manual one-origin acceptance passed direct identity addition, invitation
+  issue/reissue, replaced-token rejection, invite registration without
+  auto-login, normal invited-user sign-in, member authorization, tenant-keyed
+  UI state, refresh token loss, logout, and absence of unrestricted signup.
+* Dependency audit reported no vulnerabilities across 96 packages.

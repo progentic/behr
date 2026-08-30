@@ -28,6 +28,20 @@ export const initialIdentitySchema = z
   })
   .strict();
 
+export const inviteRegistrationRequestSchema = z
+  .object({
+    token: z.string().min(1),
+    name: z.string().trim().min(1).max(DISPLAY_NAME_MAX_LENGTH),
+    password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+  })
+  .strict();
+
+export const inviteRegistrationResponseSchema = z
+  .object({
+    status: z.literal("registered"),
+  })
+  .strict();
+
 const authenticatedSessionSchema = z
   .object({
     status: z.literal("authenticated"),
@@ -56,6 +70,12 @@ export const authErrorResponseSchema = z
 export type AuthenticatedUser = z.infer<typeof authenticatedUserSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type InitialIdentity = z.infer<typeof initialIdentitySchema>;
+export type InviteRegistrationRequest = z.infer<
+  typeof inviteRegistrationRequestSchema
+>;
+export type InviteRegistrationResponse = z.infer<
+  typeof inviteRegistrationResponseSchema
+>;
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 export type AuthenticatedSession = Extract<
   SessionResponse,

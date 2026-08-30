@@ -7,6 +7,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { SiteCreateForm } from "./SiteCreateForm";
+import { TenantMembers } from "./TenantMembers";
 import { requestApi } from "./lib/api";
 
 type TenantState =
@@ -152,6 +153,9 @@ export function SitesPage() {
             })
           }
         />
+      ) : null}
+      {selectedTenant.role === "owner" ? (
+        <TenantMembers key={selectedTenant.id} tenantId={selectedTenant.id} />
       ) : null}
     </section>
   );

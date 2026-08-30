@@ -1,13 +1,13 @@
-# BeHR CMS — Agentic Implementation Execution Brief
+BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.1
+Version: 1.2
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
 
----
+────────
 
-# Global Execution Rules
+Global Execution Rules
 
 These rules apply to every phase.
 
@@ -22,16 +22,20 @@ These rules apply to every phase.
 9. Runtime behavior must remain request-driven and awaited. Do not introduce background workers, fire-and-forget operations, or distributed execution unless explicitly approved.
 10. The system must remain monolithic with clean internal boundaries.
 11. Unimplemented behavior must be documented. Do not represent it with future-work markers, fake readiness exports, stub functions, or speculative code.
+12. Composition-root hygiene: Remove functions that only forward arguments, rename another call, or package already-available values unless they own distinct policy, validation, lifecycle, translation, reuse, or a necessary test seam.
+13. Async UI identity: Any asynchronous UI state whose result belongs to a selectable resource must carry that resource’s authoritative ID. Late load or save completions must not update state belonging to a different current resource. Prefer functional/latest-state updates over mirrored refs or global state unless stronger coordination is actually required.
+14. Cross-layer naming clarity: When similarly named operations exist at different boundaries, names must communicate the boundary when search, stack traces, or review would otherwise be ambiguous. Database mutations, HTTP requests, UI actions, and response translations must not use indistinguishable names when they perform materially different work.
 
----
+────────
 
-# Phase Execution Order
+Phase Execution Order
 
 A — Repository Spine
 B — Environment and Persistence Bootstrap
 C — Identity and Session Core
 D — Tenant and Membership Core
 E — Site Core
+Decision Gate — Multi-user Identity and Membership (Phase F may proceed; must resolve before G)
 F — Canonical Content Contracts
 G — Page Persistence and Version Storage
 H — Published Read Model and Public Renderer
@@ -45,41 +49,41 @@ O — Theme and Settings UI
 P — UX Refinement
 Q — Production Operations Lock
 
----
+────────
 
-# Phase A — Repository Spine
+Phase A — Repository Spine
 
-## Task
+Task
 
 Initialize deterministic monorepo structure and build pipeline.
 
-## Objective
+Objective
 
 Establish a stable repository spine that builds successfully with status-only applications.
 
 No business logic.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Use Bun workspaces
-* Support Bun 1.4.x
-* Support TypeScript 7.0 or newer
-* Maintain strict package boundaries
-* Build all apps
-* Provide CI skeleton
-* Provide infra skeleton
-* Provide a valid root index.html that documents the unimplemented landing experience
+• Use Bun workspaces
+• Support Bun 1.4.x
+• Support TypeScript 7.0 or newer
+• Maintain strict package boundaries
+• Build all apps
+• Provide CI skeleton
+• Provide infra skeleton
+• Provide a valid root index.html that documents the unimplemented landing experience
 
 Must not:
 
-* Implement auth
-* Implement database schema
-* Implement API behavior
-* Implement content model
+• Implement auth
+• Implement database schema
+• Implement API behavior
+• Implement content model
 
-## Files / Functions
+Files / Functions
 
 Root
 
@@ -118,7 +122,7 @@ infra/nginx
 infra/systemd
 infra/scripts
 
-## Acceptance Criteria
+Acceptance Criteria
 
 All workspaces build.
 
@@ -132,42 +136,42 @@ Root index.html exists and describes the Phase A implementation status.
 No business logic exists.
 No fake readiness exports, stub functions, or future-work markers exist.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Verification results
 
----
+────────
 
-# Phase B — Environment and Persistence Bootstrap
+Phase B — Environment and Persistence Bootstrap
 
-## Task
+Task
 
 Establish database connectivity and migration capability.
 
-## Objective
+Objective
 
 Create a functioning persistence layer without application tables.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Configure PostgreSQL connection
-* Configure migration tooling
-* Validate environment variables
-* Keep seed behavior deferred until a phase introduces real seedable tables
+• Configure PostgreSQL connection
+• Configure migration tooling
+• Validate environment variables
+• Keep seed behavior deferred until a phase introduces real seedable tables
 
 Must not:
 
-* Create application domain tables
-* Implement business logic
-* Implement auth
-* Create no-op seed behavior
+• Create application domain tables
+• Implement business logic
+• Implement auth
+• Create no-op seed behavior
 
-## Files / Functions
+Files / Functions
 
 packages/db
 
@@ -182,7 +186,7 @@ Root
 
 .env.example
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Database connection succeeds.
 
@@ -193,50 +197,50 @@ No application tables exist.
 
 Seed behavior remains deferred until real seedable tables exist.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Migration status
 
----
+────────
 
-# Phase C — Identity and Session Core
+Phase C — Identity and Session Core
 
-## Task
+Task
 
 Implement authentication and session resolution.
 
-## Objective
+Objective
 
 Establish secure user authentication.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement the Better Auth identity, account, session, and verification tables
-* Integrate Better Auth through the existing Bun SQL-backed Drizzle client
-* Implement a one-time initial identity bootstrap command
-* Implement login, logout, and authoritative session resolution
-* Validate `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and `ADMIN_ORIGIN`
-* Enforce a 12-character minimum password
-* Enforce trusted origins on state-changing authentication requests
-* Allow credentialed CORS only for the configured admin origin
-* Implement typed authentication middleware
-* Implement the minimal login and authenticated admin shell
+• Implement the Better Auth identity, account, session, and verification tables
+• Integrate Better Auth through the existing Bun SQL-backed Drizzle client
+• Implement a one-time initial identity bootstrap command
+• Implement login, logout, and authoritative session resolution
+• Validate BETTER_AUTH_SECRET, BETTER_AUTH_URL, and ADMIN_ORIGIN
+• Enforce a 12-character minimum password
+• Enforce trusted origins on state-changing authentication requests
+• Allow credentialed CORS only for the configured admin origin
+• Implement typed authentication middleware
+• Implement the minimal login and authenticated admin shell
 
 Must not:
 
-* Implement tenants
-* Implement memberships
-* Implement sites
-* Implement RBAC roles
-* Implement content
-* Expose provider sign-up, password-reset, OAuth, MFA, or SSO user interfaces
+• Implement tenants
+• Implement memberships
+• Implement sites
+• Implement RBAC roles
+• Implement content
+• Expose provider sign-up, password-reset, OAuth, MFA, or SSO user interfaces
 
-## Files / Functions
+Files / Functions
 
 packages/db
 
@@ -263,7 +267,7 @@ App.tsx
 LoginPage.tsx
 AuthGuard.tsx
 
-## Acceptance Criteria
+Acceptance Criteria
 
 User can authenticate.
 
@@ -284,41 +288,41 @@ displays only a minimal authenticated shell after login.
 
 Only identity/authentication tables exist; no Phase D or later table exists.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Auth test results
 
----
+────────
 
-# Phase D — Tenant and Membership Core
+Phase D — Tenant and Membership Core
 
-## Task
+Task
 
 Implement tenant ownership boundaries.
 
-## Objective
+Objective
 
 Establish multi-tenant isolation.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement tenants table
-* Implement memberships table
-* Enforce tenant resolution
-* Enforce membership validation
+• Implement tenants table
+• Implement memberships table
+• Enforce tenant resolution
+• Enforce membership validation
 
 Must not:
 
-* Implement sites
-* Implement page content
-* Implement rendering
+• Implement sites
+• Implement page content
+• Implement rendering
 
-## Files / Functions
+Files / Functions
 
 packages/db
 
@@ -330,7 +334,7 @@ apps/api
 middleware/tenant.ts
 routes/tenants.ts
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Tenant context resolves correctly.
 
@@ -338,41 +342,41 @@ Cross-tenant access is denied.
 
 Membership enforcement works.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Tenant isolation test results
 
----
+────────
 
-# Phase E — Site Core
+Phase E — Site Core
 
-## Task
+Task
 
 Implement site ownership and domain mapping.
 
-## Objective
+Objective
 
 Allow tenants to create and manage sites.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement sites table
-* Implement domains table
-* Implement site creation route
-* Implement site listing route
+• Implement sites table
+• Implement domains table
+• Implement site creation route
+• Implement site listing route
 
 Must not:
 
-* Implement page editing
-* Implement content model
-* Implement publishing
+• Implement page editing
+• Implement content model
+• Implement publishing
 
-## Files / Functions
+Files / Functions
 
 packages/db
 
@@ -388,7 +392,7 @@ apps/admin
 SitesPage.tsx
 SiteCreateForm.tsx
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Authorized user can create site.
 
@@ -396,41 +400,41 @@ Unauthorized user cannot create site.
 
 Site listing returns correct tenant sites.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Site tests
 
----
+────────
 
-# Phase F — Canonical Content Contracts
+Phase F — Canonical Content Contracts
 
-## Task
+Task
 
 Define content schema and block system.
 
-## Objective
+Objective
 
 Establish deterministic content contract.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Define PageDocument schema
-* Define Section schema
-* Define Block union
-* Define Style token schema
+• Define PageDocument schema
+• Define Section schema
+• Define Block union
+• Define Style token schema
 
 Must not:
 
-* Implement database tables
-* Implement editor UI
-* Implement renderer
+• Implement database tables
+• Implement editor UI
+• Implement renderer
 
-## Files / Functions
+Files / Functions
 
 packages/contracts
 
@@ -439,7 +443,7 @@ section.ts
 block.ts
 style.ts
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Valid documents pass validation.
 
@@ -447,40 +451,121 @@ Invalid documents fail validation.
 
 Document serialization round-trips correctly.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Validation results
 
----
+────────
 
-# Phase G — Page Persistence and Version Storage
+Decision Gate — Multi-user Identity and Membership
 
-## Task
+Purpose
+
+Resolve the v1 operator model before page persistence and later admin workflows build on the current owner | member contract.
+
+This is a product and sequencing gate, not an implementation phase by itself.
+
+Phase F may complete independently. Phase G must not begin until this gate is explicitly resolved and all follow-up work required by the selected option is completed and verified.
+
+Resolution
+
+Resolved before Phase G.
+
+Selected model: Option A — Multi-user tenants.
+
+Approved onboarding mechanism: existing identities may be added directly by normalized email; missing identities are created only through owner-issued, one-time tenant invitations. The bounded membership-administration and invite-registration implementation is complete and verified. Phase G remains unstarted.
+
+Decision Required
+
+Choose exactly one v1 model.
+
+Option A — Multi-user tenants
+
+Retain the existing owner | member membership model.
+
+Before membership administration can be implemented, explicitly decide how identity #2 and later identities come into existence. Phase C intentionally provides only a one-time bootstrap for the first identity and refuses a second bootstrap attempt.
+
+Select one bounded identity-onboarding mechanism:
+
+• Authenticated/admin-driven identity creation
+• Controlled/public signup
+• Invitation-based onboarding
+
+Add existing user by email is not a complete identity-onboarding mechanism by itself. It is valid only when another approved path already creates that user’s BeHR identity.
+
+After choosing the identity-onboarding mechanism, define a bounded membership-administration phase before Phase G. That phase may add only the identity-onboarding and membership-management surfaces required by the selected model.
+
+Do not infer or implement invitations, signup, email delivery, token lifecycle, or user administration until the selected mechanism explicitly requires them.
+
+Option B — Single-operator tenants
+
+Declare that v1 supports one operational owner identity per tenant.
+
+This option requires corrective rework; it is not a no-op.
+
+Before Phase G, reconcile accepted Phase D and Phase E behavior so unreachable member capability does not remain as product behavior. Review and, where required, remove or revise:
+
+• owner | member public contract
+• Membership database enum or constraints
+• Generated migration state
+• Membership authorization tests
+• Member-read and owner-create site behavior
+• Documentation describing multi-user tenant behavior
+
+Do not retain unreachable member behavior merely because it already exists in tests or direct database setup.
+
+Decision Record
+
+Record the chosen option and rationale in docs/DOCUMENTATION.md.
+
+The decision record must state:
+
+• Selected v1 operator model
+• If multi-user: the approved mechanism that creates identity #2
+• If multi-user: the bounded membership-administration phase that must execute before Phase G
+• If single-operator: the corrective Phase D/E surface that must be reconciled before Phase G
+• Explicitly deferred identity or membership capabilities
+
+Exit Criteria
+
+This gate is resolved only when:
+
+• One option is selected explicitly.
+• The rationale is documented.
+• Required corrective or membership-administration work is scoped.
+• Any work required before Phase G is complete and verified.
+• No ambiguous or unreachable membership capability remains undocumented.
+
+────────
+
+Phase G — Page Persistence and Version Storage
+
+Task
 
 Implement page storage and versioning.
 
-## Objective
+Objective
 
 Store draft versions safely.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement pages table
-* Implement page_versions table
-* Implement draft pointer behavior
+• Implement pages table
+• Implement page_versions table
+• Implement draft pointer behavior
 
 Must not:
 
-* Implement preview
-* Implement publish
-* Implement renderer
+• Implement preview
+• Implement publish
+• Implement renderer
 
-## Files / Functions
+Files / Functions
 
 packages/db
 
@@ -491,7 +576,7 @@ apps/api
 
 routes/pages.ts
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Saving page creates version.
 
@@ -499,47 +584,47 @@ Draft pointer updates correctly.
 
 Version records are immutable.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Persistence tests
 
----
+────────
 
-# Phase H — Published Read Model and Public Renderer
+Phase H — Published Read Model and Public Renderer
 
-## Task
+Task
 
 Render published pages.
 
-## Objective
+Objective
 
 Serve public content safely.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Resolve host and slug
-* Fetch published version
-* Render blocks deterministically
+• Resolve host and slug
+• Fetch published version
+• Render blocks deterministically
 
 Must not:
 
-* Expose draft content
-* Implement preview
-* Implement publishing
+• Expose draft content
+• Implement preview
+• Implement publishing
 
-## Files / Functions
+Files / Functions
 
 apps/web
 
 router.ts
 renderer.ts
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Published page renders correctly.
 
@@ -547,39 +632,39 @@ Draft content is not accessible.
 
 Rendering is deterministic.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Renderer tests
 
----
+────────
 
-# Phase I — Preview Surface
+Phase I — Preview Surface
 
-## Task
+Task
 
 Implement preview capability.
 
-## Objective
+Objective
 
 Allow safe draft viewing.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement preview_tokens table usage
-* Validate preview tokens
-* Allow draft rendering via token
+• Implement preview_tokens table usage
+• Validate preview tokens
+• Allow draft rendering via token
 
 Must not:
 
-* Modify published content
-* Bypass token validation
+• Modify published content
+• Bypass token validation
 
-## Files / Functions
+Files / Functions
 
 packages/db
 
@@ -589,7 +674,7 @@ apps/api
 
 routes/preview.ts
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Valid preview token renders draft.
 
@@ -597,39 +682,39 @@ Invalid token is rejected.
 
 Public routes remain protected.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Preview tests
 
----
+────────
 
-# Phase J — Publish Workflow
+Phase J — Publish Workflow
 
-## Task
+Task
 
 Implement publish behavior.
 
-## Objective
+Objective
 
 Switch public content safely.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement publish route
-* Update published pointer
-* Record publish event
+• Implement publish route
+• Update published pointer
+• Record publish event
 
 Must not:
 
-* Modify draft version
-* Delete previous versions
+• Modify draft version
+• Delete previous versions
 
-## Files / Functions
+Files / Functions
 
 packages/db
 
@@ -639,7 +724,7 @@ apps/api
 
 routes/publish.ts
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Publish switches public version.
 
@@ -647,47 +732,48 @@ Previous versions remain intact.
 
 Audit event recorded.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Publish tests
 
----
+────────
 
-# Phase K — Editor Foundation
+Phase K — Editor Foundation
 
-## Task
+Task
 
 Implement basic page editor.
 
-## Objective
+Objective
 
 Allow structured page authoring.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Add/remove sections
-* Add/remove blocks
-* Edit block properties
-* Save draft
+• Add/remove sections
+• Add/remove blocks
+• Edit block properties
+• Save draft
+• Key asynchronous page load and save state by page ID. A completion belonging to page A must never mutate page B’s visible editor state.
 
 Must not:
 
-* Implement drag-and-drop
-* Implement autosave
+• Implement drag-and-drop
+• Implement autosave
 
-## Files / Functions
+Files / Functions
 
 apps/admin
 
 PageList.tsx
 PageEditor.tsx
 
-## Acceptance Criteria
+Acceptance Criteria
 
 User can create valid page.
 
@@ -695,39 +781,39 @@ Document validates successfully.
 
 Saved document persists.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Editor tests
 
----
+────────
 
-# Phase L — Asset Storage Core
+Phase L — Asset Storage Core
 
-## Task
+Task
 
 Implement file storage system.
 
-## Objective
+Objective
 
 Store assets reliably.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement upload endpoint
-* Store files on disk
-* Record metadata
+• Implement upload endpoint
+• Store files on disk
+• Record metadata
 
 Must not:
 
-* Implement editor asset picker
-* Implement image processing pipeline
+• Implement editor asset picker
+• Implement image processing pipeline
 
-## Files / Functions
+Files / Functions
 
 packages/db
 
@@ -737,7 +823,7 @@ apps/api
 
 routes/assets.ts
 
-## Acceptance Criteria
+Acceptance Criteria
 
 File uploads succeed.
 
@@ -745,38 +831,38 @@ File metadata recorded.
 
 Files persist on disk.
 
-## Output Format
+Output Format
 
 Files created
 Files modified
 Commands executed
 Upload tests
 
----
+────────
 
-# Phase M — Asset Integration
+Phase M — Asset Integration
 
-## Task
+Task
 
 Integrate assets into content.
 
-## Objective
+Objective
 
 Allow blocks to reference assets.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement asset picker
-* Record asset usage
-* Render asset-backed blocks
+• Implement asset picker
+• Record asset usage
+• Render asset-backed blocks
 
 Must not:
 
-* Implement media pipelines
+• Implement media pipelines
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Asset references persist.
 
@@ -784,122 +870,122 @@ Renderer displays asset correctly.
 
 Asset usage recorded.
 
----
+────────
 
-# Phase N — Theme Runtime Contract
+Phase N — Theme Runtime Contract
 
-## Task
+Task
 
 Implement theme token system.
 
-## Objective
+Objective
 
 Control site appearance via tokens.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement themes table
-* Resolve active theme
-* Apply tokens in renderer
+• Implement themes table
+• Resolve active theme
+• Apply tokens in renderer
 
 Must not:
 
-* Implement theme editor UI
+• Implement theme editor UI
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Theme changes affect rendering.
 
 Tokens apply consistently.
 
----
+────────
 
-# Phase O — Theme and Settings UI
+Phase O — Theme and Settings UI
 
-## Task
+Task
 
 Implement theme and settings management.
 
-## Objective
+Objective
 
 Expose controlled customization.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement theme selection
-* Implement site settings editor
+• Implement theme selection
+• Implement site settings editor
 
 Must not:
 
-* Allow arbitrary CSS injection
+• Allow arbitrary CSS injection
 
-## Acceptance Criteria
+Acceptance Criteria
 
 User can change theme.
 
 Renderer reflects theme.
 
----
+────────
 
-# Phase P — UX Refinement
+Phase P — UX Refinement
 
-## Task
+Task
 
 Improve usability.
 
-## Objective
+Objective
 
 Enhance workflow efficiency.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Improve validation UX
-* Add optional drag-and-drop
+• Improve validation UX
+• Add optional drag-and-drop
 
 Must not:
 
-* Change persistence model
-* Change content contract
+• Change persistence model
+• Change content contract
 
-## Acceptance Criteria
+Acceptance Criteria
 
 UX improvements function correctly.
 
 No schema changes occur.
 
----
+────────
 
-# Phase Q — Production Operations Lock
+Phase Q — Production Operations Lock
 
-## Task
+Task
 
 Finalize operational readiness.
 
-## Objective
+Objective
 
 Make system deployable and recoverable.
 
-## Guidelines
+Guidelines
 
 Must:
 
-* Implement backup script
-* Implement restore script
-* Integrate the existing health endpoint with deployment monitoring
-* Configure nginx
-* Configure systemd
+• Implement backup script
+• Implement restore script
+• Integrate the existing health endpoint with deployment monitoring
+• Configure nginx
+• Configure systemd
 
 Must not:
 
-* Introduce new runtime behavior
+• Introduce new runtime behavior
 
-## Files / Functions
+Files / Functions
 
 infra/scripts
 
@@ -915,7 +1001,7 @@ infra/systemd
 
 bhr-api.service
 
-## Acceptance Criteria
+Acceptance Criteria
 
 Deployment succeeds.
 
@@ -925,19 +1011,21 @@ Restore executes successfully.
 
 Health endpoint responds.
 
----
+────────
 
-# Final Agent Execution Directive
+Final Agent Execution Directive
 
 The agent must stop after completing the assigned phase.
 
 The agent must not:
 
-* Implement future-phase behavior
-* Modify unrelated files
-* Introduce architecture changes
-* Expand scope beyond the defined phase
+• Implement future-phase behavior
+• Modify unrelated files
+• Introduce architecture changes
+• Expand scope beyond the defined phase
 
 Each phase must be verified before the next begins.
+
+Any explicit decision gate must be resolved before the dependent phase identified by that gate begins.
 
 This preserves the monolithic architecture, deterministic content contracts, and single-VPS operational model defined for the system.

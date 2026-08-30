@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 
 import type { LoginRequest } from "@bher/contracts";
+import { InvitationRegistrationForm } from "./InvitationRegistrationForm";
 
 type LoginPageProps = Readonly<{
   error: string | null;
@@ -55,6 +56,7 @@ export function LoginPage({ error, onLogin }: LoginPageProps) {
           {submitting ? "Signing in…" : "Sign in"}
         </button>
       </form>
+      <InvitationRegistrationForm />
     </main>
   );
 }

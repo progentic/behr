@@ -42,6 +42,10 @@ export type ProviderAuthenticationAttempt =
   | Readonly<{ accepted: true; mutation: ProviderMutation }>
   | Readonly<{ accepted: false; statusCode: number }>;
 
+export type ProviderIdentityRegistrationAttempt =
+  | Readonly<{ accepted: true; user: ProviderUser }>
+  | Readonly<{ accepted: false; identityExists: true }>;
+
 export function constructAuthProvider(
   config: AuthConfig,
   persistence: AuthPersistenceAdapter,
@@ -154,12 +158,22 @@ export async function registerProviderIdentity(
   provider: AuthProvider,
   identity: IdentityRegistration,
   headers: Headers,
-): Promise<ProviderUser> {
-  const result = await provider.api.signUpEmail({
-    body: identity,
-    headers,
-  });
-  return toProviderUser(result.user);
+): Promise<ProviderIdentityRegistrationAttempt> {
+  try {
+    const result = await provider.api.signUpEmail({
+      body: identity,
+      headers,
+    });
+    return { accepted: true, user: toProviderUser(result.user) };
+  } catch (error) {
+    if (
+      isAPIError(error) &&
+      error.body?.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL"
+    ) {
+      return { accepted: false, identityExists: true };
+    }
+    throw error;
+  }
 }
 
 export async function resolveProviderSession(

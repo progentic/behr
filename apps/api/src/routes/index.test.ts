@@ -21,6 +21,18 @@ test("allows credentialed auth requests only for the configured admin origin", a
       },
       listSites: async () => [],
     },
+    {
+      listMembers: async () => [],
+      resolveIdentityByEmail: async () => null,
+      addExistingMember: async () => {
+        throw new Error("Membership addition is not used by this CORS test.");
+      },
+      createOrRotateInvitation: async () => {
+        throw new Error("Invitation creation is not used by this CORS test.");
+      },
+      resolveInvitation: async () => null,
+      completeInvitation: async () => undefined,
+    },
     ADMIN_ORIGIN,
   );
   const response = await routes.request("/auth/login", {

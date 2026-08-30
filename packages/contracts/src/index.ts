@@ -4,11 +4,15 @@ export {
   type AuthenticatedUser,
   type AuthenticatedSession,
   type InitialIdentity,
+  type InviteRegistrationRequest,
+  type InviteRegistrationResponse,
   type LoginRequest,
   type SessionResponse,
   authErrorResponseSchema,
   authenticatedUserSchema,
   initialIdentitySchema,
+  inviteRegistrationRequestSchema,
+  inviteRegistrationResponseSchema,
   loginRequestSchema,
   sessionResponseSchema,
 } from "./auth";
@@ -20,6 +24,16 @@ export {
   headingBlockSchema,
   paragraphBlockSchema,
 } from "./block";
+export {
+  type AddTenantMemberRequest,
+  type MemberProvisioningResult,
+  type TenantMember,
+  type TenantMemberList,
+  addTenantMemberRequestSchema,
+  memberProvisioningResultSchema,
+  tenantMemberListSchema,
+  tenantMemberSchema,
+} from "./membership";
 export {
   PAGE_DOCUMENT_SCHEMA_VERSION,
   type PageDocument,

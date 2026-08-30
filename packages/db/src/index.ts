@@ -10,6 +10,12 @@ export { createAuthPersistence, identityExists } from "./auth-persistence";
 export { checkDatabaseConnection } from "./check";
 export { migrateDatabase } from "./migrate";
 export {
+  type MembershipPersistence,
+  InvitationCompletionRejectedError,
+  MembershipAlreadyExistsError,
+  createMembershipPersistence,
+} from "./membership-persistence";
+export {
   type SitePersistence,
   SiteHostnameConflictError,
   createSitePersistence,
@@ -29,6 +35,7 @@ export {
   authSchema,
   databaseSchema,
   domains,
+  membershipInvitations,
   memberships,
   session,
   sites,

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import type { AuthenticatedUser } from "@bher/contracts";
+import type { MembershipPersistence } from "@bher/db";
 
 import {
   type AuthService,
@@ -18,9 +19,18 @@ const AUTHENTICATED_SESSION = {
   user: AUTHENTICATED_USER,
   expiresAt: "2026-09-05T00:00:00.000Z",
 };
+const INVITATION = {
+  id: "11111111-1111-4111-8111-111111111111",
+  tenantId: "22222222-2222-4222-8222-222222222222",
+  email: "race@example.com",
+  expiresAt: new Date("2099-09-06T00:00:00.000Z"),
+};
 
 test("rejects login bodies that assert a user identity", async () => {
-  const routes = createAuthRoutes(createSuccessfulAuthService());
+  const routes = createAuthRoutes(
+    createSuccessfulAuthService(),
+    createFakeMembershipPersistence(),
+  );
   const response = await routes.request("/login", {
     method: "POST",
     headers: createJsonHeaders(),
@@ -36,7 +46,10 @@ test("rejects login bodies that assert a user identity", async () => {
 });
 
 test("maps rejected credentials to a generic response", async () => {
-  const routes = createAuthRoutes(createRejectedAuthService());
+  const routes = createAuthRoutes(
+    createRejectedAuthService(),
+    createFakeMembershipPersistence(),
+  );
   const response = await routes.request("/login", {
     method: "POST",
     headers: createJsonHeaders(),
@@ -51,7 +64,10 @@ test("maps rejected credentials to a generic response", async () => {
 });
 
 test("returns a narrow session response and an HttpOnly cookie", async () => {
-  const routes = createAuthRoutes(createSuccessfulAuthService());
+  const routes = createAuthRoutes(
+    createSuccessfulAuthService(),
+    createFakeMembershipPersistence(),
+  );
   const response = await routes.request("/login", {
     method: "POST",
     headers: createJsonHeaders(),
@@ -66,6 +82,49 @@ test("returns a narrow session response and an HttpOnly cookie", async () => {
   expect(body).toEqual(AUTHENTICATED_SESSION);
   expect(body).not.toHaveProperty("token");
   expect(response.headers.get("set-cookie")).toContain("HttpOnly");
+});
+
+test("rejects a synthetic provider success without attaching membership", async () => {
+  let identityReads = 0;
+  let membershipCompleted = false;
+  const auth: AuthService = {
+    ...createSuccessfulAuthService(),
+    registerIdentity: async () => ({
+      id: "synthetic-race-user",
+      email: INVITATION.email,
+      displayName: "Race User",
+    }),
+  };
+  const persistence: MembershipPersistence = {
+    ...createFakeMembershipPersistence(),
+    resolveInvitation: async () => INVITATION,
+    resolveIdentityByEmail: async () => {
+      identityReads += 1;
+      return identityReads === 1
+        ? null
+        : {
+            id: "persisted-race-user",
+            email: INVITATION.email,
+            displayName: "Persisted Race User",
+          };
+    },
+    completeInvitation: async () => {
+      membershipCompleted = true;
+    },
+  };
+  const routes = createAuthRoutes(auth, persistence);
+  const response = await routes.request("/register", {
+    method: "POST",
+    headers: createJsonHeaders(),
+    body: JSON.stringify({
+      token: "race-token",
+      name: "Race User",
+      password: "race-user-password",
+    }),
+  });
+
+  expect(response.status).toBe(409);
+  expect(membershipCompleted).toBe(false);
 });
 
 function createSuccessfulAuthService(): AuthService {
@@ -101,4 +160,19 @@ function createJsonHeaders(): Headers {
     "content-type": "application/json",
     origin: TRUSTED_ORIGIN,
   });
+}
+
+function createFakeMembershipPersistence(): MembershipPersistence {
+  return {
+    listMembers: async () => [],
+    resolveIdentityByEmail: async () => null,
+    addExistingMember: async () => {
+      throw new Error("Membership addition is not used by auth route tests.");
+    },
+    createOrRotateInvitation: async () => {
+      throw new Error("Invitation creation is not used by auth route tests.");
+    },
+    resolveInvitation: async () => null,
+    completeInvitation: async () => undefined,
+  };
 }
