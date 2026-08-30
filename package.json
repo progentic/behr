@@ -23,7 +23,7 @@
     "dev:api-only": "bun run --cwd apps/api dev:api-only",
     "dev:admin-only": "bun run --cwd apps/admin dev",
     "dev:web": "bun run --cwd apps/web dev",
-    "test": "bun run --cwd apps/api test && bun run --cwd packages/db test:unit",
+    "test": "bun run --cwd apps/api test && bun run --cwd packages/db test:unit && bun run --cwd packages/contracts test",
     "test:auth:integration": "bun run --cwd apps/api test:auth:integration",
     "test:integration": "bun run --cwd packages/db test:integration",
     "test:site:integration": "bun run --cwd apps/api test:site:integration",

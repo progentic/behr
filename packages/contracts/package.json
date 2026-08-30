@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "tsc --noEmit",
+    "test": "bun test src/content.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
