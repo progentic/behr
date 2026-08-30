@@ -40,6 +40,7 @@
       "name": "@bher/web",
       "version": "0.1.0",
       "dependencies": {
+        "@bher/contracts": "workspace:0.1.0",
         "react": "18.3.1",
         "react-dom": "18.3.1",
       },
