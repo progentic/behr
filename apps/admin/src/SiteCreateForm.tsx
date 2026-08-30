@@ -35,13 +35,13 @@ export function SiteCreateForm({
     }
     setSubmitting(true);
     try {
-      const site = await createSite(tenantId, request.data);
+      const site = await requestSiteCreation(tenantId, request.data);
       setName("");
       setHostname("");
       onCreated(site);
     } catch (failure) {
       setError(
-        failure instanceof HostnameConflictError
+        failure instanceof SiteHostnameConflictResponseError
           ? "That hostname is already assigned."
           : "The site could not be created.",
       );
@@ -82,9 +82,9 @@ export function SiteCreateForm({
   );
 }
 
-class HostnameConflictError extends Error {}
+class SiteHostnameConflictResponseError extends Error {}
 
-async function createSite(
+async function requestSiteCreation(
   tenantId: string,
   request: CreateSiteRequest,
 ): Promise<SiteSummary> {
@@ -93,7 +93,7 @@ async function createSite(
     body: JSON.stringify(request),
   });
   if (response.status === CONFLICT_STATUS) {
-    throw new HostnameConflictError();
+    throw new SiteHostnameConflictResponseError();
   }
   if (!response.ok) {
     throw new Error("Site creation failed.");

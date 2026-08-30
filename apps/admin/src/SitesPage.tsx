@@ -16,9 +16,9 @@ type TenantState =
 
 type SiteState =
   | Readonly<{ status: "idle" }>
-  | Readonly<{ status: "loading" }>
-  | Readonly<{ status: "error" }>
-  | Readonly<{ status: "loaded"; sites: SiteSummary[] }>;
+  | Readonly<{ status: "loading"; tenantId: string }>
+  | Readonly<{ status: "error"; tenantId: string }>
+  | Readonly<{ status: "loaded"; tenantId: string; sites: SiteSummary[] }>;
 
 export function SitesPage() {
   const [tenantState, setTenantState] = useState<TenantState>({
@@ -33,7 +33,13 @@ export function SitesPage() {
       .then((tenants) => {
         if (active) {
           setTenantState({ status: "loaded", tenants });
-          setSelectedTenantId(tenants[0]?.id ?? null);
+          const initialTenantId = tenants[0]?.id ?? null;
+          setSelectedTenantId(initialTenantId);
+          setSiteState(
+            initialTenantId
+              ? { status: "loading", tenantId: initialTenantId }
+              : { status: "idle" },
+          );
         }
       })
       .catch(() => {
@@ -51,17 +57,22 @@ export function SitesPage() {
       setSiteState({ status: "idle" });
       return;
     }
+    const requestedTenantId = selectedTenantId;
     let active = true;
-    setSiteState({ status: "loading" });
-    void loadSites(selectedTenantId)
+    setSiteState({ status: "loading", tenantId: requestedTenantId });
+    void loadSites(requestedTenantId)
       .then((sites) => {
         if (active) {
-          setSiteState({ status: "loaded", sites });
+          setSiteState({
+            status: "loaded",
+            tenantId: requestedTenantId,
+            sites,
+          });
         }
       })
       .catch(() => {
         if (active) {
-          setSiteState({ status: "error" });
+          setSiteState({ status: "error", tenantId: requestedTenantId });
         }
       });
     return () => {
@@ -90,6 +101,7 @@ export function SitesPage() {
   if (!selectedTenant) {
     return <p role="alert">The selected tenant is unavailable.</p>;
   }
+  const formTenantId = selectedTenant.id;
 
   return (
     <section>
@@ -100,7 +112,11 @@ export function SitesPage() {
           <select
             id="tenant-selector"
             value={selectedTenant.id}
-            onChange={(event) => setSelectedTenantId(event.currentTarget.value)}
+            onChange={(event) => {
+              const nextTenantId = event.currentTarget.value;
+              setSelectedTenantId(nextTenantId);
+              setSiteState({ status: "loading", tenantId: nextTenantId });
+            }}
           >
             {tenantState.tenants.map((tenant) => (
               <option key={tenant.id} value={tenant.id}>
@@ -113,19 +129,27 @@ export function SitesPage() {
         <h2>{selectedTenant.name}</h2>
       )}
 
-      <SiteList state={siteState} />
-      {selectedTenant.role === "owner" ? (
+      <SiteList selectedTenantId={selectedTenant.id} state={siteState} />
+      {selectedTenant.role === "owner" &&
+      siteState.status === "loaded" &&
+      siteState.tenantId === selectedTenant.id ? (
         <SiteCreateForm
           key={selectedTenant.id}
-          tenantId={selectedTenant.id}
+          tenantId={formTenantId}
           onCreated={(site) =>
-            setSiteState((current) => ({
-              status: "loaded",
-              sites:
-                current.status === "loaded"
-                  ? [...current.sites, site]
-                  : [site],
-            }))
+            setSiteState((current) => {
+              if (
+                current.status !== "loaded" ||
+                current.tenantId !== formTenantId
+              ) {
+                return current;
+              }
+              return {
+                status: "loaded",
+                tenantId: formTenantId,
+                sites: [...current.sites, site],
+              };
+            })
           }
         />
       ) : null}
@@ -133,8 +157,15 @@ export function SitesPage() {
   );
 }
 
-function SiteList({ state }: Readonly<{ state: SiteState }>) {
-  if (state.status === "idle" || state.status === "loading") {
+function SiteList({
+  selectedTenantId,
+  state,
+}: Readonly<{ selectedTenantId: string; state: SiteState }>) {
+  if (
+    state.status === "idle" ||
+    state.status === "loading" ||
+    state.tenantId !== selectedTenantId
+  ) {
     return <p role="status">Loading sites…</p>;
   }
   if (state.status === "error") {
