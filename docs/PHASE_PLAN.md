@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.2
+Version: 1.3
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -476,7 +476,7 @@ Resolved before Phase G.
 
 Selected model: Option A — Multi-user tenants.
 
-Approved onboarding mechanism: existing identities may be added directly by normalized email; missing identities are created only through owner-issued, one-time tenant invitations. The bounded membership-administration and invite-registration implementation is complete and verified. Phase G remains unstarted.
+Approved onboarding mechanism: existing identities may be added directly by normalized email; missing identities are created only through owner-issued, one-time tenant invitations. The bounded membership-administration and invite-registration implementation is complete and verified. This gate is resolved and no longer blocks Phase G or later phases.
 
 Decision Required
 
@@ -607,22 +607,74 @@ Guidelines
 
 Must:
 
-• Resolve host and slug
-• Fetch published version
-• Render blocks deterministically
+• Add nullable pages.published_version_id referencing an immutable page_versions record
+• Treat published_version_id as published read state, not publish workflow state
+• Keep new pages unpublished until later publish behavior explicitly sets the published pointer
+• Keep draft saves independent; they must not modify published_version_id
+• Resolve public requests by authoritative hostname and page slug
+• Resolve the public document only through pages.published_version_id
+• Never fall back to pages.draft_version_id
+• Never infer publication from the latest page version
+• Validate stored published content against the canonical PageDocument
+• Expose the minimum API and database read boundary required by the static public web application
+• Render supported canonical blocks deterministically
 
 Must not:
 
-• Expose draft content
-• Implement preview
-• Implement publishing
+• Mutate pages.published_version_id through production application behavior
+• Implement publish routes or publish controls
+• Implement page_publications or publication event/history behavior
+• Implement preview behavior or preview tokens
+• Fall back to draft content
+• Implement editor behavior
+
+Test Fixture Boundary
+
+Phase H integration tests may set pages.published_version_id directly through test-only database fixture setup to establish known published read state. This is not production publishing behavior.
+
+Do not create a production publishPage, setPublishedVersion, advancePublishedPointer, or markPublished helper in Phase H.
 
 Files / Functions
+
+packages/contracts
+
+page.ts
+
+packages/db
+
+schema/pages.ts
+public-page-persistence.ts
+migrations/
+
+apps/api
+
+routes/public.ts
 
 apps/web
 
 router.ts
 renderer.ts
+main.tsx
+
+Authority Flow
+
+HTTP Host
+    ↓
+domains.hostname
+    ↓
+site
+    ↓
+page slug
+    ↓
+pages.published_version_id
+    ↓
+page_versions
+    ↓
+canonical PageDocument
+    ↓
+deterministic renderer
+
+Only pages.published_version_id authorizes public content. apps/web must use the public HTTP read boundary and must not access PostgreSQL directly. Phase H adds no second backend service.
 
 Acceptance Criteria
 
@@ -705,14 +757,21 @@ Guidelines
 
 Must:
 
+• Implement publish authorization
 • Implement publish route
-• Update published pointer
-• Record publish event
+• Select the immutable version to publish according to the approved workflow
+• Perform the first production application mutation of pages.published_version_id
+• Update the existing published pointer
+• Record publication history or event data through page_publications
+• Preserve previous immutable versions
 
 Must not:
 
 • Modify draft version
 • Delete previous versions
+• Implement public rendering
+
+Phase H represents and reads what is published. Phase J changes what is published and records that change.
 
 Files / Functions
 
