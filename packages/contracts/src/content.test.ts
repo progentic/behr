@@ -3,6 +3,7 @@ import {
   pageDocumentSchema,
   pageSlugSchema,
   pageTitleSchema,
+  publicPageResponseSchema,
   savePageDraftRequestSchema,
 } from "./page";
 
@@ -130,6 +131,28 @@ test("normalizes strict page metadata and persistence requests", () => {
         schemaVersion: 1,
         sections: [{ id: SECTION_ID, blocks: [{ type: "image" }] }],
       },
+    }).success,
+  ).toBe(false);
+});
+
+test("exposes only canonical public page fields", () => {
+  expect(
+    publicPageResponseSchema.parse({
+      title: "About",
+      slug: "about",
+      document: canonicalDocument,
+    }),
+  ).toEqual({
+    title: "About",
+    slug: "about",
+    document: canonicalDocument,
+  });
+  expect(
+    publicPageResponseSchema.safeParse({
+      title: "About",
+      slug: "about",
+      document: canonicalDocument,
+      publishedVersionId: SECTION_ID,
     }).success,
   ).toBe(false);
 });

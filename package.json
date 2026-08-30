@@ -23,11 +23,12 @@
     "dev:api-only": "bun run --cwd apps/api dev:api-only",
     "dev:admin-only": "bun run --cwd apps/admin dev",
     "dev:web": "bun run --cwd apps/web dev",
-    "test": "bun run --cwd apps/api test && bun run --cwd packages/db test:unit && bun run --cwd packages/contracts test",
+    "test": "bun run --cwd apps/api test && bun run --cwd packages/db test:unit && bun run --cwd packages/contracts test && bun test apps/web/src/router.test.ts apps/web/src/renderer.test.tsx",
     "test:auth:integration": "bun run --cwd apps/api test:auth:integration",
     "test:integration": "bun run --cwd packages/db test:integration",
     "test:membership:integration": "bun run --cwd apps/api test:membership:integration",
     "test:page:integration": "bun run --cwd apps/api test:page:integration",
+    "test:public:integration": "bun run --cwd apps/api test:public:integration",
     "test:site:integration": "bun run --cwd apps/api test:site:integration",
     "test:tenant:integration": "bun run --cwd apps/api test:tenant:integration",
     "typecheck": "bun run --filter '*' typecheck"

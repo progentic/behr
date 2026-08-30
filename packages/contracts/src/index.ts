@@ -42,6 +42,7 @@ export {
   type PageDraft,
   type PageListResponse,
   type PageSummary,
+  type PublicPageResponse,
   type SavePageDraftRequest,
   createPageRequestSchema,
   draftVersionSchema,
@@ -52,6 +53,7 @@ export {
   pageSlugSchema,
   pageSummarySchema,
   pageTitleSchema,
+  publicPageResponseSchema,
   savePageDraftRequestSchema,
 } from "./page";
 export { type Section, sectionSchema } from "./section";

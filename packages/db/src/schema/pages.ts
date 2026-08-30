@@ -24,6 +24,10 @@ export const pages = pgTable(
       (): AnyPgColumn => pageVersions.id,
       { onDelete: "set null" },
     ),
+    publishedVersionId: uuid("published_version_id").references(
+      (): AnyPgColumn => pageVersions.id,
+      { onDelete: "set null" },
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

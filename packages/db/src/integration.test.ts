@@ -205,6 +205,10 @@ async function verifyDatabaseConstraints(
       name: "pages_draft_version_id_page_versions_id_fk",
       type: "FOREIGN KEY",
     },
+    {
+      name: "pages_published_version_id_page_versions_id_fk",
+      type: "FOREIGN KEY",
+    },
     { name: "pages_site_id_sites_id_fk", type: "FOREIGN KEY" },
     { name: "session_token_unique", type: "UNIQUE" },
     { name: "session_user_id_user_id_fk", type: "FOREIGN KEY" },
@@ -221,6 +225,10 @@ async function verifyDatabaseConstraints(
     "pages_site_id_sites_id_fk",
     "session_user_id_user_id_fk",
     "sites_tenant_id_tenants_id_fk",
+  ]);
+  expect(await listSetNullForeignKeys(context.observer)).toEqual([
+    "pages_draft_version_id_page_versions_id_fk",
+    "pages_published_version_id_page_versions_id_fk",
   ]);
 }
 
@@ -357,6 +365,7 @@ async function listDatabaseConstraints(
         'memberships_user_id_user_id_fk',
         'page_versions_page_id_pages_id_fk',
         'pages_draft_version_id_page_versions_id_fk',
+        'pages_published_version_id_page_versions_id_fk',
         'pages_site_id_sites_id_fk',
         'session_token_unique',
         'session_user_id_user_id_fk',
@@ -383,6 +392,21 @@ async function listCascadeForeignKeys(client: DatabaseClient): Promise<string[]>
         'pages_site_id_sites_id_fk',
         'session_user_id_user_id_fk',
         'sites_tenant_id_tenants_id_fk'
+      )
+    ORDER BY constraint_name
+  `;
+  return rows.map(({ name }) => name);
+}
+
+async function listSetNullForeignKeys(client: DatabaseClient): Promise<string[]> {
+  const rows = await client.native<Array<{ name: string }>>`
+    SELECT constraint_name AS name
+    FROM information_schema.referential_constraints
+    WHERE constraint_schema = 'public'
+      AND delete_rule = 'SET NULL'
+      AND constraint_name IN (
+        'pages_draft_version_id_page_versions_id_fk',
+        'pages_published_version_id_page_versions_id_fk'
       )
     ORDER BY constraint_name
   `;

@@ -10,6 +10,11 @@ export { createAuthPersistence, identityExists } from "./auth-persistence";
 export { checkDatabaseConnection } from "./check";
 export { migrateDatabase } from "./migrate";
 export {
+  type PublicPagePersistence,
+  type PublicPageRecord,
+  createPublicPagePersistence,
+} from "./public-page-persistence";
+export {
   type PagePersistence,
   PageScopeNotFoundError,
   PageSlugConflictError,

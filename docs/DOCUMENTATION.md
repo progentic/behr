@@ -751,3 +751,83 @@ Admin page lists and editing, public rendering, host-based resolution, preview,
 preview tokens, publication pointers and history, publishing, autosave,
 optimistic locking, page deletion, version-history APIs, assets, themes, and
 all Phase H and later behavior remain unimplemented. Phase H has not started.
+
+---
+
+## Phase H — Published Read Model and Public Renderer
+
+### Version 1.3 ownership correction
+
+Version 1.3 separates published-state representation from publication
+mutation. Phase H adds the nullable read-state pointer required to identify one
+immutable public version. Phase J remains the first phase allowed to change
+that pointer through production behavior and continues to own publication
+history.
+
+Migration `0005_published_page_read_state.sql` adds only
+`pages.published_version_id`, referencing `page_versions.id` with `ON DELETE
+SET NULL`. New pages remain unpublished, and Phase G draft saves continue to
+update only `draft_version_id` and `updated_at`.
+
+### Authoritative public read boundary
+
+The single public API route is:
+
+```text
+GET /public/page?slug=<site-local-slug>
+```
+
+The request Host is normalized without percent-decoding and resolved through
+`domains.hostname`. The query then proves the complete authority chain:
+
+```text
+Host → domain → site → page slug → published_version_id
+     → same-page page_version → canonical PageDocument
+```
+
+The same-page join is required because foreign-key existence alone does not
+prove version ownership. Null pointers, mismatched pointers, invalid authority,
+and missing relationships all return a nondisclosing HTTP 404. No draft or
+latest-version fallback exists. Authority-shaped query parameters other than
+the single `slug` value are ignored.
+
+Published JSONB is validated with `pageDocumentSchema` before a successful
+response. Malformed stored content reaches the existing generic HTTP 500
+boundary without being exposed, repaired, or replaced with another version.
+
+### Static public application
+
+The static `apps/web` application maps `/` to the root slug and one decoded
+pathname segment such as `/about-us` to its Phase G slug. Decoding occurs
+exactly once; malformed encoding, encoded slashes, nested paths, and trailing
+slashes are rejected. The browser requests `/public/page` on its current origin
+without credentials and parses successful responses through
+`@bher/contracts`.
+
+The deterministic renderer preserves section and block order, maps heading
+levels to `h1` through `h6`, renders paragraphs as `p`, and uses canonical UUIDs
+only as React keys. Existing bounded style tokens map to code-owned class names.
+Content text uses normal escaped React nodes; arbitrary HTML, CSS, and class
+names are not accepted.
+
+### Fixture and production-write boundary
+
+Phase H integration tests assign `published_version_id` directly in test-only
+SQL to establish known read state, verify draft isolation, and construct the
+cross-page mismatch negative control. No production route or persistence
+operation writes the pointer, and no reusable production publishing helper
+exists.
+
+### Verification and deferred behavior
+
+PostgreSQL-backed coverage verifies hostname/slug authority, root pages,
+draft-only nondisclosure, same-slug host isolation, immutable published reads
+across newer draft saves, mismatched-pointer rejection, malformed-content
+failure, and inert non-authoritative query parameters. Router and renderer
+coverage verifies one-time decoding, deterministic order, semantic headings,
+paragraphs, bounded style output, and React text escaping.
+
+Preview, preview tokens, publish authorization, publish routes, production
+published-pointer mutation, `page_publications`, publication history, editor
+behavior, theme runtime, assets, nginx routing, and all Phase I/Phase J behavior
+remain unimplemented.

@@ -1,6 +1,7 @@
 import type {
   MembershipPersistence,
   PagePersistence,
+  PublicPagePersistence,
   SitePersistence,
   TenantPersistence,
 } from "@bher/db";
@@ -12,6 +13,7 @@ import type { ApiBindings } from "../types";
 import { createAuthRoutes } from "./auth";
 import { createMembershipRoutes } from "./memberships";
 import { createPageRoutes } from "./pages";
+import { createPublicRoutes } from "./public";
 import { createSiteRoutes } from "./sites";
 import { createTenantRoutes } from "./tenants";
 
@@ -21,6 +23,7 @@ const TENANT_ROUTE = "/tenants";
 const SITE_ROUTE = "/tenants/:tenantId/sites";
 const MEMBERSHIP_ROUTE = "/tenants/:tenantId/members";
 const PAGE_ROUTE = "/tenants/:tenantId/sites/:siteId/pages";
+const PUBLIC_ROUTE = "/public";
 
 export function createApiRoutes(
   auth: AuthService,
@@ -28,6 +31,7 @@ export function createApiRoutes(
   sitePersistence: SitePersistence,
   membershipPersistence: MembershipPersistence,
   pagePersistence: PagePersistence,
+  publicPagePersistence: PublicPagePersistence,
   adminOrigin: string,
 ): Hono<ApiBindings> {
   const routes = new Hono<ApiBindings>();
@@ -54,5 +58,6 @@ export function createApiRoutes(
     PAGE_ROUTE,
     createPageRoutes(auth, tenantPersistence, pagePersistence),
   );
+  routes.route(PUBLIC_ROUTE, createPublicRoutes(publicPagePersistence));
   return routes;
 }

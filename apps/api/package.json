@@ -15,6 +15,7 @@
     "test:site:integration": "bun test src/site.integration.test.ts",
     "test:membership:integration": "bun test src/membership.integration.test.ts",
     "test:page:integration": "bun test src/page.integration.test.ts",
+    "test:public:integration": "bun test src/public.integration.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

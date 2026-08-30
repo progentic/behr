@@ -27,6 +27,14 @@ export const pageDocumentSchema = z
   })
   .strict();
 
+export const publicPageResponseSchema = z
+  .object({
+    title: pageTitleSchema,
+    slug: pageSlugSchema,
+    document: pageDocumentSchema,
+  })
+  .strict();
+
 export const pageSummarySchema = z
   .object({
     id: pageIdSchema,
@@ -71,6 +79,7 @@ export const pageDraftSchema = z
   .strict();
 
 export type PageDocument = z.infer<typeof pageDocumentSchema>;
+export type PublicPageResponse = z.infer<typeof publicPageResponseSchema>;
 export type PageSummary = z.infer<typeof pageSummarySchema>;
 export type PageListResponse = z.infer<typeof pageListResponseSchema>;
 export type CreatePageRequest = z.infer<typeof createPageRequestSchema>;

@@ -144,6 +144,7 @@ async function verifyPageLifecycle(): Promise<void> {
       Array<{
         document: unknown;
         draftVersionId: string;
+        publishedVersionId: string | null;
         pageCount: number;
         versionCount: number;
         versionId: string;
@@ -152,6 +153,7 @@ async function verifyPageLifecycle(): Promise<void> {
     >`
       SELECT
         page.draft_version_id AS "draftVersionId",
+        page.published_version_id AS "publishedVersionId",
         version.id AS "versionId",
         version.document,
         pg_typeof(version.document)::text AS "documentType",
@@ -168,6 +170,7 @@ async function verifyPageLifecycle(): Promise<void> {
       document: DOCUMENT_A,
       draftVersionId: pageA.draft.id,
       pageCount: 1,
+      publishedVersionId: null,
       versionCount: 1,
       versionId: pageA.draft.id,
       documentType: "jsonb",
@@ -336,13 +339,16 @@ async function verifyPageLifecycle(): Promise<void> {
       DOCUMENT_B,
     );
     const [currentPointer] = await observer.native<
-      Array<{ draftVersionId: string }>
+      Array<{ draftVersionId: string; publishedVersionId: string | null }>
     >`
-      SELECT draft_version_id AS "draftVersionId"
+      SELECT
+        draft_version_id AS "draftVersionId",
+        published_version_id AS "publishedVersionId"
       FROM pages
       WHERE id = ${pageA.page.id}
     `;
     expect(currentPointer?.draftVersionId).toBe(saved.draft.id);
+    expect(currentPointer?.publishedVersionId).toBe(null);
 
     const currentDraft = await application.app.request(
       `${pageCollectionPath(tenantA.id, siteA.id)}/${pageA.page.id}`,

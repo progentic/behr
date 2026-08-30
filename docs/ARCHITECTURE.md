@@ -46,16 +46,18 @@ flowchart LR
 
     Browser -->|HTTP localhost:3000| Dev[Bun development listener]
     Dev -->|GET / and assets| AdminApp[React admin]
-    Dev -->|/health, /auth/*, /tenants/*| API[Hono API]
+    Dev -->|/health, /auth/*, /public/*, /tenants/*| API[Hono API]
+    PublicApp[Static apps/web build] -->|GET /public/page| API
     API --> Postgres[(PostgreSQL)]
 ```
 
 The Phase Q production target keeps the same public route paths: nginx will
-serve static application assets and forward `/health`, `/auth/*`, `/tenants`,
-and `/tenants/*`—including nested site routes—to the Bun API. It must not
+serve static application assets and forward `/health`, `/auth/*`, `/public/*`,
+`/tenants`, and `/tenants/*`—including nested site routes—to the Bun API. It must not
 invent an `/api` prefix unless the application routes are changed in a
-separately reviewed phase. Reverse-proxy configuration, SSR, and tenant-aware
-public rendering remain unimplemented.
+separately reviewed phase. Reverse-proxy configuration and SSR remain
+unimplemented; Phase H implements the public read model and static renderer
+without pulling that production routing work forward.
 
 ---
 
@@ -87,6 +89,7 @@ flowchart TD
     Request --> Pages[GET/POST /tenants/:tenantId/sites/:siteId/pages]
     Request --> Draft[GET /tenants/:tenantId/sites/:siteId/pages/:pageId]
     Request --> Version[POST /tenants/:tenantId/sites/:siteId/pages/:pageId/versions]
+    Request --> PublicPage[GET /public/page?slug=...]
 ```
 
 Interpretation:
@@ -103,7 +106,10 @@ Phase G adds no page UI; page listing and editing remain deferred to Phase K.
 
 Public Website
 
-The Phase A app displays only an implementation-status message. Domain routing and published content delivery are added in Phase H.
+Phase H replaces the status placeholder with a static browser application that
+translates one pathname segment to a page slug, reads `/public/page` on the
+current origin, and renders the canonical document. Production hostname
+routing remains Phase Q infrastructure.
 
 Customer Portal
 
@@ -161,8 +167,11 @@ site creation and membership-authorized site listing beneath that same tenant
 boundary. The pre-Phase G membership work adds owner-only member listing and
 provisioning plus invite-gated identity registration. Phase G adds relationally
 scoped page metadata, immutable draft versions, and current-draft resolution.
-Every decision uses the user resolved from the authoritative database session.
-Publishing, assets, preview, and public hostname resolution remain deferred.
+Phase H adds nullable published read state, hostname/slug resolution, and the
+public canonical-document response. Authenticated decisions use the user
+resolved from the authoritative database session; the public read is
+unauthenticated and read-only. Publishing mutation, assets, and preview remain
+deferred.
 
 The currently implemented public API routes are exactly:
 
@@ -182,6 +191,7 @@ The currently implemented public API routes are exactly:
 * `POST /tenants/:tenantId/sites/:siteId/pages`
 * `GET /tenants/:tenantId/sites/:siteId/pages/:pageId`
 * `POST /tenants/:tenantId/sites/:siteId/pages/:pageId/versions`
+* `GET /public/page?slug=...`
 
 ---
 
@@ -230,7 +240,13 @@ Constraints:
 
 * Cannot access draft content
 * Cannot perform mutations
-* Cannot bypass publish controls
+* Cannot bypass the published-version pointer
+
+Phase H implements pathname-to-slug translation, same-origin public API reads,
+and deterministic React rendering for canonical heading and paragraph blocks.
+Text is rendered through escaped React text nodes. The static application has
+no database import, server runtime, cache, preview state, theme framework, or
+publication controls.
 
 ---
 
@@ -301,6 +317,12 @@ then assigns the draft pointer in one transaction. A draft save inserts a new
 version and advances the pointer without changing prior versions. Concurrent
 saves use last-committed pointer semantics; both immutable versions may remain.
 
+Phase H adds nullable `pages.published_version_id`, a foreign key to an
+immutable page version with `ON DELETE SET NULL`. It represents only public
+read state. New pages remain unpublished, draft saves do not change it, and no
+production Phase H operation writes it. The public query additionally proves
+that the referenced version belongs to the same page.
+
 The database remains the sole session authority. Browser cookies contain only
 the opaque session identifier; they do not authorize a user without a valid
 database session.
@@ -311,8 +333,9 @@ the authenticated session user ID. Invalid, nonexistent, and inaccessible
 tenant IDs all return HTTP 404 without disclosing tenant existence.
 
 Site routes reuse this tenant context. Owners may create and list sites;
-members may list sites but receive HTTP 403 for creation. Stored hostnames are
-not resolved from public `Host` headers and are not publicly served in Phase E.
+members may list sites but receive HTTP 403 for creation. Phase H resolves a
+validated HTTP Host against the globally unique stored hostname for public
+reads; it does not add domain administration or production proxy routing.
 
 Page routes additionally prove that the requested site belongs to that tenant
 and that the requested page belongs to that site. Both owners and members may
@@ -320,8 +343,15 @@ list and create pages, resolve the current draft, and append draft versions;
 `member` therefore means content collaborator. Mutations retain trusted-origin
 protection. Invalid or inaccessible tenant, site, and page scopes return the
 same nondisclosing HTTP 404. Stored draft JSONB is validated against the
-canonical `pageDocumentSchema` before a successful public response; malformed
+canonical `pageDocumentSchema` before a successful authenticated response; malformed
 stored content fails through the generic HTTP 500 boundary.
+
+The public route accepts only the actual HTTP Host and one validated slug as
+authority. It joins domains, sites, pages, and the same page's published
+version. A null or mismatched pointer returns the same generic HTTP 404 and
+never falls back to the draft or latest version. Published JSONB is validated
+against `pageDocumentSchema`; malformed stored content fails through the
+generic HTTP 500 boundary.
 
 ---
 
@@ -384,9 +414,9 @@ sequenceDiagram
 
 # 6. Content Publication Flow
 
-This diagram is the Phase J target, not current behavior. Phase G implements
-only authenticated draft persistence through the API; no editor UI, public
-renderer, published pointer, or publish operation exists yet.
+This diagram remains the Phase J mutation target. Phase H now represents and
+reads published state through a nullable pointer, but no editor UI, publish
+route, production pointer mutation, or publication history exists yet.
 
 ```mermaid
 sequenceDiagram
