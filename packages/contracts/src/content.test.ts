@@ -1,4 +1,10 @@
-import { pageDocumentSchema } from "./page";
+import {
+  createPageRequestSchema,
+  pageDocumentSchema,
+  pageSlugSchema,
+  pageTitleSchema,
+  savePageDraftRequestSchema,
+} from "./page";
 
 declare function test(name: string, body: () => void): void;
 declare function expect<T>(actual: T): {
@@ -76,4 +82,54 @@ test("preserves the canonical document through a JSON round trip", () => {
   const parsed = pageDocumentSchema.parse(canonicalDocument);
   const roundTripped: unknown = JSON.parse(JSON.stringify(parsed));
   expect(pageDocumentSchema.parse(roundTripped)).toEqual(parsed);
+});
+
+test("normalizes strict page metadata and persistence requests", () => {
+  expect(pageTitleSchema.parse("  About Us  ")).toBe("About Us");
+  expect(pageTitleSchema.safeParse(" ").success).toBe(false);
+  expect(pageTitleSchema.safeParse("a".repeat(200)).success).toBe(true);
+  expect(pageTitleSchema.safeParse("a".repeat(201)).success).toBe(false);
+  expect(pageSlugSchema.parse("")).toBe("");
+  expect(pageSlugSchema.parse("  About-US  ")).toBe("about-us");
+  expect(pageSlugSchema.safeParse("a".repeat(200)).success).toBe(true);
+  expect(pageSlugSchema.safeParse("a".repeat(201)).success).toBe(false);
+  expect(pageSlugSchema.safeParse("/about").success).toBe(false);
+  expect(pageSlugSchema.safeParse("about/team").success).toBe(false);
+  expect(pageSlugSchema.safeParse("about us").success).toBe(false);
+
+  expect(
+    createPageRequestSchema.parse({
+      title: "  About  ",
+      slug: "ABOUT-US",
+      document: canonicalDocument,
+    }),
+  ).toEqual({
+    title: "About",
+    slug: "about-us",
+    document: canonicalDocument,
+  });
+  expect(
+    createPageRequestSchema.safeParse({
+      title: "About",
+      slug: "about",
+      document: canonicalDocument,
+      published: true,
+    }).success,
+  ).toBe(false);
+  expect(
+    savePageDraftRequestSchema.safeParse({
+      document: canonicalDocument,
+      pageId: SECTION_ID,
+    }).success,
+  ).toBe(false);
+  expect(
+    createPageRequestSchema.safeParse({
+      title: "Invalid",
+      slug: "invalid",
+      document: {
+        schemaVersion: 1,
+        sections: [{ id: SECTION_ID, blocks: [{ type: "image" }] }],
+      },
+    }).success,
+  ).toBe(false);
 });

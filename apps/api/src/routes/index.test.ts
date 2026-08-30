@@ -33,6 +33,14 @@ test("allows credentialed auth requests only for the configured admin origin", a
       resolveInvitation: async () => null,
       completeInvitation: async () => undefined,
     },
+    {
+      listPages: async () => [],
+      createPage: async () => {
+        throw new Error("Page creation is not used by this CORS test.");
+      },
+      resolvePageDraft: async () => null,
+      saveDraftVersion: async () => null,
+    },
     ADMIN_ORIGIN,
   );
   const response = await routes.request("/auth/login", {

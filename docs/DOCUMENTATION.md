@@ -647,7 +647,8 @@ existing-account path and the owner can add it directly.
 Role selection, ownership transfer, member removal, role mutation, general user
 administration, password reset, invitation email delivery, mailbox
 verification, unrestricted signup, OAuth, MFA, and SSO remain unimplemented.
-Phase G has not started.
+This decision was completed before Phase G and introduces no page behavior by
+itself.
 
 ### Verification performed
 
@@ -666,3 +667,87 @@ The final local verification used Bun 1.4.0, TypeScript 7.0.2, Better Auth
   auto-login, normal invited-user sign-in, member authorization, tenant-keyed
   UI state, refresh token loss, logout, and absence of unrestricted signup.
 * Dependency audit reported no vulnerabilities across 96 packages.
+
+---
+
+## Phase G — Page Persistence and Version Storage
+
+### What this phase delivers
+
+Phase G stores page metadata and canonical draft content without adding page
+UI, rendering, preview, or publishing. Its authenticated API surface is:
+
+```text
+GET  /tenants/:tenantId/sites/:siteId/pages
+POST /tenants/:tenantId/sites/:siteId/pages
+GET  /tenants/:tenantId/sites/:siteId/pages/:pageId
+POST /tenants/:tenantId/sites/:siteId/pages/:pageId/versions
+```
+
+Both `owner` and `member` may use these routes after authoritative session,
+tenant-membership, site-scope, and page-scope resolution. This is an explicit
+v1 product decision: `member` means content collaborator. Owner-only site
+creation and membership administration remain unchanged.
+
+### Metadata, slugs, and canonical content
+
+Migration `0004_page_version_storage.sql` adds exactly `pages` and
+`page_versions`. A page belongs to a site through `pages.site_id`; tenant
+ownership is derived through the site and is not duplicated. Page titles are
+trimmed. Slugs are trimmed, lowercased site-local keys containing lowercase
+ASCII letters, digits, and internal hyphens. The empty slug represents a site's
+root page. PostgreSQL's unique `(site_id, slug)` index is the concurrency-safe
+authority, so one site cannot contain duplicate or multiple root slugs while
+separate sites may reuse a slug.
+
+The content body is the unchanged Phase F `PageDocument` and is stored as a
+structured PostgreSQL JSONB value. The Bun SQL-specific Drizzle JSONB column
+mapping passes the validated object to the native client without an extra JSON
+stringification layer. No persistence metadata was added to the canonical
+document and no second content schema exists.
+
+### Immutable drafts and transaction behavior
+
+Page creation inserts metadata, inserts the initial immutable version, and
+assigns `pages.draft_version_id` in one transaction. A committed page therefore
+always has a current draft. Saving inserts another `page_versions` row and
+advances the page pointer in one transaction; normal application behavior
+exposes no version update or delete operation. If pointer advancement fails,
+the new version rolls back.
+
+Concurrent valid saves use simple last-committed pointer semantics. Both saves
+may create immutable history rows, and the transaction that commits its pointer
+last becomes current. Optimistic locking, ETags, and collaboration coordination
+remain intentionally absent.
+
+### Isolation and fail-closed reads
+
+Every page persistence operation is scoped by tenant ID and site ID, with page
+ID added where applicable. The API never resolves a page by page ID alone.
+Malformed IDs, inaccessible tenants, cross-tenant sites, cross-site page IDs,
+and missing resources share the same nondisclosing HTTP 404 response.
+
+Writes validate strict request contracts containing the canonical
+`PageDocument`. Reads validate retrieved JSONB with `pageDocumentSchema` before
+constructing a successful response. Invalid stored content is neither returned,
+coerced, nor repaired; it reaches the existing generic HTTP 500 boundary
+without exposing validation details or the stored value.
+
+### Verification performed
+
+Phase G verification uses Bun 1.4.0, TypeScript 7.0.2, Better Auth 1.7.2, and a
+fresh PostgreSQL database. Contract coverage proves metadata normalization,
+strict requests, and canonical-document rejection. PostgreSQL-backed coverage
+proves creation atomicity, the draft foreign key, JSONB object storage,
+database-authoritative slug uniqueness, owner/member collaboration,
+tenant/site/page nondisclosure, immutable history, pointer advancement,
+failed-save rollback, and malformed-content fail-closed behavior. Existing
+authentication, tenant, site, and membership integration gates remain part of
+the full regression sequence.
+
+### Deferred work
+
+Admin page lists and editing, public rendering, host-based resolution, preview,
+preview tokens, publication pointers and history, publishing, autosave,
+optimistic locking, page deletion, version-history APIs, assets, themes, and
+all Phase H and later behavior remain unimplemented. Phase H has not started.

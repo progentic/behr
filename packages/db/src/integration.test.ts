@@ -19,18 +19,20 @@ const MIGRATION_APPLICATION_NAME = "behr_integration_migration";
 const DRIZZLE_SCHEMA_NAME = "drizzle";
 const DRIZZLE_OBJECT_PREFIX = "__drizzle_migrations";
 const TABLE_OBJECT_KINDS = new Set(["r", "p"]);
-const PHASE_E_TABLE_NAMES = [
+const EXPECTED_APPLICATION_TABLE_NAMES = [
   "account",
   "domains",
   "membership_invitations",
   "memberships",
+  "page_versions",
+  "pages",
   "session",
   "sites",
   "tenants",
   "user",
   "verification",
 ];
-const PHASE_E_CATALOG_OBJECTS = new Set([
+const EXPECTED_CATALOG_OBJECTS = new Set([
   "account",
   "account_issuer_account_id_uidx",
   "account_pkey",
@@ -45,6 +47,13 @@ const PHASE_E_CATALOG_OBJECTS = new Set([
   "memberships",
   "memberships_tenant_id_user_id_pk",
   "memberships_user_id_idx",
+  "page_versions",
+  "page_versions_page_id_idx",
+  "page_versions_pkey",
+  "pages",
+  "pages_pkey",
+  "pages_site_id_idx",
+  "pages_site_id_slug_uidx",
   "session",
   "session_pkey",
   "session_token_unique",
@@ -169,8 +178,10 @@ async function verifyMigrationIdempotency(
 async function verifyDatabaseCatalog(context: IntegrationContext): Promise<void> {
   const objects = await listCatalogObjects(context.observer);
   expect(objects.length).toBeGreaterThan(NO_CATALOG_OBJECTS);
-  expect(objects.every(isAllowedPhaseECatalogObject)).toBe(true);
-  expect(findApplicationTableNames(objects)).toEqual(PHASE_E_TABLE_NAMES);
+  expect(objects.every(isExpectedCatalogObject)).toBe(true);
+  expect(findApplicationTableNames(objects)).toEqual(
+    EXPECTED_APPLICATION_TABLE_NAMES,
+  );
 }
 
 async function verifyDatabaseConstraints(
@@ -189,6 +200,12 @@ async function verifyDatabaseConstraints(
     { name: "memberships_tenant_id_tenants_id_fk", type: "FOREIGN KEY" },
     { name: "memberships_tenant_id_user_id_pk", type: "PRIMARY KEY" },
     { name: "memberships_user_id_user_id_fk", type: "FOREIGN KEY" },
+    { name: "page_versions_page_id_pages_id_fk", type: "FOREIGN KEY" },
+    {
+      name: "pages_draft_version_id_page_versions_id_fk",
+      type: "FOREIGN KEY",
+    },
+    { name: "pages_site_id_sites_id_fk", type: "FOREIGN KEY" },
     { name: "session_token_unique", type: "UNIQUE" },
     { name: "session_user_id_user_id_fk", type: "FOREIGN KEY" },
     { name: "sites_tenant_id_tenants_id_fk", type: "FOREIGN KEY" },
@@ -200,6 +217,8 @@ async function verifyDatabaseConstraints(
     "membership_invitations_tenant_id_tenants_id_fk",
     "memberships_tenant_id_tenants_id_fk",
     "memberships_user_id_user_id_fk",
+    "page_versions_page_id_pages_id_fk",
+    "pages_site_id_sites_id_fk",
     "session_user_id_user_id_fk",
     "sites_tenant_id_tenants_id_fk",
   ]);
@@ -336,6 +355,9 @@ async function listDatabaseConstraints(
         'memberships_tenant_id_tenants_id_fk',
         'memberships_tenant_id_user_id_pk',
         'memberships_user_id_user_id_fk',
+        'page_versions_page_id_pages_id_fk',
+        'pages_draft_version_id_page_versions_id_fk',
+        'pages_site_id_sites_id_fk',
         'session_token_unique',
         'session_user_id_user_id_fk',
         'sites_tenant_id_tenants_id_fk',
@@ -357,6 +379,8 @@ async function listCascadeForeignKeys(client: DatabaseClient): Promise<string[]>
         'membership_invitations_tenant_id_tenants_id_fk',
         'memberships_tenant_id_tenants_id_fk',
         'memberships_user_id_user_id_fk',
+        'page_versions_page_id_pages_id_fk',
+        'pages_site_id_sites_id_fk',
         'session_user_id_user_id_fk',
         'sites_tenant_id_tenants_id_fk'
       )
@@ -388,11 +412,11 @@ function isApplicationTable(object: CatalogObject): boolean {
   );
 }
 
-function isAllowedPhaseECatalogObject(object: CatalogObject): boolean {
+function isExpectedCatalogObject(object: CatalogObject): boolean {
   return (
     isDrizzleMigrationObject(object) ||
     (object.schemaName === PUBLIC_SCHEMA_NAME &&
-      PHASE_E_CATALOG_OBJECTS.has(object.objectName))
+      EXPECTED_CATALOG_OBJECTS.has(object.objectName))
   );
 }
 

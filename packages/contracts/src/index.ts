@@ -36,8 +36,23 @@ export {
 } from "./membership";
 export {
   PAGE_DOCUMENT_SCHEMA_VERSION,
+  type CreatePageRequest,
+  type DraftVersion,
   type PageDocument,
+  type PageDraft,
+  type PageListResponse,
+  type PageSummary,
+  type SavePageDraftRequest,
+  createPageRequestSchema,
+  draftVersionSchema,
+  pageDraftSchema,
   pageDocumentSchema,
+  pageIdSchema,
+  pageListResponseSchema,
+  pageSlugSchema,
+  pageSummarySchema,
+  pageTitleSchema,
+  savePageDraftRequestSchema,
 } from "./page";
 export { type Section, sectionSchema } from "./section";
 export {

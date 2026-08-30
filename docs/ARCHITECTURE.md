@@ -75,6 +75,7 @@ flowchart TD
     Request --> Root[GET / → admin index.html]
     Request --> Health[GET /health]
     Request --> Login[POST /auth/login]
+    Request --> Register[POST /auth/register]
     Request --> Session[GET /auth/session]
     Request --> Logout[POST /auth/logout]
     Request --> CreateTenant[POST /tenants]
@@ -82,6 +83,10 @@ flowchart TD
     Request --> TenantAccess[GET /tenants/:tenantId]
     Request --> CreateSite[POST /tenants/:tenantId/sites]
     Request --> ListSites[GET /tenants/:tenantId/sites]
+    Request --> Members[GET/POST /tenants/:tenantId/members]
+    Request --> Pages[GET/POST /tenants/:tenantId/sites/:siteId/pages]
+    Request --> Draft[GET /tenants/:tenantId/sites/:siteId/pages/:pageId]
+    Request --> Version[POST /tenants/:tenantId/sites/:siteId/pages/:pageId/versions]
 ```
 
 Interpretation:
@@ -92,8 +97,9 @@ implemented Hono route paths.
 
 Admin Panel
 
-The Phase C admin provides login, session restoration, logout, and the minimal
-authenticated shell. Later administrative workflows remain deferred.
+The admin provides login, session restoration, logout, tenant-local site
+management, and owner-only membership provisioning and invitation handling.
+Phase G adds no page UI; page listing and editing remain deferred to Phase K.
 
 Public Website
 
@@ -152,14 +158,17 @@ Phase C implements authentication through Hono, Better Auth, and the existing
 Bun SQL-backed Drizzle client. Phase D adds tenant creation, membership-based
 listing, and path-based tenant access resolution. Phase E adds owner-authorized
 site creation and membership-authorized site listing beneath that same tenant
-boundary. Every decision uses the user resolved from the authoritative database
-session. Content behavior, publishing, assets, preview, and public hostname
-resolution remain deferred.
+boundary. The pre-Phase G membership work adds owner-only member listing and
+provisioning plus invite-gated identity registration. Phase G adds relationally
+scoped page metadata, immutable draft versions, and current-draft resolution.
+Every decision uses the user resolved from the authoritative database session.
+Publishing, assets, preview, and public hostname resolution remain deferred.
 
 The currently implemented public API routes are exactly:
 
 * `GET /health`
 * `POST /auth/login`
+* `POST /auth/register`
 * `GET /auth/session`
 * `POST /auth/logout`
 * `POST /tenants`
@@ -167,6 +176,12 @@ The currently implemented public API routes are exactly:
 * `GET /tenants/:tenantId`
 * `POST /tenants/:tenantId/sites`
 * `GET /tenants/:tenantId/sites`
+* `GET /tenants/:tenantId/members`
+* `POST /tenants/:tenantId/members`
+* `GET /tenants/:tenantId/sites/:siteId/pages`
+* `POST /tenants/:tenantId/sites/:siteId/pages`
+* `GET /tenants/:tenantId/sites/:siteId/pages/:pageId`
+* `POST /tenants/:tenantId/sites/:siteId/pages/:pageId/versions`
 
 ---
 
@@ -192,8 +207,10 @@ Constraints:
 Phase C implements only the login page, four explicit authentication states,
 current-session resolution, and logout. Phase E adds a minimal authenticated
 site workflow: component-local tenant selection, site loading, and owner-only
-site creation. Page, asset, theme, domain-administration, preview, and
-publishing interfaces remain unimplemented.
+site creation. The pre-Phase G membership work adds owner-only membership
+administration and invite registration. Phase G adds no admin behavior. Page,
+asset, theme, domain-administration, preview, and publishing interfaces remain
+unimplemented.
 
 ---
 
@@ -264,6 +281,26 @@ the unique site foreign key limits each Phase E site to one hostname. Site and
 domain insertion occurs in one transaction, and tenant deletion cascades
 through sites to domain mappings.
 
+The pre-Phase G membership decision adds `membership_invitations`, which binds
+one hashed, expiring invitation credential to one tenant and normalized email.
+The database enforces globally unique token hashes and one current invitation
+per tenant/email pair.
+
+Phase G adds:
+
+* `pages` — UUID identity, site foreign key, title, normalized site-local slug,
+  nullable current-draft pointer, and timestamps
+* `page_versions` — UUID identity, page foreign key, canonical `PageDocument`
+  JSONB, and creation timestamp
+
+Page ownership follows `tenant → site → page`; neither page table duplicates
+tenant identity. PostgreSQL enforces unique `(site_id, slug)` values, so each
+site has at most one root page (`slug = ""`) while another site may reuse the
+same slug. Creation inserts the metadata row and initial immutable version and
+then assigns the draft pointer in one transaction. A draft save inserts a new
+version and advances the pointer without changing prior versions. Concurrent
+saves use last-committed pointer semantics; both immutable versions may remain.
+
 The database remains the sole session authority. Browser cookies contain only
 the opaque session identifier; they do not authorize a user without a valid
 database session.
@@ -276,6 +313,15 @@ tenant IDs all return HTTP 404 without disclosing tenant existence.
 Site routes reuse this tenant context. Owners may create and list sites;
 members may list sites but receive HTTP 403 for creation. Stored hostnames are
 not resolved from public `Host` headers and are not publicly served in Phase E.
+
+Page routes additionally prove that the requested site belongs to that tenant
+and that the requested page belongs to that site. Both owners and members may
+list and create pages, resolve the current draft, and append draft versions;
+`member` therefore means content collaborator. Mutations retain trusted-origin
+protection. Invalid or inaccessible tenant, site, and page scopes return the
+same nondisclosing HTTP 404. Stored draft JSONB is validated against the
+canonical `pageDocumentSchema` before a successful public response; malformed
+stored content fails through the generic HTTP 500 boundary.
 
 ---
 
@@ -337,6 +383,10 @@ sequenceDiagram
 ---
 
 # 6. Content Publication Flow
+
+This diagram is the Phase J target, not current behavior. Phase G implements
+only authenticated draft persistence through the API; no editor UI, public
+renderer, published pointer, or publish operation exists yet.
 
 ```mermaid
 sequenceDiagram

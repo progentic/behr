@@ -10,6 +10,12 @@ export { createAuthPersistence, identityExists } from "./auth-persistence";
 export { checkDatabaseConnection } from "./check";
 export { migrateDatabase } from "./migrate";
 export {
+  type PagePersistence,
+  PageScopeNotFoundError,
+  PageSlugConflictError,
+  createPagePersistence,
+} from "./page-persistence";
+export {
   type MembershipPersistence,
   InvitationCompletionRejectedError,
   MembershipAlreadyExistsError,
@@ -37,6 +43,8 @@ export {
   domains,
   membershipInvitations,
   memberships,
+  pageVersions,
+  pages,
   session,
   sites,
   tenantRole,
