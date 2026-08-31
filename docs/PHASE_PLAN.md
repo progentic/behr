@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.8
+Version: 1.9
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -2189,25 +2189,793 @@ Objective
 
 Allow blocks to reference assets.
 
-Guidelines
+Ownership Correction
 
-Must:
+High — Phase M ownership and asset-read authority gap: Version 1.8 requires canonical asset references, persistent usage, an admin asset picker, and asset-backed rendering without defining the contract, persistence, authorization, storage-read, UI, or renderer surfaces needed to implement them. In particular, usage history alone cannot become public asset authority because doing so would expose bytes referenced only by unpublished drafts. Version 1.9 defines separate current-publication and token-bound-preview asset authorities while preserving the existing draft-isolation invariant.
 
-• Implement asset picker
-• Record asset usage
-• Render asset-backed blocks
+This correction does not reopen Phase L. No Phase L runtime correction is required, and Phase N remains unstarted.
 
-Must not:
+Authority Flow
 
-• Implement media pipelines
+site asset
+    ↓
+canonical image block
+    ↓
+immutable page version
+    ↓
+immutable version→asset usage
+    ↓
+published-version OR preview-token authority
+    ↓
+asset bytes
+    ↓
+existing React renderer
+
+page_version_assets records usage. It does not by itself grant public access.
+
+Canonical Image Block
+
+Add exactly one canonical asset-backed block:
+
+{
+  id: string;
+  type: "image";
+  assetId: string;
+  alt: string;
+}
+
+Requirements:
+
+• id remains a UUID
+• assetId uses the existing assetIdSchema
+• alt is a string
+• Empty alt is permitted for a decorative image
+• The block object is strict
+
+Do not add URL, storage key, filename, MIME type, caption, width, height, crop, focal point, responsive variants, link target, or CSS class.
+
+Canonical content stores stable asset identity, not delivery metadata.
+
+Existing Blocks and Document Version
+
+Preserve existing heading and paragraph contracts and semantics, including heading levels, text, alignment, section structure, and ordering.
+
+Do not change the existing PageDocument schema version merely because the discriminated block union gains one backward-compatible member unless direct contract evidence proves a version change is required.
+
+Renderable Asset Types
+
+Phase M may render only these stored content-type values:
+
+image/jpeg
+image/png
+image/gif
+image/webp
+image/avif
+
+Do not publicly or privately preview-render image/svg+xml, text/html, application/pdf, application/octet-stream, or arbitrary uploaded types.
+
+Phase L content type remains untrusted descriptive metadata. Phase M does not add MIME sniffing, image decoding, sanitization, or content inference.
+
+Minimal Asset Picker
+
+The authenticated admin picker may:
+
+• Load renderable assets belonging to the current site
+• Display original filename
+• Select one asset
+• Append an image block to the selected section
+
+It does not upload, delete, rename, search, paginate, organize folders, display usage counts, generate thumbnails, implement drag-and-drop, or introduce a media-library modal/framework.
+
+Keep the picker inline and functional. The Phase L POST route remains the only upload authority.
+
+Authenticated Asset List Route
+
+Extend the existing asset route module with exactly:
+
+GET /tenants/:tenantId/sites/:siteId/assets
+
+Authority:
+
+authenticated session
+    ↓
+tenant membership
+    ↓
+valid site ID
+    ↓
+authoritative tenant/site relationship
+
+Both owner and member may list site assets.
+
+GET does not require trusted-origin middleware. Preserve the existing POST route's trusted-origin, 11 MiB body-limit, 10 MiB file-limit, exact multipart, narrow parser classification, exclusive-write, and compensation behavior unchanged.
+
+Asset List Response
+
+Add a strict response equivalent to:
+
+{
+  assets: [
+    {
+      id: string;
+      originalFilename: string;
+      contentType: string;
+      byteSize: number;
+      createdAt: string;
+    }
+  ];
+}
+
+Reuse existing asset metadata contracts where appropriate.
+
+Return only assets whose stored content type is in the Phase M renderable-image allowlist. Order by created_at ascending, then id ascending.
+
+Do not expose storageKey, physical path, siteId, tenantId, or usage count.
+
+Asset List Persistence
+
+Extend AssetPersistence with one focused operation equivalent to:
+
+listSiteAssets(tenantId, siteId)
+
+It must prove:
+
+sites.id = siteId
+AND sites.tenant_id = tenantId
+AND assets.site_id = sites.id
+
+Do not add generic asset CRUD, a repository class, an asset service, or search infrastructure.
+
+Asset Picker Async Identity
+
+Asset-list state belongs to a tenant/site pair. Per Global Rule 13, every asynchronous state and completion must carry at least tenantId and siteId.
+
+A late result started for site A must not populate an editor currently displaying site B. Use component-local React state, normal effect cleanup, and latest-state checks only where needed.
+
+Do not add a custom asset hook, reducer, context, store, generic request manager, global epoch/generation abstraction, or mirrored current-site ref. If effect cleanup plus tenant/site identity is sufficient, use it.
+
+Editor Domain Operations
+
+Extend packages/editor only with the pure operations required by the image block:
+
+addImageBlock(document, sectionId, blockId, assetId)
+updateImageAlt(document, blockId, alt)
+
+addImageBlock appends:
+
+{
+  id: blockId,
+  type: "image",
+  assetId,
+  alt: ""
+}
+
+updateImageAlt changes only the addressed image block. Existing text, heading-level, and alignment operations leave image blocks unchanged.
+
+Wrong-section insertion remains a bounded no-op consistent with current editor semantics.
+
+Do not add an asset service, editor state manager, generic block factory, or media domain layer.
+
+Image Block Editor
+
+Extend the existing BlockEditor for image blocks with:
+
+• Selected asset identity or original filename when available from current-site asset state
+• Alt-text input
+• Existing Remove block action
+
+The canonical block must not depend on original filename. Do not add resizing, alignment, captions, links, or media controls.
+
+Asset Usage Table
+
+Create exactly:
+
+page_version_assets
+
+Required columns:
+
+page_version_id
+asset_id
+
+Primary key:
+
+(page_version_id, asset_id)
+
+Add an index on asset_id.
+
+Do not add tenant_id, site_id, page_id, block_id, created_at, or usage_count. The immutable page version already identifies the document containing the reference.
+
+Usage Foreign Keys
+
+page_version_id:
+
+FK → page_versions.id
+ON DELETE CASCADE
+
+asset_id:
+
+FK → assets.id
+ON DELETE NO ACTION
+
+Asset deletion remains unimplemented. The non-cascading asset relationship prevents a future delete workflow from silently erasing evidence referenced by immutable historical versions.
+
+Usage Extraction Ownership
+
+For initial page creation and every draft-version save:
+
+API validates canonical PageDocument
+    ↓
+API extracts unique image asset IDs
+    ↓
+PagePersistence receives document + assetIds
+    ↓
+persistence resolves authoritative site/page
+    ↓
+prove every referenced asset belongs to that site
+    ↓
+INSERT immutable page_version
+    ↓
+INSERT page_version_assets rows
+    ↓
+advance draft pointer
+
+Initial page creation applies the same rules before establishing its first draft pointer.
+
+Do not make @bher/db import canonical contracts or parse PageDocument to discover image blocks. Canonical parsing and asset-ID extraction remain API/contract boundary responsibilities.
+
+Unique Usage Extraction
+
+Multiple blocks using the same asset create exactly one page_version_assets row for that version/asset pair.
+
+The document remains authoritative for block count, position, and order. Do not store block-level usage rows.
+
+Same-Site Asset Reference Validation
+
+Before inserting a page version, prove every referenced asset satisfies:
+
+assets.id = requested assetId
+AND assets.site_id = authoritative page site
+
+A syntactically valid nonexistent or wrong-site asset is an invalid page request.
+
+Return the existing bounded response:
+
+400
+{"error":"Page request is invalid."}
+
+Do not disclose whether an asset exists elsewhere.
+
+No page_versions row, page_version_assets row, or draft-pointer update may commit for an invalid reference.
+
+Page-Version Transaction Boundary
+
+For every initial or later version, the same existing page-persistence transaction owns:
+
+• Authoritative site/page scope proof
+• Same-site asset proof
+• page_versions insert
+• page_version_assets inserts
+• Draft-pointer update
+
+Initial creation retains page metadata creation in that transaction.
+
+Usage must never commit without its immutable version, and a version containing image references must never commit without every required usage row.
+
+Do not create another transaction coordinator.
+
+Invalid Asset Reference Translation
+
+Use one explicit persistence error/result for referenced assets that are invalid for the authoritative site. The page route translates only that owned condition to the existing HTTP 400 response.
+
+Do not use a generic database exception as invalid-input authority.
+
+Global Rule 15 applies:
+
+owned same-site-reference failure
+    → HTTP 400
+
+adjacent generic persistence failure
+    → propagate
+    → generic HTTP 500
+
+Where realistically exercisable through the existing focused route seam, prove both paths. Do not write catch-all translation, add a production failure endpoint, or create general error-classification infrastructure.
+
+Historical Usage Semantics
+
+Usage is immutable because page versions are immutable.
+
+Saving version B does not mutate version A usage. Publishing and preview-token issuance do not create, rewrite, or delete usage.
+
+Usage answers which assets an immutable version references. It does not answer whether an asset is currently public.
+
+Draft Isolation
+
+Saving an image-backed draft records page_version_assets but must not make its bytes anonymously accessible.
+
+Required:
+
+draft save
+    ↓
+page_version_assets row exists
+    ↓
+GET /public/assets/:assetId returns 404
+
+unless another currently published version on the same site independently references that asset.
+
+Preserve the invariant that draft content cannot be publicly exposed. Historical usage is never implicit public authority.
+
+Published Asset Route
+
+Add exactly:
+
+GET /public/assets/:assetId
+
+under the existing /public route boundary.
+
+The response contains asset bytes, not JSON metadata.
+
+Public authority requires the requested asset to be referenced by at least one currently published page version on the Host-resolved site.
+
+Published Relational Proof
+
+The public resolver must prove the complete relationship:
+
+domains.hostname = actual Host
+domains.site_id = sites.id
+assets.id = requested assetId
+assets.site_id = sites.id
+pages.site_id = sites.id
+page_versions.id = pages.published_version_id
+page_versions.page_id = pages.id
+page_version_assets.page_version_id = page_versions.id
+page_version_assets.asset_id = assets.id
+
+Do not trust any individual foreign key alone. This retains Phase H's same-page published-version proof and adds exact usage/asset/site ancestry.
+
+Published Asset Results
+
+Return one nondisclosing HTTP 404 for missing or invalid Host, malformed asset ID, unknown asset, wrong-site asset, draft-only asset, asset used only by an unpublished or historical non-current version, and unsupported content type.
+
+If another currently published page on the same site references the asset, that current publication still authorizes it.
+
+Preview Asset Route
+
+Add exactly:
+
+GET /preview/assets/:assetId
+
+under the existing preview boundary. Require the existing X-BeHR-Preview-Token header and existing token format.
+
+Preview Relational Proof
+
+Preview authority must prove:
+
+domains.hostname = actual Host
+domains.site_id = sites.id
+preview_tokens.token_hash = hash(header token)
+preview_tokens.expires_at > now
+preview_tokens.page_id = pages.id
+preview_tokens.version_id = page_versions.id
+page_versions.page_id = pages.id
+pages.site_id = sites.id
+page_version_assets.page_version_id = preview_tokens.version_id
+page_version_assets.asset_id = assets.id
+assets.id = requested assetId
+assets.site_id = sites.id
+
+The requested asset must be referenced by the exact immutable version bound to the currently valid preview credential. Same-site ownership alone is insufficient.
+
+Preview Asset Results
+
+Return one nondisclosing HTTP 404 for missing, malformed, expired, or rotated credentials; wrong Host; malformed asset ID; wrong-site asset; asset not used by the token-bound version; and unsupported content type.
+
+Preview failure must never fall back to the public asset route.
+
+Preview Credential Transport
+
+Do not place raw preview credentials in an asset URL, query string, cookie, localStorage, or sessionStorage.
+
+Reuse the existing browser-held preview token and X-BeHR-Preview-Token header.
+
+Do not add signed URLs, asset-specific preview tokens, preview cookies, a new token table, or another credential service.
+
+Published Renderer Behavior
+
+For normal published rendering, an image block renders equivalent to:
+
+<img
+  src={`/public/assets/${block.assetId}`}
+  alt={block.alt}
+/>
+
+React owns text escaping. Do not inject HTML or place storage keys or physical paths into markup.
+
+Preview Renderer Behavior
+
+Preview rendering must not place the preview token in the image source URL.
+
+Use one small preview-image component local to the existing web renderer:
+
+assetId + alt + existing preview token
+    ↓
+fetch /preview/assets/:assetId
+with X-BeHR-Preview-Token
+    ↓
+Blob
+    ↓
+URL.createObjectURL()
+    ↓
+<img src=objectURL>
+
+Cleanup must call URL.revokeObjectURL().
+
+The component owns only this browser transport difference. Do not add a generic asset-source resolver, global asset cache/context, service worker, or media client service.
+
+Preview Asset Async Identity
+
+The preview byte request belongs to the exact assetId/previewToken pair. A late result for another pair must not replace the current source.
+
+A React effect keyed by those values with cleanup is sufficient. Do not add epochs, request managers, reducers, stores, or global generation counters unless direct evidence proves normal cleanup insufficient.
+
+Read-Persistence Ownership
+
+Do not turn AssetPersistence into a generic authorization service.
+
+AssetPersistence owns authenticated site asset management only:
+
+resolveAssetSite
+createAssetMetadata
+listSiteAssets
+
+PublicPagePersistence adds one focused operation equivalent to:
+
+resolvePublishedAsset(hostname, assetId)
+
+It owns current-publication asset authority.
+
+PreviewPersistence adds one focused operation equivalent to:
+
+resolvePreviewAsset(hostname, assetId, tokenHash, now)
+
+It owns token-bound preview asset authority.
+
+Do not add AssetReadService, AssetAuthorizationService, AssetRepository, or MediaService.
+
+Asset Read Persistence Result
+
+Published and preview asset resolution returns only internal delivery metadata needed by the byte boundary:
+
+{
+  storageKey: string;
+  contentType: string;
+}
+
+Do not expose this object through a public JSON response.
+
+Storage Read
+
+Extend the existing AssetStorage with exactly:
+
+readOriginal(storageKey) → Uint8Array
+
+It must reuse existing storage-key parsing, UUID validation, and root confinement. Physical-path logic remains inside AssetStorage.
+
+Do not add a blob-store/CDN abstraction, streaming framework, or file repository.
+
+Missing Physical File
+
+If authoritative database resolution succeeds but readOriginal fails because bytes are missing or unreadable, return the existing generic HTTP 500 response.
+
+Do not translate that integrity/storage failure to HTTP 404, repair the row, or add cleanup behavior. Under Global Rule 15, broad filesystem-error-to-not-found translation is forbidden.
+
+Content-Type Response Policy
+
+Both GET /public/assets/:assetId and GET /preview/assets/:assetId must:
+
+1. Resolve content type from authoritative stored metadata.
+2. Require the exact metadata value to be in the Phase M renderable allowlist.
+3. Set that exact allowlisted Content-Type.
+4. Set X-Content-Type-Options: nosniff.
+
+Do not reflect original filename into response headers, sniff content, or serve SVG.
+
+No Media Pipeline
+
+Do not add resizing, thumbnails, cropping, optimization, transcoding, format conversion, EXIF processing, derivatives, virus scanning, a worker, or a queue.
+
+The reserved derivatives directory remains unused.
+
+No Asset-Management Expansion
+
+Do not add asset DELETE, UPDATE/PATCH, rename, folders, tags, search, pagination, usage-count endpoints, orphan cleanup, or garbage collection.
+
+Phase M integrates references only.
+
+Workspace Dependency Preflight
+
+Before implementation inspect:
+
+apps/admin/package.json
+apps/web/package.json
+packages/editor/package.json
+packages/db/package.json
+
+The accepted relationships are:
+
+@bher/admin  → @bher/contracts
+@bher/admin  → @bher/editor
+@bher/editor → @bher/contracts
+@bher/web    → @bher/contracts
+
+No new workspace edge is expected. In particular, do not add @bher/db → @bher/contracts merely so persistence can inspect PageDocument; the API already owns canonical parsing.
+
+If a required workspace dependency is genuinely missing, stop and request a separately approved micro-task. Do not bypass workspace ownership with relative imports.
+
+Usage Extraction Boundary
+
+A small API-side collectAssetIds(document) function is justified only if shared by page creation and draft saving or if the name materially clarifies the page-version persistence boundary.
+
+Do not create a generic document walker. Use a short direct expression when clearer. Global Rule 12 remains authoritative.
+
+Files / Functions
+
+packages/contracts
+
+src/asset.ts
+src/asset.test.ts
+src/block.ts
+src/content.test.ts
+src/index.ts
+package.json only if existing test wiring genuinely requires it
+
+packages/editor
+
+src/index.ts
+src/index.test.ts
+
+packages/db
+
+src/schema/page-version-assets.ts
+src/schema/index.ts
+src/page-persistence.ts
+src/asset-persistence.ts
+src/public-page-persistence.ts
+src/preview-persistence.ts
+src/index.ts
+src/integration.test.ts
+migrations/
+migrations/meta/
+
+apps/api
+
+src/application.ts
+src/lib/asset-storage.ts
+src/lib/asset-storage.test.ts
+src/routes/index.ts
+src/routes/assets.ts
+src/routes/assets.test.ts
+src/routes/pages.ts
+src/routes/pages.test.ts
+src/routes/public.ts
+src/routes/preview.ts
+src/asset.integration.test.ts
+src/page.integration.test.ts
+src/public.integration.test.ts
+src/preview.integration.test.ts
+
+apps/admin
+
+src/PageEditor.tsx
+src/PageEditor.test.ts
+
+apps/web
+
+src/main.tsx
+src/renderer.tsx
+src/renderer.test.tsx
+
+A focused additional web unit-test file is permitted only if preview-asset request lifecycle coverage cannot reasonably live in the existing web unit surface.
+
+Repository / Documentation
+
+package.json only if existing root test wiring must include a new focused test
+.github/workflows/ci.yml only if an existing gate genuinely does not execute required tests
+docs/ARCHITECTURE.md
+docs/DOCUMENTATION.md
+
+No unnamed support surface exists.
+
+Files Outside Phase M
+
+Do not modify unrelated authentication, tenant creation, membership invitation, site creation, publishing semantics, preview-token issuance semantics, theme packages, or infrastructure.
+
+Do not modify Phase N behavior or add new applications/packages.
+
+Migration
+
+Generate the next normal Drizzle migration, expected equivalent to:
+
+0009_page_version_assets.sql
+
+The exact generated suffix follows repository tooling.
+
+Exactly one new application table is expected: page_version_assets. No existing application table requires Phase M schema mutation.
+
+Dependencies
+
+No new external dependency is expected. Use existing Bun/Web and Node filesystem APIs, Hono, Zod, Drizzle, PostgreSQL, React, and accepted workspace packages.
+
+bun.lock must remain unchanged unless a genuinely missing already-required workspace relationship requires an approved workspace-only metadata correction.
+
+Do not add image libraries.
+
+Verification Requirements
+
+Contract tests must prove existing heading/paragraph blocks remain valid; one strict image block is accepted; malformed asset UUID and missing alt are rejected; empty alt is accepted; extra delivery fields are rejected; and asset-list responses are strict.
+
+Editor tests must prove addImageBlock, updateImageAlt, unchanged text-transform behavior for image blocks, wrong-section no-op behavior, tenant/site-confined async list state, correct asset selection, and absence of media-management frameworks.
+
+PostgreSQL usage tests must prove initial and later version/usage/pointer atomicity, duplicate-reference deduplication, and immutable historical usage.
+
+Wrong-Site and Nonexistent Reference Controls
+
+For a page in site A, reject an asset from site B and a valid UUID with no asset row using the same bounded HTTP 400 response.
+
+Directly prove page-version delta = 0, usage delta = 0, and draft pointer unchanged. Do not infer transactional integrity from response status or disclose which invalid-reference condition occurred.
+
+Rule 15 Classification Control
+
+Where realistically exercisable through the existing route seam, prove an owned invalid-reference result translates to HTTP 400 while an adjacent generic persistence exception reaches generic HTTP 500.
+
+Do not add a generalized error injector or production failure route.
+
+Published Asset Verification
+
+Create draft version A containing asset A without publishing it:
+
+GET /public/assets/A → 404
+
+Publish that exact version:
+
+GET /public/assets/A → 200
+
+Verify exact bytes, allowlisted Content-Type, and X-Content-Type-Options: nosniff.
+
+Published-Version Transition and Reuse
+
+After publishing version A using asset A, save and publish version B without A. If no other current published page on the site references A, public asset A returns 404 while historical usage remains.
+
+If another current published page on the same site still references A, public asset A remains 200. The relational existence query—not usage counts—owns this proof.
+
+Preview Asset Verification
+
+Issue preview token T1 bound to immutable version A containing asset A. T1 authorizes A and no unused asset.
+
+After saving version B containing asset B without rotating T1:
+
+T1 + A → 200
+T1 + B → 404
+
+After rotating to token T2 bound to B:
+
+old T1 + A → 404
+old T1 + B → 404
+new T2 + B → 200
+new T2 + A → 404 unless B references A
+
+Expired credentials return 404 with no public fallback or asset mutation.
+
+Host, Site, MIME, and Integrity Controls
+
+For public and preview routes prove wrong Host, another-site asset, malformed asset ID, and unsupported MIME return nondisclosing 404.
+
+Preview additionally proves a credential for another page/site/version cannot authorize the asset.
+
+If otherwise-authorized metadata and usage exist but the physical original is missing, both authorized delivery paths return generic HTTP 500 rather than 404.
+
+Renderer Verification
+
+Published image markup uses /public/assets/<assetId> and canonical alt text.
+
+Preview rendering sends the existing token only through X-BeHR-Preview-Token, creates an object URL from the returned Blob, renders it, and revokes it during cleanup.
+
+The token never appears in the asset URL, cookie, or browser storage. Preview failure never falls back to the public endpoint.
+
+Do not add browser E2E infrastructure solely for Phase M.
+
+Asset Route Regression
+
+The existing POST asset route retains owner/member authorization, trusted origin, exact multipart policy, 10 MiB file and 11 MiB request limits, narrow malformed-parser classification, exclusive writes, and metadata compensation.
+
+Adding GET must not alter POST behavior.
+
+Public and Preview Page Regression
+
+GET /public/page and GET /preview/page remain canonical-document JSON routes. They do not embed binary bytes and retain their existing authority rules except that the canonical document may contain a valid image block.
+
+API Route Inventory
+
+Phase M adds exactly:
+
+GET /tenants/:tenantId/sites/:siteId/assets
+GET /public/assets/:assetId
+GET /preview/assets/:assetId
+
+The Phase L POST upload route remains. No other route is expected.
+
+Database and Storage Operation Inventories
+
+The only new production database mutation is INSERT page_version_assets while creating an immutable page version.
+
+Do not add UPDATE or explicit DELETE page_version_assets, asset UPDATE, or asset DELETE. Usage deletion occurs only through its declared page-version cascade.
+
+Storage adds read original to existing exclusive write original and compensating remove. No derivative write or user-selected filesystem path is allowed.
+
+Documentation
+
+During implementation, update docs/ARCHITECTURE.md and docs/DOCUMENTATION.md to current state for the image block, immutable usage, authenticated listing, current-publication authority, token-bound preview authority, draft-byte isolation, MIME allowlist, nosniff, filesystem read, preview object URLs, and explicit absence of media pipelines/asset management.
 
 Acceptance Criteria
 
-Asset references persist.
+1. Canonical content supports one strict image block containing only id, type, assetId, and alt.
+2. Existing heading and paragraph documents remain valid.
+3. Owner and member can list renderable assets belonging to the current site.
+4. Asset-list responses expose no storage or path authority.
+5. Late asset-list responses cannot cross tenant/site state.
+6. Admin can select a site asset and append an image block.
+7. Image alt text can be edited.
+8. Valid same-site references persist in immutable page versions.
+9. Usage rows commit transactionally with their page version.
+10. Duplicate references produce one usage row per version/asset.
+11. Missing and wrong-site references return nondisclosing HTTP 400 with no version, usage, or pointer mutation.
+12. Generic persistence failures are not misclassified as invalid references.
+13. Historical usage remains immutable.
+14. Draft-only asset usage does not grant public access.
+15. Public asset authority requires usage by a current published version on the Host-resolved site.
+16. Full asset→usage→version→page→site ownership is proven.
+17. Historical non-current publication usage alone does not preserve public access.
+18. Preview asset authority requires the existing valid preview token.
+19. The preview token must bind the exact immutable version whose usage authorizes the asset.
+20. A preview token cannot read unused or another-version assets.
+21. Preview credentials never enter asset URLs, cookies, or browser storage.
+22. Preview rendering uses credentialed fetch and a temporary object URL.
+23. Preview object URLs are revoked.
+24. Preview failure never falls back to public asset delivery.
+25. Public and preview delivery support only the explicit image MIME allowlist.
+26. Successful byte responses include X-Content-Type-Options: nosniff.
+27. Missing authoritative physical bytes fail through generic HTTP 500.
+28. Existing asset upload behavior remains unchanged.
+29. No media pipeline exists.
+30. No asset-management expansion exists.
+31. No new external dependency exists.
+32. Phase N remains unstarted.
 
-Renderer displays asset correctly.
+Required Negative Controls
 
-Asset usage recorded.
+• Wrong-site asset reference
+• Nonexistent asset reference
+• Adjacent generic persistence failure
+• Duplicate usage reference
+• Late cross-site asset-list completion
+• Draft-only public asset
+• Historical but non-current published asset
+• Wrong-host public asset
+• Wrong-site public asset
+• Unsupported-MIME public asset
+• Preview token for wrong version
+• Expired preview token
+• Rotated preview token
+• Preview asset not used by bound version
+• Preview failure public-fallback absence
+• Missing physical file
+
+Keep tests focused within existing unit/integration boundaries. Do not turn these controls into generalized frameworks or exhaustive browser automation.
+
+Output Format
+
+Files created
+Files modified
+Commands executed
+Contract, editor, usage, public-authority, preview-authority, renderer, storage-read, isolation, and regression tests
 
 ────────
 
