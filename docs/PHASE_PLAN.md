@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.4
+Version: 1.5
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -909,46 +909,246 @@ Guidelines
 
 Must:
 
-• Implement publish authorization
-• Implement publish route
-• Select the immutable version to publish according to the approved workflow
+• Authorize only an authenticated tenant owner to publish in v1
+• Return HTTP 403 when an authenticated member with valid tenant access attempts publication
+• Preserve nondisclosing resource behavior for outsider or inaccessible tenant/site/page scope
+• Expose exactly POST /tenants/:tenantId/sites/:siteId/pages/:pageId/publish
+• Require authentication, tenant membership, owner role, valid site/page IDs, and trusted origin
+• Require no publish request body
+• Select only the page's authoritative current immutable draft version
+• Accept no caller-selected version, draft pointer, published pointer, or actor identity
+• Prove tenant → site → page → current draft → same-page immutable version ancestry
+• Validate the selected immutable PageDocument canonically before publication
+• Conditionally commit only the exact validated candidate while it remains the current draft
+• Reject a stale validated candidate with HTTP 409 and no pointer or history mutation
+• Treat publication of an already-public current draft as an idempotent successful no-op
+• Prevent concurrent duplicate publication attempts from recording duplicate transition events
 • Perform the first production application mutation of pages.published_version_id
-• Update the existing published pointer
-• Record publication history or event data through page_publications
-• Preserve previous immutable versions
+• Update the published pointer and insert one page_publications transition event atomically
+• Record the authoritative authenticated session user as the publisher
+• Preserve the draft pointer and all immutable page versions
+• Make the newly published version immediately visible through the existing Phase H public read
+• Preserve Phase I preview-token binding, rotation, and expiry behavior
 
 Must not:
 
-• Modify draft version
-• Delete previous versions
-• Implement public rendering
+• Permit a member to publish
+• Add a publisher role, permission table, generic RBAC framework, per-page ACL, or approval workflow
+• Accept versionId, draftVersionId, publishedVersionId, userId, actorId, or publishedByUserId as request authority
+• Publish a stale candidate after the draft pointer advances
+• Silently substitute an unvalidated newer draft for the validated candidate
+• Modify pages.draft_version_id
+• Update or delete page_versions
+• Update or delete page_publications through normal production operations
+• Create duplicate history for an idempotent or concurrent duplicate request
+• Mutate, rotate, delete, rebind, or extend preview credentials
+• Modify Phase H public rendering or Phase I preview authorization
+• Implement editor UI, publish controls, autosave, or other Phase K behavior
+• Introduce a workflow engine, event bus, queue, outbox, worker, generic transaction manager, repository class, or idempotency service
 
 Phase H represents and reads what is published. Phase J changes what is published and records that change.
 
+Publication Authority
+
+authenticated tenant owner
+    ↓
+authoritative tenant/site/page scope
+    ↓
+current same-page immutable draft
+    ↓
+canonical PageDocument validation
+    ↓
+conditional atomic publication transition
+    ├── pages.published_version_id
+    └── append-only page_publications event
+    ↓
+existing Phase H public read
+
+Publish Authorization Policy
+
+In v1, owner may publish and member may not publish. Members remain content collaborators for drafting and preview, while publication changes externally visible production state. No separate publisher role exists.
+
+Version Selection
+
+The only publication candidate is pages.draft_version_id resolved through the authoritative tenant/site/page path and joined to a page_versions row belonging to that same page. The request cannot select a historical version or provide a version identifier through body, query, or headers.
+
+Candidate Validation and Consistency
+
+Publication uses a bounded resolve/validate/commit sequence:
+
+resolve current candidate A
+    ↓
+validate A with pageDocumentSchema
+    ↓
+conditionally commit A
+
+The commit may succeed only if the authoritatively scoped page still has pages.draft_version_id = A and A still belongs to that page. It must receive the exact validated candidate ID and must not reread and substitute another draft.
+
+If the draft advances from A to B between candidate resolution and commit, publication of A is stale. The result is HTTP 409, draft remains B, published state remains unchanged, and no publication event is inserted. Retrying resolves and validates B.
+
+Concurrent duplicate publication of the same unchanged candidate is distinct from stale-candidate rejection. At most one request may perform the actual transition and insert an event. Another request may resolve as unchanged once it observes that the same candidate is already public.
+
+Idempotency
+
+If draft_version_id already equals published_version_id, return status unchanged. Do not update pointers, create versions, or insert another history event. page_publications records actual public-state transitions rather than publish requests.
+
+Publication History
+
+page_publications contains only:
+
+id
+page_id
+version_id
+published_by_user_id
+published_at
+
+id is a database-generated UUID. page_id and version_id are required foreign keys. published_by_user_id is required text referencing the existing Better Auth user ID without cascading history merely because identity relationships change. published_at is a timezone-aware timestamp defaulting to the database current time.
+
+Do not duplicate tenant ID, site ID, hostname, slug, role, draft/published pointers, or document content. Production code may insert transition events but exposes no event update or delete operation.
+
+Same-Page Integrity
+
+The publication transition must prove page_versions.page_id = pages.id for the validated candidate. A foreign key proving version existence alone is insufficient. Page A must never point to or record an event for Page B's version.
+
+Atomic Transition
+
+A real state change commits both or neither:
+
+pages.published_version_id = validated current draft version
+AND one page_publications row for the same page/version/actor
+
+If pointer mutation or event insertion fails, both roll back. There must be no updated public pointer without history and no history event without matching public state.
+
+Publisher Authority
+
+published_by_user_id comes only from authenticatedSession.user.id. Do not accept actor identity from the request and do not duplicate email or display name in history.
+
+Response Contract
+
+Return one strict response:
+
+{ status: "published" | "unchanged" }
+
+published means one public-state transition and event committed. unchanged means the current draft was already public and no event was inserted. Do not expose version IDs, pointers, actor identity, history rows, or resource ownership metadata.
+
+Malformed Candidate
+
+Malformed persisted current-draft content fails through the generic HTTP 500 boundary. The published pointer and event count remain unchanged; content and Zod details are not returned, repaired, or replaced by another version.
+
+Public, Draft, and Preview Isolation
+
+After a successful transition, the existing GET /public/page immediately reads the new pointer. Publishing leaves draft_version_id unchanged. A later draft save advances only the draft and does not auto-publish. Existing preview tokens remain bound to their own immutable versions and are neither rotated nor extended by publication.
+
 Files / Functions
+
+packages/contracts
+
+publish.ts
+index.ts
 
 packages/db
 
-schema/page_publications.ts
+schema/page-publications.ts
+publish-persistence.ts
+migrations/
+index.ts
 
 apps/api
 
+routes/pages.ts
 routes/publish.ts
+routes/index.ts
+application.ts
+
+Also permitted:
+
+• Focused unit and integration tests
+• Package script and CI gate updates
+• docs/ARCHITECTURE.md
+• docs/DOCUMENTATION.md
+
+Existing PagePersistence may be consumed to resolve and validate the candidate without rewriting Phase G persistence. No dependency change is expected.
+
+Page Route Ownership
+
+Mount POST /:pageId/publish through the existing createPageRoutes surface so publication reuses its authentication, membership, site/page-ID, and trusted-origin policy chain. routes/publish.ts may own publish-specific authorization, handling, and translation only when those responsibilities justify a separate module. Do not create another router or forwarding-only file merely because an earlier stub named it.
+
+Composition
+
+Preserve createApiApplication → createHttpApplication → createApiRoutes. Compose one focused PublishPersistence through that hierarchy. Do not add a publication application root, service container, or generic workflow layer.
+
+Publish Persistence Boundary
+
+One focused publication boundary may expose resolvePublishCandidate and commitPublication when required to validate outside the database package while preventing stale publication.
+
+resolvePublishCandidate proves tenant/site/page/current draft/same-page version ancestry and returns the immutable candidate content.
+
+commitPublication receives the exact validated candidate ID and authoritative actor ID and transactionally distinguishes:
+
+published — candidate remains current, public state changed, one event inserted
+unchanged — candidate remains current and is already public, no event inserted
+stale — current draft no longer equals candidate, no mutation or event
+not-found — authoritative tenant/site/page/candidate relationship cannot be proven
+
+These outcomes are bounded publication semantics, not a generic state machine.
+
+HTTP Semantics
+
+Unauthenticated requests return 401. Authenticated members with valid tenant access return bounded HTTP 403. Invalid or inaccessible scope retains nondisclosing resource behavior. Stale candidates return bounded HTTP 409 without IDs or pointer details. Malformed candidates return generic HTTP 500.
+
+Trusted Origin
+
+Use the existing createRequireTrustedOrigin(auth) policy. Missing or untrusted origin must change neither pointer nor history.
 
 Acceptance Criteria
 
-Publish switches public version.
+1. Authenticated owner can publish an accessible page.
+2. Authenticated member receives HTTP 403 and cannot publish.
+3. Outsider or inaccessible scope cannot publish.
+4. Trusted origin is required.
+5. Current same-page immutable draft is the only publication candidate.
+6. Caller cannot select arbitrary version or publisher identity.
+7. Candidate content is canonically validated before publication.
+8. Initial publish sets published_version_id.
+9. Initial publish records exactly one publication event.
+10. Event records page, version, authoritative actor, and timestamp.
+11. Pointer update and event insertion are atomic.
+12. Existing immutable versions remain unchanged.
+13. Draft pointer remains unchanged.
+14. Existing public route renders the newly published version.
+15. Saving a later draft does not change public content.
+16. Publishing the later draft switches public content.
+17. Repeating publish without a draft change returns unchanged.
+18. Idempotent no-op creates no duplicate history.
+19. Stale validated candidate A is rejected with HTTP 409 if the draft advances to B; pointer and event count remain unchanged until a retry selects and validates B.
+20. Two concurrent owner requests for the same unchanged candidate create at most one transition event.
+21. Malformed persisted draft cannot become published.
+22. Preview-token lifecycle remains unchanged.
+23. No Phase K editor UI exists.
 
-Previous versions remain intact.
+Required Negative Controls
 
-Audit event recorded.
+• Member publish returns 403 with unchanged pointer and event count
+• Missing trusted origin returns 403 with unchanged pointer and event count
+• Body/query version and actor fields cannot select another version or impersonate another publisher
+• Initial publish transitions null → A, records one authoritative event, and makes public GET return A
+• Saving B leaves published A and public GET A until explicit publication
+• Publishing B transitions A → B, records one event, and public GET returns B
+• Repeating B returns unchanged with no event-count change
+• Deterministically resolve and validate A, advance draft to B through normal save, then commit A through production persistence and prove stale; HTTP translation is 409 with no pointer/event mutation
+• Independently exercise two concurrent owner attempts for the same candidate and prove one transition and one event
+• Corrupt the current draft in test setup and prove HTTP 500, unchanged pointer/event count, and unrepaired content
+• Construct event-insertion failure in test-only conditions where practical and prove pointer rollback without production failure hooks
+• Inspect each real transition event directly for page, same-page version, authenticated actor, timestamp, and exact event-count delta
+
+Stale-candidate consistency and concurrent duplicate publication are separate contracts and require independent evidence.
 
 Output Format
 
 Files created
 Files modified
 Commands executed
-Publish tests
+Publication authorization, consistency, transaction, and history tests
 
 ────────
 
