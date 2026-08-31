@@ -32,6 +32,9 @@ const ASSET_MAX_REQUEST_BODY_SIZE = 11 * 1024 * 1024;
 const MULTIPART_CONTENT_TYPE = "multipart/form-data";
 const ASSET_FILE_FIELD = "file";
 const DEFAULT_CONTENT_TYPE = "application/octet-stream";
+const FORM_DATA_PARSE_ERROR_CODE = "ERR_FORMDATA_PARSE_ERROR";
+const MISSING_FINAL_BOUNDARY_MESSAGE =
+  "missing final boundary while parsing FormData";
 
 type ValidAssetUpload = Readonly<{
   status: "valid";
@@ -193,9 +196,21 @@ async function readAssetFormData(
   }
   try {
     return await request.formData();
-  } catch {
-    return null;
+  } catch (error) {
+    if (isMalformedMultipartError(error)) {
+      return null;
+    }
+    throw error;
   }
+}
+
+function isMalformedMultipartError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const hasParseErrorCode =
+    "code" in error && error.code === FORM_DATA_PARSE_ERROR_CODE;
+  return hasParseErrorCode || error.message === MISSING_FINAL_BOUNDARY_MESSAGE;
 }
 
 function readOnlyAssetFile(formData: RequestFormData): File | null {

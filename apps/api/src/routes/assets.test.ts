@@ -88,13 +88,72 @@ describe("asset upload orchestration", () => {
     );
     expect(normalizeAssetContentType(" text/plain ")).toBe("text/plain");
   });
+
+  test("translates malformed multipart parsing to HTTP 400", async () => {
+    const root = await createTemporaryRoot();
+    const routes = createTestApplication(createUnusedAssetPersistence(), root);
+
+    const response = await routes.request(ASSET_ROUTE, {
+      method: "POST",
+      headers: {
+        "content-type": "multipart/form-data; boundary=missing-boundary",
+        origin: TRUSTED_ORIGIN,
+      },
+      body: "malformed multipart body",
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "Asset upload is invalid.",
+    });
+    const missingBoundaryResponse = await routes.request(ASSET_ROUTE, {
+      method: "POST",
+      headers: {
+        "content-type": "multipart/form-data",
+        origin: TRUSTED_ORIGIN,
+      },
+      body: "multipart body without a boundary",
+    });
+    expect(missingBoundaryResponse.status).toBe(400);
+    expect(await missingBoundaryResponse.json()).toEqual({
+      error: "Asset upload is invalid.",
+    });
+    expect(await listStoredFiles(root)).toEqual([]);
+  });
+
+  test("propagates an unexpected consumed-body error to HTTP 500", async () => {
+    const root = await createTemporaryRoot();
+    const routes = createTestApplication(
+      createUnusedAssetPersistence(),
+      root,
+      true,
+    );
+
+    const response = await routes.request(
+      ASSET_ROUTE,
+      createUploadRequest("consumed.txt", true),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: "Internal server error.",
+    });
+    expect(await listStoredFiles(root)).toEqual([]);
+  });
 });
 
 function createTestApplication(
   assetPersistence: AssetPersistence,
   storageRoot: string,
+  consumeRequestBody = false,
 ): Hono<ApiBindings> {
   const app = new Hono<ApiBindings>();
+  if (consumeRequestBody) {
+    app.use("/tenants/:tenantId/sites/:siteId/assets", async (context, next) => {
+      await context.req.raw.text();
+      await next();
+    });
+  }
   app.route(
     "/tenants/:tenantId/sites/:siteId/assets",
     createAssetRoutes(
@@ -142,13 +201,29 @@ function createFakeTenantPersistence(): TenantPersistence {
   };
 }
 
-function createUploadRequest(filename: string): RequestInit {
+function createUploadRequest(
+  filename: string,
+  includeContentLength = false,
+): RequestInit {
   const form = new FormData();
   form.append(
     "file",
     new File(["asset bytes"], filename, { type: "text/plain" }),
   );
-  return { method: "POST", headers: { origin: TRUSTED_ORIGIN }, body: form };
+  const headers = new Headers({ origin: TRUSTED_ORIGIN });
+  if (includeContentLength) {
+    headers.set("content-length", "1");
+  }
+  return { method: "POST", headers, body: form };
+}
+
+function createUnusedAssetPersistence(): AssetPersistence {
+  return {
+    resolveAssetSite: async () => true,
+    createAssetMetadata: async () => {
+      throw new Error("Metadata is not used by multipart error tests.");
+    },
+  };
 }
 
 async function createTemporaryRoot(): Promise<string> {
