@@ -2,8 +2,10 @@ import { and, eq, gt } from "drizzle-orm";
 
 import type { DatabaseClient } from "./client";
 import {
+  assets,
   domains,
   pages,
+  pageVersionAssets,
   pageVersions,
   previewTokens,
   sites,
@@ -17,6 +19,11 @@ export type PreviewPageRecord = Readonly<{
   title: string;
   slug: string;
   document: unknown;
+}>;
+
+export type PreviewAssetRecord = Readonly<{
+  storageKey: string;
+  contentType: string;
 }>;
 
 export type PreviewPersistence = Readonly<{
@@ -33,6 +40,12 @@ export type PreviewPersistence = Readonly<{
     tokenHash: string,
     now: Date,
   ) => Promise<PreviewPageRecord | null>;
+  resolvePreviewAsset: (
+    hostname: string,
+    assetId: string,
+    tokenHash: string,
+    now: Date,
+  ) => Promise<PreviewAssetRecord | null>;
 }>;
 
 export function createPreviewPersistence(
@@ -56,7 +69,55 @@ export function createPreviewPersistence(
       ),
     resolvePreviewPage: (hostname, slug, tokenHash, now) =>
       resolvePreviewPage(client, hostname, slug, tokenHash, now),
+    resolvePreviewAsset: (hostname, assetId, tokenHash, now) =>
+      resolvePreviewAsset(client, hostname, assetId, tokenHash, now),
   });
+}
+
+async function resolvePreviewAsset(
+  client: DatabaseClient,
+  hostname: string,
+  assetId: string,
+  tokenHash: string,
+  now: Date,
+): Promise<PreviewAssetRecord | null> {
+  const records = await client.drizzle
+    .select({
+      storageKey: assets.storageKey,
+      contentType: assets.contentType,
+    })
+    .from(domains)
+    .innerJoin(sites, eq(sites.id, domains.siteId))
+    .innerJoin(pages, eq(pages.siteId, sites.id))
+    .innerJoin(
+      previewTokens,
+      and(
+        eq(previewTokens.pageId, pages.id),
+        eq(previewTokens.tokenHash, tokenHash),
+        gt(previewTokens.expiresAt, now),
+      ),
+    )
+    .innerJoin(
+      pageVersions,
+      and(
+        eq(pageVersions.id, previewTokens.versionId),
+        eq(pageVersions.pageId, pages.id),
+      ),
+    )
+    .innerJoin(
+      pageVersionAssets,
+      eq(pageVersionAssets.pageVersionId, previewTokens.versionId),
+    )
+    .innerJoin(
+      assets,
+      and(
+        eq(assets.id, pageVersionAssets.assetId),
+        eq(assets.siteId, sites.id),
+      ),
+    )
+    .where(and(eq(domains.hostname, hostname), eq(assets.id, assetId)))
+    .limit(1);
+  return records[0] ?? null;
 }
 
 async function createOrRotatePreviewToken(

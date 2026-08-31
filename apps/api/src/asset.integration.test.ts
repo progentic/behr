@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import {
   ASSET_MAX_BYTE_SIZE,
   assetUploadResponseSchema,
+  assetListResponseSchema,
   siteSummarySchema,
   tenantAccessSchema,
 } from "@bher/contracts";
@@ -132,6 +133,14 @@ async function verifyAssetLifecycle(): Promise<void> {
       observer,
       storageRoot,
       origin,
+      memberCookie,
+      tenant.id,
+      site.id,
+    );
+    await verifyAssetListing(
+      application,
+      origin,
+      ownerCookie,
       memberCookie,
       tenant.id,
       site.id,
@@ -279,6 +288,16 @@ async function verifyAuthorizationControls(
   outsiderTenantId: string,
   outsiderSiteId: string,
 ): Promise<void> {
+  expect(
+    (await application.app.request(assetRoute(tenantId, siteId))).status,
+  ).toBe(401);
+  expect(
+    (
+      await application.app.request(assetRoute(tenantId, siteId), {
+        headers: { cookie: outsiderCookie },
+      })
+    ).status,
+  ).toBe(404);
   await expectRejectedWithoutMutation(observer, storageRoot, 401, () =>
     uploadFile(
       application,
@@ -329,6 +348,58 @@ async function verifyAuthorizationControls(
       createSmallFile(),
     ),
   );
+}
+
+async function verifyAssetListing(
+  application: ApiApplication,
+  origin: string,
+  ownerCookie: string,
+  memberCookie: string,
+  tenantId: string,
+  siteId: string,
+): Promise<void> {
+  const imageResponse = await uploadFile(
+    application,
+    origin,
+    ownerCookie,
+    tenantId,
+    siteId,
+    new File([new Uint8Array([1, 2, 3])], "listed.png", {
+      type: "image/png",
+    }),
+  );
+  expect(imageResponse.status).toBe(201);
+  const image = assetUploadResponseSchema.parse(await imageResponse.json());
+  const unsupportedResponse = await uploadFile(
+    application,
+    origin,
+    ownerCookie,
+    tenantId,
+    siteId,
+    new File(["pdf"], "hidden.pdf", { type: "application/pdf" }),
+  );
+  expect(unsupportedResponse.status).toBe(201);
+
+  for (const cookie of [ownerCookie, memberCookie]) {
+    const response = await application.app.request(assetRoute(tenantId, siteId), {
+      headers: { cookie },
+    });
+    expect(response.status).toBe(200);
+    const body = assetListResponseSchema.parse(await response.json());
+    expect(body.assets).toEqual([
+      {
+        ...image,
+        contentType: "image/png",
+      },
+    ]);
+    expect(Object.keys(body.assets[0] ?? {}).sort()).toEqual([
+      "byteSize",
+      "contentType",
+      "createdAt",
+      "id",
+      "originalFilename",
+    ]);
+  }
 }
 
 async function verifyMultipartControls(

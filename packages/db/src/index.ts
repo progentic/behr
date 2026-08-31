@@ -22,17 +22,20 @@ export {
   createPublishPersistence,
 } from "./publish-persistence";
 export {
+  type PreviewAssetRecord,
   type PreviewPageRecord,
   type PreviewPersistence,
   createPreviewPersistence,
 } from "./preview-persistence";
 export {
+  type PublicAssetRecord,
   type PublicPagePersistence,
   type PublicPageRecord,
   createPublicPagePersistence,
 } from "./public-page-persistence";
 export {
   type PagePersistence,
+  PageAssetReferenceError,
   PageScopeNotFoundError,
   PageSlugConflictError,
   createPagePersistence,
@@ -67,6 +70,7 @@ export {
   membershipInvitations,
   memberships,
   pagePublications,
+  pageVersionAssets,
   pageVersions,
   pages,
   previewTokens,

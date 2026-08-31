@@ -76,8 +76,14 @@ export function createApiRoutes(
       publishPersistence,
     ),
   );
-  routes.route(PUBLIC_ROUTE, createPublicRoutes(publicPagePersistence));
-  routes.route(PREVIEW_ROUTE, createPreviewRoutes(previewPersistence));
+  routes.route(
+    PUBLIC_ROUTE,
+    createPublicRoutes(publicPagePersistence, assetStorage),
+  );
+  routes.route(
+    PREVIEW_ROUTE,
+    createPreviewRoutes(previewPersistence, assetStorage),
+  );
   routes.route(
     ASSET_ROUTE,
     createAssetRoutes(

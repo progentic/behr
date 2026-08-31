@@ -94,6 +94,9 @@ flowchart TD
     Request --> PreviewPage[GET /preview/page?slug=...]
     Request --> PublishPage[POST /tenants/:tenantId/sites/:siteId/pages/:pageId/publish]
     Request --> UploadAsset[POST /tenants/:tenantId/sites/:siteId/assets]
+    Request --> ListAssets[GET /tenants/:tenantId/sites/:siteId/assets]
+    Request --> PublicAsset[GET /public/assets/:assetId]
+    Request --> PreviewAsset[GET /preview/assets/:assetId]
 ```
 
 Interpretation:
@@ -181,6 +184,9 @@ snapshots. Phase J adds owner-only publication of the current immutable draft
 and append-only transition history. Phase L adds authenticated site-scoped
 original-file upload with bounded multipart parsing, server-generated storage
 keys, exclusive filesystem writes, and revalidated metadata persistence.
+Phase M adds one canonical image block, immutable page-version usage, a minimal
+site asset picker, current-publication byte delivery, and exact token-bound
+preview byte delivery.
 
 The currently implemented public API routes are exactly:
 
@@ -205,6 +211,9 @@ The currently implemented public API routes are exactly:
 * `GET /preview/page?slug=...`
 * `POST /tenants/:tenantId/sites/:siteId/pages/:pageId/publish`
 * `POST /tenants/:tenantId/sites/:siteId/assets`
+* `GET /tenants/:tenantId/sites/:siteId/assets`
+* `GET /public/assets/:assetId`
+* `GET /preview/assets/:assetId`
 
 ---
 
@@ -232,8 +241,11 @@ current-session resolution, and logout. Phase E adds a minimal authenticated
 site workflow: component-local tenant selection, site loading, and owner-only
 site creation. The pre-Phase G membership work adds owner-only membership
 administration and invite registration. Phase G adds no admin behavior. Phase K
-adds the first page-authoring interface. Asset, theme,
-domain-administration, preview, and publishing interfaces remain unimplemented.
+adds the first page-authoring interface. Phase M adds a tenant/site-keyed
+renderable-asset list and inline image selection with alt-text editing. Upload,
+deletion, search, and broader media management remain absent from the admin.
+Theme, domain-administration, preview-control, and publishing interfaces remain
+unimplemented.
 
 ---
 
@@ -262,6 +274,11 @@ no database import, server runtime, cache, theme framework, or publication
 controls. Phase I adds fragment-carried preview credentials and sends them only
 through `X-BeHR-Preview-Token`; successful preview content reuses the same
 renderer.
+Phase M extends that shared renderer with the canonical image block. Published
+images use `/public/assets/:assetId`. Preview images fetch
+`/preview/assets/:assetId` using the existing header-borne token, create a
+temporary object URL, and revoke it during effect cleanup. The token is never
+placed in the asset URL or browser storage.
 
 ---
 
@@ -362,6 +379,13 @@ non-cascading so future site deletion must reconcile filesystem bytes rather
 than silently removing only metadata. Phase L exposes only metadata insertion;
 there is no production asset update or delete operation.
 
+Phase M adds `page_version_assets`, whose composite key records one immutable
+version/asset usage pair. The version foreign key cascades; the asset foreign
+key does not. Page creation and draft saving validate every referenced asset
+against the authoritative site and commit version, deduplicated usage, and
+draft pointer in one transaction. Usage is immutable historical evidence, not
+public authority.
+
 The database remains the sole session authority. Browser cookies contain only
 the opaque session identifier; they do not authorize a user without a valid
 database session.
@@ -406,6 +430,13 @@ in one transaction. Repeating the same publication is unchanged; a candidate
 made stale by a newer draft returns HTTP 409 without pointer or history changes.
 Publishing does not mutate drafts, immutable versions, or preview credentials.
 
+Public asset reads join actual Host, domain/site, same-site asset, a page's
+current published pointer, the same-page immutable version, and that exact
+version's usage row. Preview asset reads instead join the existing unexpired
+token hash to its exact immutable version and usage. Neither path follows a
+draft pointer or historical usage alone. Both permit only JPEG, PNG, GIF, WebP,
+and AVIF metadata and return `X-Content-Type-Options: nosniff`.
+
 ---
 
 ## 4.6 Local File Storage
@@ -436,9 +467,11 @@ just-written file. This is compensation, not a cross-store transaction: a hard
 process crash after the file write but before metadata commit may leave an
 orphan file with no authoritative `assets` row.
 
-The reserved `/var/lib/bhr-cms/derivatives` location remains unimplemented.
-There is no public asset serving, listing, deletion, image processing, editor
-picker, content reference, worker, or orphan-cleanup process in Phase L.
+Phase M adds confined reads by logical storage key through the same
+`AssetStorage`; missing authoritative bytes remain an internal HTTP 500
+integrity failure. The reserved `/var/lib/bhr-cms/derivatives` location remains
+unused. There is no asset deletion/update, image processing, media pipeline,
+worker, cache, or orphan-cleanup process.
 
 ---
 

@@ -71,7 +71,7 @@ function App() {
     state.requestId === requestId
       ? state
       : createInitialPageState(requestId, slug, preview);
-  return renderPublicPageState(visibleState);
+  return renderPublicPageState(visibleState, previewToken);
 }
 
 function createPageRequestId(
@@ -135,7 +135,10 @@ async function requestPreviewPage(
   return publicPageResponseSchema.parse(await response.json());
 }
 
-function renderPublicPageState(state: PublicPageState) {
+function renderPublicPageState(
+  state: PublicPageState,
+  previewToken: string | null,
+) {
   switch (state.status) {
     case "loading":
       return <main>Loading page…</main>;
@@ -146,7 +149,10 @@ function renderPublicPageState(state: PublicPageState) {
     case "loaded":
       return (
         <main>
-          <PageRenderer document={state.page.document} />
+          <PageRenderer
+            document={state.page.document}
+            previewToken={previewToken}
+          />
         </main>
       );
   }

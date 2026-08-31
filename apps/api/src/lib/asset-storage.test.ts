@@ -64,6 +64,18 @@ describe("AssetStorage", () => {
     expect(storage.removeOriginal("../../outside")).rejects.toThrow();
   });
 
+  test("reads exact bytes through the confined storage key", async () => {
+    const root = await createTemporaryRoot();
+    const storage = createAssetStorage(root);
+    const bytes = new TextEncoder().encode("readable bytes");
+    await storage.writeOriginal(SITE_ID, ASSET_ID, bytes);
+
+    expect(Array.from(await storage.readOriginal(STORAGE_KEY))).toEqual(
+      Array.from(bytes),
+    );
+    expect(storage.readOriginal("../../outside")).rejects.toThrow();
+  });
+
   test("removes a partial file created by a failed write", async () => {
     const root = await createTemporaryRoot();
     const storage = createAssetStorage(root, createFailingWriteOperations());
@@ -105,5 +117,6 @@ function createFailingWriteOperations(): AssetFileOperations {
     removeFile: async (path) => {
       await unlink(path);
     },
+    readFile: async (path) => await readFile(path),
   };
 }

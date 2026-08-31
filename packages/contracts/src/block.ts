@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { assetIdSchema } from "./asset";
 import { textStyleSchema } from "./style";
 
 const blockIdSchema = z.string().uuid();
@@ -31,11 +32,22 @@ export const paragraphBlockSchema = z
   })
   .strict();
 
+export const imageBlockSchema = z
+  .object({
+    id: blockIdSchema,
+    type: z.literal("image"),
+    assetId: assetIdSchema,
+    alt: z.string(),
+  })
+  .strict();
+
 export const blockSchema = z.discriminatedUnion("type", [
   headingBlockSchema,
   paragraphBlockSchema,
+  imageBlockSchema,
 ]);
 
 export type HeadingBlock = z.infer<typeof headingBlockSchema>;
 export type ParagraphBlock = z.infer<typeof paragraphBlockSchema>;
+export type ImageBlock = z.infer<typeof imageBlockSchema>;
 export type Block = z.infer<typeof blockSchema>;

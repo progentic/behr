@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  type AuthenticatedSession,
   type PageDocument,
   type PageDraft,
   pageDraftSchema,
@@ -9,14 +10,24 @@ import {
 } from "@bher/contracts";
 import {
   type DatabaseClient,
+  type PagePersistence,
+  type PreviewPersistence,
+  type PublishPersistence,
+  type TenantPersistence,
+  PageAssetReferenceError,
+  assets,
   createDatabaseClient,
   loadDatabaseConfig,
   memberships,
   pages,
 } from "@bher/db";
+import { Hono } from "hono";
 
 import { type ApiApplication, createApiApplication } from "./application";
 import { loadApiConfig } from "./env";
+import type { AuthService } from "./lib/auth";
+import { createPageRoutes } from "./routes/pages";
+import type { ApiBindings } from "./types";
 
 const OWNER_PASSWORD = "page-owner-password";
 const MEMBER_PASSWORD = "page-member-password";
@@ -46,6 +57,26 @@ type TestIdentity = Readonly<{
 }>;
 
 test("enforces page persistence and immutable drafts", verifyPageLifecycle);
+
+test("translates only the owned invalid asset-reference error", async () => {
+  const invalidReference = createPageRouteTestApplication(
+    new PageAssetReferenceError(),
+  );
+  const invalidResponse = await requestPageRouteTest(invalidReference);
+  expect(invalidResponse.status).toBe(400);
+  expect(await invalidResponse.json()).toEqual({
+    error: "Page request is invalid.",
+  });
+
+  const genericFailure = createPageRouteTestApplication(
+    new Error("generic persistence failure"),
+  );
+  const genericResponse = await requestPageRouteTest(genericFailure);
+  expect(genericResponse.status).toBe(500);
+  expect(await genericResponse.json()).toEqual({
+    error: "Internal server error.",
+  });
+});
 
 async function verifyPageLifecycle(): Promise<void> {
   const environment = process.env;
@@ -126,6 +157,26 @@ async function verifyPageLifecycle(): Promise<void> {
       "Page Site B",
       "page-b.example.com",
     );
+    const assetA = crypto.randomUUID();
+    const assetB = crypto.randomUUID();
+    await observer.drizzle.insert(assets).values([
+      {
+        id: assetA,
+        siteId: siteA.id,
+        storageKey: `${siteA.id}/${assetA}`,
+        originalFilename: "page-a.png",
+        contentType: "image/png",
+        byteSize: 3,
+      },
+      {
+        id: assetB,
+        siteId: siteB.id,
+        storageKey: `${siteB.id}/${assetB}`,
+        originalFilename: "page-b.png",
+        contentType: "image/png",
+        byteSize: 3,
+      },
+    ]);
 
     const pageA = await createPage(
       application,
@@ -385,6 +436,103 @@ async function verifyPageLifecycle(): Promise<void> {
     expect(await countPageVersions(observer, pageA.page.id)).toBe(
       versionsBeforeFailedSave,
     );
+
+    const imagePage = await createPage(
+      application,
+      origin,
+      ownerCookie,
+      tenantA.id,
+      siteA.id,
+      "Image Page",
+      "image-page",
+      createImageDocument(assetA, true),
+    );
+    expect(
+      await countVersionAssetUsage(observer, imagePage.draft.id, assetA),
+    ).toBe(1);
+    expect(imagePage.draft.document.sections[0]?.blocks).toHaveLength(2);
+
+    const versionCountBeforeWrongSite = await countPageVersions(
+      observer,
+      imagePage.page.id,
+    );
+    const pointerBeforeWrongSite = await readDraftPointer(
+      observer,
+      imagePage.page.id,
+    );
+    expect(
+      (
+        await saveDraftResponse(
+          application,
+          origin,
+          ownerCookie,
+          tenantA.id,
+          siteA.id,
+          imagePage.page.id,
+          createImageDocument(assetB),
+        )
+      ).status,
+    ).toBe(400);
+    expect(await countPageVersions(observer, imagePage.page.id)).toBe(
+      versionCountBeforeWrongSite,
+    );
+    expect(await readDraftPointer(observer, imagePage.page.id)).toBe(
+      pointerBeforeWrongSite,
+    );
+    expect(
+      await countVersionAssetUsage(observer, imagePage.draft.id, assetA),
+    ).toBe(1);
+
+    expect(
+      (
+        await saveDraftResponse(
+          application,
+          origin,
+          ownerCookie,
+          tenantA.id,
+          siteA.id,
+          imagePage.page.id,
+          createImageDocument(crypto.randomUUID()),
+        )
+      ).status,
+    ).toBe(400);
+    expect(await countPageVersions(observer, imagePage.page.id)).toBe(
+      versionCountBeforeWrongSite,
+    );
+    expect(await readDraftPointer(observer, imagePage.page.id)).toBe(
+      pointerBeforeWrongSite,
+    );
+
+    const withoutImage = await saveDraft(
+      application,
+      origin,
+      ownerCookie,
+      tenantA.id,
+      siteA.id,
+      imagePage.page.id,
+      DOCUMENT_A,
+    );
+    expect(
+      await countVersionAssetUsage(observer, imagePage.draft.id, assetA),
+    ).toBe(1);
+    expect(
+      await countVersionAssetUsage(observer, withoutImage.draft.id, assetA),
+    ).toBe(0);
+    const restoredImage = await saveDraft(
+      application,
+      origin,
+      ownerCookie,
+      tenantA.id,
+      siteA.id,
+      imagePage.page.id,
+      createImageDocument(assetA),
+    );
+    expect(
+      await countVersionAssetUsage(observer, restoredImage.draft.id, assetA),
+    ).toBe(1);
+    expect(await readDraftPointer(observer, imagePage.page.id)).toBe(
+      restoredImage.draft.id,
+    );
     expect(
       (await saveDraftResponse(
         application,
@@ -424,6 +572,104 @@ async function verifyPageLifecycle(): Promise<void> {
     await application.close();
     await observer.close();
   }
+}
+
+function createPageRouteTestApplication(error: Error): Hono<ApiBindings> {
+  const app = new Hono<ApiBindings>();
+  app.route(
+    "/tenants/:tenantId/sites/:siteId/pages",
+    createPageRoutes(
+      createPageRouteAuthService(),
+      createPageRouteTenantPersistence(),
+      createFailingPagePersistence(error),
+      createUnusedPreviewPersistence(),
+      createUnusedPublishPersistence(),
+    ),
+  );
+  app.onError(() => Response.json({ error: "Internal server error." }, { status: 500 }));
+  return app;
+}
+
+async function requestPageRouteTest(app: Hono<ApiBindings>): Promise<Response> {
+  return await app.request(
+    "/tenants/11111111-1111-4111-8111-111111111111/sites/22222222-2222-4222-8222-222222222222/pages",
+    {
+      method: "POST",
+      headers: {
+        "content-type": JSON_CONTENT_TYPE,
+        origin: "https://admin.example.com",
+      },
+      body: JSON.stringify({
+        title: "Page",
+        slug: "page",
+        document: DOCUMENT_A,
+      }),
+    },
+  );
+}
+
+function createPageRouteAuthService(): AuthService {
+  const session: AuthenticatedSession = {
+    status: "authenticated",
+    user: {
+      id: "page-route-user",
+      email: "page-route@example.com",
+      displayName: "Page Route User",
+    },
+    expiresAt: "2026-09-07T00:00:00.000Z",
+  };
+  return {
+    login: async () => {
+      throw new Error("Unused login.");
+    },
+    logout: async () => ({
+      session: { status: "unauthenticated" },
+      headers: new Headers(),
+    }),
+    resolveSession: async () => session,
+    registerIdentity: async () => session.user,
+    isTrustedOrigin: (origin) => origin === "https://admin.example.com",
+  };
+}
+
+function createPageRouteTenantPersistence(): TenantPersistence {
+  return {
+    createTenantWithOwner: async () => {
+      throw new Error("Unused tenant creation.");
+    },
+    listTenantAccess: async () => [],
+    resolveTenantAccess: async () => ({
+      id: "11111111-1111-4111-8111-111111111111",
+      name: "Page Route Tenant",
+      role: "owner",
+    }),
+  };
+}
+
+function createFailingPagePersistence(error: Error): PagePersistence {
+  return {
+    listPages: async () => [],
+    createPage: async () => {
+      throw error;
+    },
+    resolvePageDraft: async () => null,
+    saveDraftVersion: async () => null,
+  };
+}
+
+function createUnusedPreviewPersistence(): PreviewPersistence {
+  return {
+    createOrRotatePreviewToken: async () => null,
+    resolvePreviewPage: async () => null,
+    resolvePreviewAsset: async () => null,
+  };
+}
+
+function createUnusedPublishPersistence(): PublishPersistence {
+  return {
+    resolvePublishCandidate: async () => null,
+    commitPublication: async () => "not-found",
+  };
 }
 
 function createIdentity(label: string, password: string): TestIdentity {
@@ -596,6 +842,53 @@ async function countPageVersions(
   return row?.count ?? 0;
 }
 
+async function countVersionAssetUsage(
+  observer: DatabaseClient,
+  versionId: string,
+  assetId: string,
+): Promise<number> {
+  const [row] = await observer.native<Array<{ count: number }>>`
+    SELECT count(*)::int AS count
+    FROM page_version_assets
+    WHERE page_version_id = ${versionId}
+      AND asset_id = ${assetId}
+  `;
+  return row?.count ?? 0;
+}
+
+async function readDraftPointer(
+  observer: DatabaseClient,
+  pageId: string,
+): Promise<string | null> {
+  const [row] = await observer.native<Array<{ draftVersionId: string | null }>>`
+    SELECT draft_version_id AS "draftVersionId"
+    FROM pages
+    WHERE id = ${pageId}
+  `;
+  return row?.draftVersionId ?? null;
+}
+
+function createImageDocument(
+  assetId: string,
+  duplicate = false,
+): PageDocument {
+  const image = () => ({
+    id: crypto.randomUUID(),
+    type: "image" as const,
+    assetId,
+    alt: "Image",
+  });
+  return {
+    schemaVersion: 1,
+    sections: [
+      {
+        id: crypto.randomUUID(),
+        blocks: duplicate ? [image(), image()] : [image()],
+      },
+    ],
+  };
+}
+
 function pageCollectionPath(tenantId: string, siteId: string): string {
   return `/tenants/${tenantId}/sites/${siteId}/pages`;
 }
@@ -617,6 +910,14 @@ async function removeTestRecords(
   userIds: string[],
 ): Promise<void> {
   for (const tenantId of tenantIds) {
+    await observer.native`
+      DELETE FROM pages
+      WHERE site_id IN (SELECT id FROM sites WHERE tenant_id = ${tenantId})
+    `;
+    await observer.native`
+      DELETE FROM assets
+      WHERE site_id IN (SELECT id FROM sites WHERE tenant_id = ${tenantId})
+    `;
     await observer.native`DELETE FROM tenants WHERE id = ${tenantId}`;
   }
   for (const userId of userIds) {

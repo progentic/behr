@@ -26,6 +26,7 @@ const EXPECTED_APPLICATION_TABLE_NAMES = [
   "membership_invitations",
   "memberships",
   "page_publications",
+  "page_version_assets",
   "page_versions",
   "pages",
   "preview_tokens",
@@ -56,6 +57,9 @@ const EXPECTED_CATALOG_OBJECTS = new Set([
   "memberships_user_id_idx",
   "page_publications",
   "page_publications_pkey",
+  "page_version_assets",
+  "page_version_assets_asset_id_idx",
+  "page_version_assets_page_version_id_asset_id_pk",
   "page_versions",
   "page_versions_page_id_idx",
   "page_versions_pkey",
@@ -122,6 +126,7 @@ async function verifyPersistenceBootstrap(): Promise<void> {
     await verifyDatabaseCatalog(context);
     await verifyDatabaseConstraints(context);
     await verifyAssetCatalog(context);
+    await verifyPageVersionAssetCatalog(context);
     await verifyPagePublicationCatalog(context);
     await verifyPreviewTokenColumns(context);
     await verifyConnectionCleanup(context);
@@ -229,6 +234,18 @@ async function verifyDatabaseConstraints(
       name: "page_publications_version_id_page_versions_id_fk",
       type: "FOREIGN KEY",
     },
+    {
+      name: "page_version_assets_asset_id_assets_id_fk",
+      type: "FOREIGN KEY",
+    },
+    {
+      name: "page_version_assets_page_version_id_asset_id_pk",
+      type: "PRIMARY KEY",
+    },
+    {
+      name: "page_version_assets_page_version_id_page_versions_id_fk",
+      type: "FOREIGN KEY",
+    },
     { name: "page_versions_page_id_pages_id_fk", type: "FOREIGN KEY" },
     {
       name: "pages_draft_version_id_page_versions_id_fk",
@@ -260,6 +277,7 @@ async function verifyDatabaseConstraints(
     "membership_invitations_tenant_id_tenants_id_fk",
     "memberships_tenant_id_tenants_id_fk",
     "memberships_user_id_user_id_fk",
+    "page_version_assets_page_version_id_page_versions_id_fk",
     "page_versions_page_id_pages_id_fk",
     "pages_site_id_sites_id_fk",
     "preview_tokens_page_id_pages_id_fk",
@@ -270,6 +288,44 @@ async function verifyDatabaseConstraints(
   expect(await listSetNullForeignKeys(context.observer)).toEqual([
     "pages_draft_version_id_page_versions_id_fk",
     "pages_published_version_id_page_versions_id_fk",
+  ]);
+}
+
+async function verifyPageVersionAssetCatalog(
+  context: IntegrationContext,
+): Promise<void> {
+  const columns = await context.observer.native<Array<{ name: string }>>`
+    SELECT column_name AS name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'page_version_assets'
+    ORDER BY ordinal_position
+  `;
+  expect(columns.map(({ name }) => name)).toEqual([
+    "page_version_id",
+    "asset_id",
+  ]);
+  const foreignKeys = await context.observer.native<
+    Array<{ name: string; deleteRule: string }>
+  >`
+    SELECT constraint_name AS name, delete_rule AS "deleteRule"
+    FROM information_schema.referential_constraints
+    WHERE constraint_schema = 'public'
+      AND constraint_name IN (
+        'page_version_assets_asset_id_assets_id_fk',
+        'page_version_assets_page_version_id_page_versions_id_fk'
+      )
+    ORDER BY constraint_name
+  `;
+  expect(foreignKeys).toEqual([
+    {
+      name: "page_version_assets_asset_id_assets_id_fk",
+      deleteRule: "NO ACTION",
+    },
+    {
+      name: "page_version_assets_page_version_id_page_versions_id_fk",
+      deleteRule: "CASCADE",
+    },
   ]);
 }
 
@@ -522,6 +578,9 @@ async function listDatabaseConstraints(
         'page_publications_page_id_pages_id_fk',
         'page_publications_published_by_user_id_user_id_fk',
         'page_publications_version_id_page_versions_id_fk',
+        'page_version_assets_asset_id_assets_id_fk',
+        'page_version_assets_page_version_id_asset_id_pk',
+        'page_version_assets_page_version_id_page_versions_id_fk',
         'page_versions_page_id_pages_id_fk',
         'pages_draft_version_id_page_versions_id_fk',
         'pages_published_version_id_page_versions_id_fk',
@@ -551,6 +610,7 @@ async function listCascadeForeignKeys(client: DatabaseClient): Promise<string[]>
         'membership_invitations_tenant_id_tenants_id_fk',
         'memberships_tenant_id_tenants_id_fk',
         'memberships_user_id_user_id_fk',
+        'page_version_assets_page_version_id_page_versions_id_fk',
         'page_versions_page_id_pages_id_fk',
         'pages_site_id_sites_id_fk',
         'preview_tokens_page_id_pages_id_fk',

@@ -1,7 +1,13 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import type { DatabaseClient } from "./client";
-import { pages, pageVersions, sites } from "./schema";
+import {
+  assets,
+  pages,
+  pageVersionAssets,
+  pageVersions,
+  sites,
+} from "./schema";
 
 type PageSummaryRecord = Readonly<{
   id: string;
@@ -26,6 +32,7 @@ export type PagePersistence = Readonly<{
     title: string,
     slug: string,
     document: unknown,
+    assetIds: readonly string[],
   ) => Promise<PageDraftRecord>;
   resolvePageDraft: (
     tenantId: string,
@@ -37,6 +44,7 @@ export type PagePersistence = Readonly<{
     siteId: string,
     pageId: string,
     document: unknown,
+    assetIds: readonly string[],
   ) => Promise<PageDraftRecord | null>;
 }>;
 
@@ -54,15 +62,30 @@ export class PageSlugConflictError extends Error {
   }
 }
 
+export class PageAssetReferenceError extends Error {
+  constructor() {
+    super("Page contains an invalid asset reference.");
+    this.name = "PageAssetReferenceError";
+  }
+}
+
 export function createPagePersistence(client: DatabaseClient): PagePersistence {
   return Object.freeze({
     listPages: (tenantId, siteId) => listPages(client, tenantId, siteId),
-    createPage: (tenantId, siteId, title, slug, document) =>
-      createPageRecord(client, tenantId, siteId, title, slug, document),
+    createPage: (tenantId, siteId, title, slug, document, assetIds) =>
+      createPageRecord(
+        client,
+        tenantId,
+        siteId,
+        title,
+        slug,
+        document,
+        assetIds,
+      ),
     resolvePageDraft: (tenantId, siteId, pageId) =>
       resolvePageDraft(client, tenantId, siteId, pageId),
-    saveDraftVersion: (tenantId, siteId, pageId, document) =>
-      saveDraftVersion(client, tenantId, siteId, pageId, document),
+    saveDraftVersion: (tenantId, siteId, pageId, document, assetIds) =>
+      saveDraftVersion(client, tenantId, siteId, pageId, document, assetIds),
   });
 }
 
@@ -93,6 +116,7 @@ async function createPageRecord(
   title: string,
   slug: string,
   document: unknown,
+  assetIds: readonly string[],
 ): Promise<PageDraftRecord> {
   return await client.drizzle.transaction(async (transaction) => {
     const [scopedSite] = await transaction
@@ -102,6 +126,20 @@ async function createPageRecord(
       .limit(1);
     if (!scopedSite) {
       throw new PageScopeNotFoundError();
+    }
+    if (assetIds.length > 0) {
+      const referencedAssets = await transaction
+        .select({ id: assets.id })
+        .from(assets)
+        .where(
+          and(
+            eq(assets.siteId, scopedSite.id),
+            inArray(assets.id, assetIds),
+          ),
+        );
+      if (referencedAssets.length !== assetIds.length) {
+        throw new PageAssetReferenceError();
+      }
     }
     const [page] = await transaction
       .insert(pages)
@@ -122,6 +160,14 @@ async function createPageRecord(
     if (!draft) {
       throw new Error("Initial page version returned no record.");
     }
+    if (assetIds.length > 0) {
+      await transaction.insert(pageVersionAssets).values(
+        assetIds.map((assetId) => ({
+          pageVersionId: draft.id,
+          assetId,
+        })),
+      );
+    }
     const [updatedPage] = await transaction
       .update(pages)
       .set({ draftVersionId: draft.id, updatedAt: new Date() })
@@ -130,7 +176,10 @@ async function createPageRecord(
     if (!updatedPage) {
       throw new Error("Initial draft pointer was not persisted.");
     }
-    return { page, draft };
+    return {
+      page: { id: page.id, title: page.title, slug: page.slug },
+      draft,
+    };
   });
 }
 
@@ -169,10 +218,16 @@ async function saveDraftVersion(
   siteId: string,
   pageId: string,
   document: unknown,
+  assetIds: readonly string[],
 ): Promise<PageDraftRecord | null> {
   return await client.drizzle.transaction(async (transaction) => {
     const [page] = await transaction
-      .select({ id: pages.id, title: pages.title, slug: pages.slug })
+      .select({
+        id: pages.id,
+        siteId: sites.id,
+        title: pages.title,
+        slug: pages.slug,
+      })
       .from(pages)
       .innerJoin(sites, eq(sites.id, pages.siteId))
       .where(
@@ -186,6 +241,17 @@ async function saveDraftVersion(
     if (!page) {
       return null;
     }
+    if (assetIds.length > 0) {
+      const referencedAssets = await transaction
+        .select({ id: assets.id })
+        .from(assets)
+        .where(
+          and(eq(assets.siteId, page.siteId), inArray(assets.id, assetIds)),
+        );
+      if (referencedAssets.length !== assetIds.length) {
+        throw new PageAssetReferenceError();
+      }
+    }
     const [draft] = await transaction
       .insert(pageVersions)
       .values({ pageId: page.id, document })
@@ -197,6 +263,14 @@ async function saveDraftVersion(
     if (!draft) {
       throw new Error("Draft version returned no record.");
     }
+    if (assetIds.length > 0) {
+      await transaction.insert(pageVersionAssets).values(
+        assetIds.map((assetId) => ({
+          pageVersionId: draft.id,
+          assetId,
+        })),
+      );
+    }
     const [updatedPage] = await transaction
       .update(pages)
       .set({ draftVersionId: draft.id, updatedAt: new Date() })
@@ -205,6 +279,9 @@ async function saveDraftVersion(
     if (!updatedPage) {
       throw new Error("Draft pointer update failed.");
     }
-    return { page, draft };
+    return {
+      page: { id: page.id, title: page.title, slug: page.slug },
+      draft,
+    };
   });
 }

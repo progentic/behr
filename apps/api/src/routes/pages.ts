@@ -1,4 +1,5 @@
 import {
+  type PageDocument,
   type PageDraft,
   type PageListResponse,
   createPageRequestSchema,
@@ -15,6 +16,7 @@ import {
   PageScopeNotFoundError,
   PageSlugConflictError,
   type TenantPersistence,
+  PageAssetReferenceError,
 } from "@bher/db";
 import type { Context, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
@@ -134,6 +136,7 @@ async function handleCreatePage(
       request.data.title,
       request.data.slug,
       request.data.document,
+      collectImageAssetIds(request.data.document),
     );
     return createJsonResponse(toPageDraft(record), CREATED_STATUS);
   } catch (error) {
@@ -145,6 +148,9 @@ async function handleCreatePage(
         { error: "Page slug already exists in this site." },
         CONFLICT_STATUS,
       );
+    }
+    if (error instanceof PageAssetReferenceError) {
+      return createInvalidPageRequestResponse();
     }
     throw error;
   }
@@ -174,15 +180,35 @@ async function handleSaveDraft(
   if (!request.success) {
     return createInvalidPageRequestResponse();
   }
-  const record = await persistence.saveDraftVersion(
-    context.get("tenantAccess").id,
-    context.req.param("siteId") ?? "",
-    context.req.param("pageId") ?? "",
-    request.data.document,
+  try {
+    const record = await persistence.saveDraftVersion(
+      context.get("tenantAccess").id,
+      context.req.param("siteId") ?? "",
+      context.req.param("pageId") ?? "",
+      request.data.document,
+      collectImageAssetIds(request.data.document),
+    );
+    return record
+      ? createJsonResponse(toPageDraft(record), CREATED_STATUS)
+      : createPageNotFoundResponse();
+  } catch (error) {
+    if (error instanceof PageAssetReferenceError) {
+      return createInvalidPageRequestResponse();
+    }
+    throw error;
+  }
+}
+
+export function collectImageAssetIds(document: PageDocument): string[] {
+  return Array.from(
+    new Set(
+      document.sections.flatMap((section) =>
+        section.blocks.flatMap((block) =>
+          block.type === "image" ? [block.assetId] : [],
+        ),
+      ),
+    ),
   );
-  return record
-    ? createJsonResponse(toPageDraft(record), CREATED_STATUS)
-    : createPageNotFoundResponse();
 }
 
 async function handleIssuePreviewToken(

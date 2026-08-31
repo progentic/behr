@@ -43,10 +43,12 @@ test("allows credentialed auth requests only for the configured admin origin", a
     },
     {
       resolvePublishedPage: async () => null,
+      resolvePublishedAsset: async () => null,
     },
     {
       createOrRotatePreviewToken: async () => null,
       resolvePreviewPage: async () => null,
+      resolvePreviewAsset: async () => null,
     },
     {
       resolvePublishCandidate: async () => null,
@@ -55,12 +57,14 @@ test("allows credentialed auth requests only for the configured admin origin", a
     {
       resolveAssetSite: async () => false,
       createAssetMetadata: async () => null,
+      listSiteAssets: async () => [],
     },
     {
       writeOriginal: async () => {
         throw new Error("Asset storage is not used by this CORS test.");
       },
       removeOriginal: async () => undefined,
+      readOriginal: async () => new Uint8Array(),
     },
     ADMIN_ORIGIN,
   );

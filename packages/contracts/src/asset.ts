@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 export const ASSET_MAX_BYTE_SIZE = 10 * 1024 * 1024;
+export const RENDERABLE_ASSET_CONTENT_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+] as const;
 const ASSET_FILENAME_MAX_LENGTH = 255;
 const ASSET_CONTENT_TYPE_MAX_LENGTH = 255;
 const INVALID_ASSET_FILENAME_PATTERN = /[\u0000-\u001f\u007f/\\]/;
@@ -18,6 +25,9 @@ export const assetContentTypeSchema = z
   .min(1)
   .max(ASSET_CONTENT_TYPE_MAX_LENGTH)
   .refine((contentType) => !INVALID_ASSET_CONTENT_TYPE_PATTERN.test(contentType));
+export const renderableAssetContentTypeSchema = z.enum(
+  RENDERABLE_ASSET_CONTENT_TYPES,
+);
 export const assetByteSizeSchema = z
   .number()
   .int()
@@ -34,4 +44,17 @@ export const assetUploadResponseSchema = z
   })
   .strict();
 
+export const assetListItemSchema = assetUploadResponseSchema
+  .extend({ contentType: renderableAssetContentTypeSchema })
+  .strict();
+
+export const assetListResponseSchema = z
+  .object({ assets: z.array(assetListItemSchema) })
+  .strict();
+
 export type AssetUploadResponse = z.infer<typeof assetUploadResponseSchema>;
+export type AssetListItem = z.infer<typeof assetListItemSchema>;
+export type AssetListResponse = z.infer<typeof assetListResponseSchema>;
+export type RenderableAssetContentType = z.infer<
+  typeof renderableAssetContentTypeSchema
+>;

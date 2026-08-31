@@ -9,12 +9,17 @@ import {
 } from "@bher/contracts";
 import {
   type DatabaseClient,
+  assets,
   createDatabaseClient,
   loadDatabaseConfig,
 } from "@bher/db";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { type ApiApplication, createApiApplication } from "./application";
 import { loadApiConfig } from "./env";
+import { createAssetStorage } from "./lib/asset-storage";
 
 const OWNER_PASSWORD = "public-owner-password";
 const EXPECTED_HOSTNAME = "published.example.com";
@@ -33,7 +38,8 @@ type TestIdentity = Readonly<{
 test("resolves only authoritative published page state", verifyPublicReadLifecycle);
 
 async function verifyPublicReadLifecycle(): Promise<void> {
-  const environment = process.env;
+  const storageRoot = await mkdtemp(join(tmpdir(), "behr-public-assets-"));
+  const environment = { ...process.env, ASSET_STORAGE_ROOT: storageRoot };
   const application = createApiApplication(environment);
   const observer = createDatabaseClient(loadDatabaseConfig(environment));
   const origin = loadApiConfig(environment).auth.baseUrl;
@@ -71,6 +77,221 @@ async function verifyPublicReadLifecycle(): Promise<void> {
       "Second Site",
       SECOND_HOSTNAME,
     );
+    const storage = createAssetStorage(storageRoot);
+    const imageBytes = new Uint8Array([1, 2, 3, 4]);
+    const assetA = await createAssetFixture(
+      observer,
+      storage,
+      site.id,
+      "published.png",
+      "image/png",
+      imageBytes,
+    );
+    const wrongSiteAsset = await createAssetFixture(
+      observer,
+      storage,
+      secondSite.id,
+      "wrong-site.png",
+      "image/png",
+      new Uint8Array([5]),
+    );
+    const unsupportedAsset = await createAssetFixture(
+      observer,
+      storage,
+      site.id,
+      "unsupported.svg",
+      "image/svg+xml",
+      new Uint8Array([6]),
+    );
+    const unusedAsset = await createAssetFixture(
+      observer,
+      storage,
+      site.id,
+      "unused.png",
+      "image/png",
+      new Uint8Array([7]),
+    );
+    const missingFileAsset = await createAssetFixture(
+      observer,
+      storage,
+      site.id,
+      "missing.png",
+      "image/png",
+      null,
+    );
+
+    const imagePage = await createPage(
+      application,
+      origin,
+      ownerCookie,
+      tenant.id,
+      site.id,
+      "Published Image",
+      "published-image",
+      createImageDocument(assetA),
+    );
+    expect(
+      (await requestPublicAsset(application, EXPECTED_HOSTNAME, assetA)).status,
+    ).toBe(404);
+    expect(await countVersionAssetUsage(observer, imagePage.draft.id, assetA)).toBe(
+      1,
+    );
+    expect(
+      (
+        await publishPage(
+          application,
+          origin,
+          ownerCookie,
+          tenant.id,
+          site.id,
+          imagePage.page.id,
+        )
+      ).status,
+    ).toBe(200);
+    const publishedAsset = await requestPublicAsset(
+      application,
+      EXPECTED_HOSTNAME,
+      assetA,
+    );
+    expect(publishedAsset.status).toBe(200);
+    expect(publishedAsset.headers.get("content-type")).toBe("image/png");
+    expect(publishedAsset.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(Array.from(new Uint8Array(await publishedAsset.arrayBuffer()))).toEqual(
+      Array.from(imageBytes),
+    );
+
+    const imageRemoved = await saveDraft(
+      application,
+      origin,
+      ownerCookie,
+      tenant.id,
+      site.id,
+      imagePage.page.id,
+      DOCUMENT_A,
+    );
+    expect(
+      (
+        await publishPage(
+          application,
+          origin,
+          ownerCookie,
+          tenant.id,
+          site.id,
+          imagePage.page.id,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (await requestPublicAsset(application, EXPECTED_HOSTNAME, assetA)).status,
+    ).toBe(404);
+    expect(await countVersionAssetUsage(observer, imagePage.draft.id, assetA)).toBe(
+      1,
+    );
+    expect(await countVersionAssetUsage(observer, imageRemoved.draft.id, assetA)).toBe(
+      0,
+    );
+
+    const sharedPage = await createPage(
+      application,
+      origin,
+      ownerCookie,
+      tenant.id,
+      site.id,
+      "Shared Image",
+      "shared-image",
+      createImageDocument(assetA),
+    );
+    await publishPage(
+      application,
+      origin,
+      ownerCookie,
+      tenant.id,
+      site.id,
+      sharedPage.page.id,
+    );
+    expect(
+      (await requestPublicAsset(application, EXPECTED_HOSTNAME, assetA)).status,
+    ).toBe(200);
+    expect(
+      (await requestPublicAsset(application, SECOND_HOSTNAME, assetA)).status,
+    ).toBe(404);
+    expect(
+      (
+        await requestPublicAsset(
+          application,
+          EXPECTED_HOSTNAME,
+          wrongSiteAsset,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (await requestPublicAsset(application, EXPECTED_HOSTNAME, "invalid")).status,
+    ).toBe(404);
+    expect(
+      (
+        await requestPublicAsset(
+          application,
+          EXPECTED_HOSTNAME,
+          unusedAsset,
+        )
+      ).status,
+    ).toBe(404);
+
+    const unsupportedPage = await createPage(
+      application,
+      origin,
+      ownerCookie,
+      tenant.id,
+      site.id,
+      "Unsupported Image",
+      "unsupported-image",
+      createImageDocument(unsupportedAsset),
+    );
+    await publishPage(
+      application,
+      origin,
+      ownerCookie,
+      tenant.id,
+      site.id,
+      unsupportedPage.page.id,
+    );
+    expect(
+      (
+        await requestPublicAsset(
+          application,
+          EXPECTED_HOSTNAME,
+          unsupportedAsset,
+        )
+      ).status,
+    ).toBe(404);
+
+    const missingFilePage = await createPage(
+      application,
+      origin,
+      ownerCookie,
+      tenant.id,
+      site.id,
+      "Missing File",
+      "missing-file",
+      createImageDocument(missingFileAsset),
+    );
+    await publishPage(
+      application,
+      origin,
+      ownerCookie,
+      tenant.id,
+      site.id,
+      missingFilePage.page.id,
+    );
+    const missingFileResponse = await requestPublicAsset(
+      application,
+      EXPECTED_HOSTNAME,
+      missingFileAsset,
+    );
+    expect(missingFileResponse.status).toBe(500);
+    expect(await missingFileResponse.json()).toEqual({
+      error: "Internal server error.",
+    });
 
     const draftOnly = await createPage(
       application,
@@ -298,6 +519,7 @@ async function verifyPublicReadLifecycle(): Promise<void> {
     await removeTestRecords(observer, createdTenantIds, createdUserIds);
     await application.close();
     await observer.close();
+    await rm(storageRoot, { recursive: true, force: true });
   }
 }
 
@@ -317,6 +539,49 @@ function createParagraphDocument(text: string): PageDocument {
       },
     ],
   };
+}
+
+function createImageDocument(assetId: string): PageDocument {
+  return {
+    schemaVersion: 1,
+    sections: [
+      {
+        id: crypto.randomUUID(),
+        blocks: [
+          {
+            id: crypto.randomUUID(),
+            type: "image",
+            assetId,
+            alt: "Image",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+async function createAssetFixture(
+  observer: DatabaseClient,
+  storage: ReturnType<typeof createAssetStorage>,
+  siteId: string,
+  originalFilename: string,
+  contentType: string,
+  bytes: Uint8Array | null,
+): Promise<string> {
+  const id = crypto.randomUUID();
+  const storageKey = `${siteId}/${id}`;
+  if (bytes !== null) {
+    await storage.writeOriginal(siteId, id, bytes);
+  }
+  await observer.drizzle.insert(assets).values({
+    id,
+    siteId,
+    storageKey,
+    originalFilename,
+    contentType,
+    byteSize: bytes?.byteLength ?? 1,
+  });
+  return id;
 }
 
 function createIdentity(): TestIdentity {
@@ -444,6 +709,44 @@ async function requestPublicPage(
   });
 }
 
+async function requestPublicAsset(
+  application: ApiApplication,
+  hostname: string,
+  assetId: string,
+): Promise<Response> {
+  return await application.app.request(`/public/assets/${assetId}`, {
+    headers: { host: hostname },
+  });
+}
+
+async function publishPage(
+  application: ApiApplication,
+  origin: string,
+  cookie: string,
+  tenantId: string,
+  siteId: string,
+  pageId: string,
+): Promise<Response> {
+  return await application.app.request(
+    `/tenants/${tenantId}/sites/${siteId}/pages/${pageId}/publish`,
+    { method: "POST", headers: createRequestHeaders(origin, cookie) },
+  );
+}
+
+async function countVersionAssetUsage(
+  observer: DatabaseClient,
+  versionId: string,
+  assetId: string,
+): Promise<number> {
+  const [row] = await observer.native<Array<{ count: number }>>`
+    SELECT count(*)::int AS count
+    FROM page_version_assets
+    WHERE page_version_id = ${versionId}
+      AND asset_id = ${assetId}
+  `;
+  return row?.count ?? 0;
+}
+
 async function readPublishedVersionId(
   observer: DatabaseClient,
   pageId: string,
@@ -496,6 +799,23 @@ async function removeTestRecords(
   userIds: string[],
 ): Promise<void> {
   for (const tenantId of tenantIds) {
+    await observer.native`
+      DELETE FROM page_publications
+      WHERE page_id IN (
+        SELECT page.id
+        FROM pages AS page
+        INNER JOIN sites AS site ON site.id = page.site_id
+        WHERE site.tenant_id = ${tenantId}
+      )
+    `;
+    await observer.native`
+      DELETE FROM pages
+      WHERE site_id IN (SELECT id FROM sites WHERE tenant_id = ${tenantId})
+    `;
+    await observer.native`
+      DELETE FROM assets
+      WHERE site_id IN (SELECT id FROM sites WHERE tenant_id = ${tenantId})
+    `;
     await observer.native`DELETE FROM tenants WHERE id = ${tenantId}`;
   }
   for (const userId of userIds) {

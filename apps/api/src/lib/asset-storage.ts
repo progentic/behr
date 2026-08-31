@@ -1,5 +1,5 @@
 import { assetIdSchema, siteIdSchema } from "@bher/contracts";
-import { mkdir, open, unlink } from "node:fs/promises";
+import { mkdir, open, readFile, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 export type StoredOriginal = Readonly<{
@@ -14,6 +14,7 @@ export type AssetStorage = Readonly<{
     bytes: Uint8Array,
   ) => Promise<StoredOriginal>;
   removeOriginal: (storageKey: string) => Promise<void>;
+  readOriginal: (storageKey: string) => Promise<Uint8Array>;
 }>;
 
 type AssetFileHandle = Readonly<{
@@ -25,6 +26,7 @@ export type AssetFileOperations = Readonly<{
   createDirectory: (path: string) => Promise<void>;
   openExclusive: (path: string) => Promise<AssetFileHandle>;
   removeFile: (path: string) => Promise<void>;
+  readFile: (path: string) => Promise<Uint8Array>;
 }>;
 
 type StorageLocation = Readonly<{
@@ -40,6 +42,7 @@ const NODE_ASSET_FILE_OPERATIONS: AssetFileOperations = Object.freeze({
   removeFile: async (path) => {
     await unlink(path);
   },
+  readFile: async (path) => await readFile(path),
 });
 
 export function createAssetStorage(
@@ -55,7 +58,17 @@ export function createAssetStorage(
       writeOriginal(root, siteId, assetId, bytes, operations),
     removeOriginal: (storageKey) =>
       removeOriginal(root, storageKey, operations),
+    readOriginal: (storageKey) => readOriginal(root, storageKey, operations),
   });
+}
+
+async function readOriginal(
+  storageRoot: string,
+  storageKey: string,
+  operations: AssetFileOperations,
+): Promise<Uint8Array> {
+  const location = resolveStorageKey(storageRoot, storageKey);
+  return await operations.readFile(location.physicalPath);
 }
 
 async function writeOriginal(

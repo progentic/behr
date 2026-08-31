@@ -12,13 +12,18 @@ import {
 } from "@bher/contracts";
 import {
   type DatabaseClient,
+  assets,
   createDatabaseClient,
   loadDatabaseConfig,
   memberships,
 } from "@bher/db";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { type ApiApplication, createApiApplication } from "./application";
 import { loadApiConfig } from "./env";
+import { createAssetStorage } from "./lib/asset-storage";
 
 const OWNER_PASSWORD = "preview-owner-password";
 const MEMBER_PASSWORD = "preview-member-password";
@@ -50,7 +55,8 @@ type StoredPreviewToken = Readonly<{
 test("enforces the immutable preview credential lifecycle", verifyPreviewLifecycle);
 
 async function verifyPreviewLifecycle(): Promise<void> {
-  const environment = process.env;
+  const storageRoot = await mkdtemp(join(tmpdir(), "behr-preview-assets-"));
+  const environment = { ...process.env, ASSET_STORAGE_ROOT: storageRoot };
   const application = createApiApplication(environment);
   const observer = createDatabaseClient(loadDatabaseConfig(environment));
   const origin = loadApiConfig(environment).auth.baseUrl;
@@ -107,6 +113,16 @@ async function verifyPreviewLifecycle(): Promise<void> {
       tenant.id,
       "Second Preview Site",
       SECOND_HOSTNAME,
+    );
+    await verifyPreviewAssetDelivery(
+      application,
+      observer,
+      createAssetStorage(storageRoot),
+      origin,
+      ownerCookie,
+      tenant.id,
+      site.id,
+      secondSite.id,
     );
     const aboutPage = await createPage(
       application,
@@ -535,7 +551,200 @@ async function verifyPreviewLifecycle(): Promise<void> {
     await removeTestRecords(observer, createdTenantIds, createdUserIds);
     await application.close();
     await observer.close();
+    await rm(storageRoot, { recursive: true, force: true });
   }
+}
+
+async function verifyPreviewAssetDelivery(
+  application: ApiApplication,
+  observer: DatabaseClient,
+  storage: ReturnType<typeof createAssetStorage>,
+  origin: string,
+  ownerCookie: string,
+  tenantId: string,
+  siteId: string,
+  secondSiteId: string,
+): Promise<void> {
+  const bytesA = new Uint8Array([10, 11]);
+  const bytesB = new Uint8Array([12, 13, 14]);
+  const assetA = await createAssetFixture(
+    observer,
+    storage,
+    siteId,
+    "preview-a.png",
+    "image/png",
+    bytesA,
+  );
+  const assetB = await createAssetFixture(
+    observer,
+    storage,
+    siteId,
+    "preview-b.webp",
+    "image/webp",
+    bytesB,
+  );
+  const wrongSiteAsset = await createAssetFixture(
+    observer,
+    storage,
+    secondSiteId,
+    "wrong-site.png",
+    "image/png",
+    new Uint8Array([15]),
+  );
+  const unsupportedAsset = await createAssetFixture(
+    observer,
+    storage,
+    siteId,
+    "unsupported.svg",
+    "image/svg+xml",
+    new Uint8Array([16]),
+  );
+  const page = await createPage(
+    application,
+    origin,
+    ownerCookie,
+    tenantId,
+    siteId,
+    "Preview Asset",
+    "preview-asset",
+    createImageDocument(assetA),
+  );
+  const firstIssue = await issuePreviewToken(
+    application,
+    origin,
+    ownerCookie,
+    tenantId,
+    siteId,
+    page.page.id,
+  );
+  const first = previewTokenResponseSchema.parse(await firstIssue.json());
+  const firstAsset = await requestPreviewAsset(
+    application,
+    EXPECTED_HOSTNAME,
+    assetA,
+    first.token,
+  );
+  expect(firstAsset.status).toBe(200);
+  expect(firstAsset.headers.get("content-type")).toBe("image/png");
+  expect(firstAsset.headers.get("x-content-type-options")).toBe("nosniff");
+  expect(Array.from(new Uint8Array(await firstAsset.arrayBuffer()))).toEqual(
+    Array.from(bytesA),
+  );
+  expect(
+    (await requestPreviewAsset(application, EXPECTED_HOSTNAME, assetB, first.token))
+      .status,
+  ).toBe(404);
+  expect(
+    (
+      await requestPreviewAsset(
+        application,
+        EXPECTED_HOSTNAME,
+        wrongSiteAsset,
+        first.token,
+      )
+    ).status,
+  ).toBe(404);
+  expect(
+    (await requestPreviewAsset(application, SECOND_HOSTNAME, assetA, first.token))
+      .status,
+  ).toBe(404);
+  expect(
+    (await requestPreviewAsset(application, EXPECTED_HOSTNAME, "invalid", first.token))
+      .status,
+  ).toBe(404);
+  expect(
+    (await requestPreviewAsset(application, EXPECTED_HOSTNAME, assetA)).status,
+  ).toBe(404);
+
+  const secondDraft = await saveDraft(
+    application,
+    origin,
+    ownerCookie,
+    tenantId,
+    siteId,
+    page.page.id,
+    createImageDocument(assetB),
+  );
+  expect(secondDraft.draft.id).not.toBe(page.draft.id);
+  expect(
+    (await requestPreviewAsset(application, EXPECTED_HOSTNAME, assetA, first.token))
+      .status,
+  ).toBe(200);
+  expect(
+    (await requestPreviewAsset(application, EXPECTED_HOSTNAME, assetB, first.token))
+      .status,
+  ).toBe(404);
+
+  const secondIssue = await issuePreviewToken(
+    application,
+    origin,
+    ownerCookie,
+    tenantId,
+    siteId,
+    page.page.id,
+  );
+  const second = previewTokenResponseSchema.parse(await secondIssue.json());
+  expect(
+    (await requestPreviewAsset(application, EXPECTED_HOSTNAME, assetA, first.token))
+      .status,
+  ).toBe(404);
+  expect(
+    (await requestPreviewAsset(application, EXPECTED_HOSTNAME, assetB, first.token))
+      .status,
+  ).toBe(404);
+  expect(
+    (await requestPreviewAsset(application, EXPECTED_HOSTNAME, assetA, second.token))
+      .status,
+  ).toBe(404);
+  const secondAsset = await requestPreviewAsset(
+    application,
+    EXPECTED_HOSTNAME,
+    assetB,
+    second.token,
+  );
+  expect(secondAsset.status).toBe(200);
+  expect(secondAsset.headers.get("content-type")).toBe("image/webp");
+  expect(Array.from(new Uint8Array(await secondAsset.arrayBuffer()))).toEqual(
+    Array.from(bytesB),
+  );
+
+  const unsupportedPage = await createPage(
+    application,
+    origin,
+    ownerCookie,
+    tenantId,
+    siteId,
+    "Unsupported Preview Asset",
+    "unsupported-preview-asset",
+    createImageDocument(unsupportedAsset),
+  );
+  const unsupportedIssue = await issuePreviewToken(
+    application,
+    origin,
+    ownerCookie,
+    tenantId,
+    siteId,
+    unsupportedPage.page.id,
+  );
+  const unsupportedToken = previewTokenResponseSchema.parse(
+    await unsupportedIssue.json(),
+  ).token;
+  expect(
+    (
+      await requestPreviewAsset(
+        application,
+        EXPECTED_HOSTNAME,
+        unsupportedAsset,
+        unsupportedToken,
+      )
+    ).status,
+  ).toBe(404);
+
+  await expirePreviewToken(observer, page.page.id);
+  expect(
+    (await requestPreviewAsset(application, EXPECTED_HOSTNAME, assetB, second.token))
+      .status,
+  ).toBe(404);
 }
 
 function createParagraphDocument(text: string): PageDocument {
@@ -550,6 +759,46 @@ function createParagraphDocument(text: string): PageDocument {
       },
     ],
   };
+}
+
+function createImageDocument(assetId: string): PageDocument {
+  return {
+    schemaVersion: 1,
+    sections: [
+      {
+        id: crypto.randomUUID(),
+        blocks: [
+          {
+            id: crypto.randomUUID(),
+            type: "image",
+            assetId,
+            alt: "Preview image",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+async function createAssetFixture(
+  observer: DatabaseClient,
+  storage: ReturnType<typeof createAssetStorage>,
+  siteId: string,
+  originalFilename: string,
+  contentType: string,
+  bytes: Uint8Array,
+): Promise<string> {
+  const id = crypto.randomUUID();
+  const stored = await storage.writeOriginal(siteId, id, bytes);
+  await observer.drizzle.insert(assets).values({
+    id,
+    siteId,
+    storageKey: stored.storageKey,
+    originalFilename,
+    contentType,
+    byteSize: bytes.byteLength,
+  });
+  return id;
 }
 
 function createIdentity(label: string, password: string): TestIdentity {
@@ -694,6 +943,21 @@ async function requestPreviewPage(
 ): Promise<Response> {
   return await application.app.request(`/preview/page?${query}`, {
     headers: { host: hostname, ...headers },
+  });
+}
+
+async function requestPreviewAsset(
+  application: ApiApplication,
+  hostname: string,
+  assetId: string,
+  token?: string,
+): Promise<Response> {
+  const headers: Record<string, string> = { host: hostname };
+  if (token) {
+    headers[PREVIEW_TOKEN_HEADER] = token;
+  }
+  return await application.app.request(`/preview/assets/${assetId}`, {
+    headers,
   });
 }
 
@@ -924,6 +1188,14 @@ async function removeTestRecords(
   userIds: string[],
 ): Promise<void> {
   for (const tenantId of tenantIds) {
+    await observer.native`
+      DELETE FROM pages
+      WHERE site_id IN (SELECT id FROM sites WHERE tenant_id = ${tenantId})
+    `;
+    await observer.native`
+      DELETE FROM assets
+      WHERE site_id IN (SELECT id FROM sites WHERE tenant_id = ${tenantId})
+    `;
     await observer.native`DELETE FROM tenants WHERE id = ${tenantId}`;
   }
   for (const userId of userIds) {

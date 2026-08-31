@@ -2,8 +2,10 @@ import {
   ASSET_MAX_BYTE_SIZE,
   assetContentTypeSchema,
   assetIdSchema,
+  assetListResponseSchema,
   assetOriginalFilenameSchema,
   assetUploadResponseSchema,
+  renderableAssetContentTypeSchema,
   siteIdSchema,
 } from "@bher/contracts";
 import type {
@@ -25,6 +27,7 @@ import { createRequireTenantMembership } from "../middleware/tenant";
 import type { ApiBindings } from "../types";
 
 const CREATED_STATUS = 201;
+const OK_STATUS = 200;
 const BAD_REQUEST_STATUS = 400;
 const NOT_FOUND_STATUS = 404;
 const PAYLOAD_TOO_LARGE_STATUS = 413;
@@ -60,10 +63,15 @@ export function createAssetRoutes(
   routes.use("*", createRequireAuthentication(auth));
   routes.use("*", createRequireTenantMembership(tenantPersistence));
   routes.use("*", createRequireValidSiteId());
-  routes.use("*", createRequireTrustedOrigin(auth));
-  routes.use("*", createRequireAssetSite(assetPersistence));
+  routes.get(
+    "/",
+    createRequireAssetSite(assetPersistence),
+    (context) => handleListAssets(context, assetPersistence),
+  );
   routes.post(
     "/",
+    createRequireTrustedOrigin(auth),
+    createRequireAssetSite(assetPersistence),
     bodyLimit({
       maxSize: ASSET_MAX_REQUEST_BODY_SIZE,
       onError: () => createAssetTooLargeResponse(),
@@ -71,6 +79,32 @@ export function createAssetRoutes(
     (context) => handleAssetUpload(context, assetPersistence, assetStorage),
   );
   return routes;
+}
+
+async function handleListAssets(
+  context: Context<ApiBindings>,
+  persistence: AssetPersistence,
+): Promise<Response> {
+  const records = await persistence.listSiteAssets(
+    context.get("tenantAccess").id,
+    context.req.param("siteId") ?? "",
+  );
+  const assets = records.flatMap((record) => {
+    const contentType = renderableAssetContentTypeSchema.safeParse(
+      record.contentType,
+    );
+    return contentType.success
+      ? [
+          {
+            ...record,
+            contentType: contentType.data,
+            createdAt: record.createdAt.toISOString(),
+          },
+        ]
+      : [];
+  });
+  const response = assetListResponseSchema.parse({ assets });
+  return createJsonResponse(response, OK_STATUS);
 }
 
 function createRequireValidSiteId(): MiddlewareHandler<ApiBindings> {

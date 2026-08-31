@@ -63,6 +63,20 @@ export function addParagraphBlock(
   });
 }
 
+export function addImageBlock(
+  document: PageDocument,
+  sectionId: string,
+  blockId: string,
+  assetId: string,
+): PageDocument {
+  return appendBlock(document, sectionId, {
+    id: blockId,
+    type: "image",
+    assetId,
+    alt: "",
+  });
+}
+
 export function removeBlock(
   document: PageDocument,
   sectionId: string,
@@ -85,9 +99,26 @@ export function updateBlockText(
   blockId: string,
   text: string,
 ): PageDocument {
-  return updateBlock(document, sectionId, blockId, (block) =>
-    block.text === text ? block : { ...block, text },
-  );
+  return updateBlock(document, sectionId, blockId, (block) => {
+    if (block.type === "image" || block.text === text) {
+      return block;
+    }
+    return { ...block, text };
+  });
+}
+
+export function updateImageAlt(
+  document: PageDocument,
+  sectionId: string,
+  blockId: string,
+  alt: string,
+): PageDocument {
+  return updateBlock(document, sectionId, blockId, (block) => {
+    if (block.type !== "image" || block.alt === alt) {
+      return block;
+    }
+    return { ...block, alt };
+  });
 }
 
 export function updateHeadingLevel(
@@ -111,6 +142,9 @@ export function updateTextAlignment(
   alignment: TextAlignToken | undefined,
 ): PageDocument {
   return updateBlock(document, sectionId, blockId, (block) => {
+    if (block.type === "image") {
+      return block;
+    }
     if (alignment === undefined) {
       if (block.style === undefined) {
         return block;

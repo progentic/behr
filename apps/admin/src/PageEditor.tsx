@@ -1,4 +1,5 @@
 import {
+  type AssetListItem,
   type Block,
   type HeadingBlock,
   type PageDocument,
@@ -6,18 +7,21 @@ import {
   type SavePageDraftRequest,
   type Section,
   type TextAlignToken,
+  assetListResponseSchema,
   pageDocumentSchema,
   pageDraftSchema,
   savePageDraftRequestSchema,
 } from "@bher/contracts";
 import {
   addHeadingBlock,
+  addImageBlock,
   addParagraphBlock,
   addSection,
   removeBlock,
   removeSection,
   updateBlockText,
   updateHeadingLevel,
+  updateImageAlt,
   updateTextAlignment,
 } from "@bher/editor";
 import { useEffect, useRef, useState } from "react";
@@ -44,6 +48,16 @@ type SaveState =
     }>
   | Readonly<{ status: "saved" }>
   | Readonly<{ status: "error"; message: string }>;
+
+export type SiteAssetState =
+  | Readonly<{ status: "loading"; tenantId: string; siteId: string }>
+  | Readonly<{ status: "error"; tenantId: string; siteId: string }>
+  | Readonly<{
+      status: "loaded";
+      tenantId: string;
+      siteId: string;
+      assets: AssetListItem[];
+    }>;
 
 export type PageEditorState =
   | Readonly<{ status: "loading"; identity: EditorIdentity }>
@@ -83,6 +97,11 @@ export function PageEditor({
     status: "loading",
     identity: { tenantId, siteId, pageId, requestEpoch: 0 },
   });
+  const [assetState, setAssetState] = useState<SiteAssetState>({
+    status: "loading",
+    tenantId,
+    siteId,
+  });
 
   useEffect(() => {
     const identity: EditorIdentity = {
@@ -109,6 +128,29 @@ export function PageEditor({
     };
   }, [tenantId, siteId, pageId]);
 
+  useEffect(() => {
+    let active = true;
+    setAssetState({ status: "loading", tenantId, siteId });
+    void requestSiteAssets(tenantId, siteId)
+      .then((assets) => {
+        if (active) {
+          setAssetState((current) =>
+            applySiteAssetLoad(current, tenantId, siteId, assets),
+          );
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAssetState((current) =>
+            applySiteAssetLoadError(current, tenantId, siteId),
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [tenantId, siteId]);
+
   if (!matchesResourceIdentity(state.identity, { tenantId, siteId, pageId })) {
     return <p role="status">Loading page…</p>;
   }
@@ -120,6 +162,10 @@ export function PageEditor({
   }
 
   const loadedState = state;
+  const visibleAssets = matchesSiteAssetState(assetState, tenantId, siteId)
+    ? assetState
+    : { status: "loading" as const, tenantId, siteId };
+  const assets = visibleAssets.status === "loaded" ? visibleAssets.assets : [];
 
   function transformDocument(transform: DocumentTransform): void {
     setState((current) => applyDocumentEdit(current, transform));
@@ -162,9 +208,16 @@ export function PageEditor({
         <SectionEditor
           key={section.id}
           section={section}
+          assets={assets}
           transformDocument={transformDocument}
         />
       ))}
+      {visibleAssets.status === "loading" ? (
+        <p role="status">Loading site assets…</p>
+      ) : null}
+      {visibleAssets.status === "error" ? (
+        <p role="alert">Site assets could not be loaded.</p>
+      ) : null}
       <button
         type="button"
         onClick={() =>
@@ -194,9 +247,11 @@ export function PageEditor({
 
 function SectionEditor({
   section,
+  assets,
   transformDocument,
 }: Readonly<{
   section: Section;
+  assets: AssetListItem[];
   transformDocument: (transform: DocumentTransform) => void;
 }>) {
   return (
@@ -214,6 +269,7 @@ function SectionEditor({
         <BlockEditor
           key={block.id}
           block={block}
+          assets={assets}
           sectionId={section.id}
           transformDocument={transformDocument}
         />
@@ -238,19 +294,60 @@ function SectionEditor({
       >
         Add paragraph
       </button>
+      {assets.length > 0 ? (
+        <>
+          <label htmlFor={`section-${section.id}-asset`}>Add image</label>
+          <select
+            id={`section-${section.id}-asset`}
+            value=""
+            onChange={(event) => {
+              const assetId = event.currentTarget.value;
+              if (assetId.length > 0) {
+                transformDocument((document) =>
+                  addImageBlock(
+                    document,
+                    section.id,
+                    crypto.randomUUID(),
+                    assetId,
+                  ),
+                );
+              }
+            }}
+          >
+            <option value="">Select an asset…</option>
+            {assets.map((asset) => (
+              <option key={asset.id} value={asset.id}>
+                {asset.originalFilename}
+              </option>
+            ))}
+          </select>
+        </>
+      ) : null}
     </fieldset>
   );
 }
 
 function BlockEditor({
   block,
+  assets,
   sectionId,
   transformDocument,
 }: Readonly<{
   block: Block;
+  assets: AssetListItem[];
   sectionId: string;
   transformDocument: (transform: DocumentTransform) => void;
 }>) {
+  if (block.type === "image") {
+    return (
+      <ImageBlockEditor
+        block={block}
+        sectionId={sectionId}
+        asset={assets.find(({ id }) => id === block.assetId)}
+        transformDocument={transformDocument}
+      />
+    );
+  }
   const inputId = `block-${block.id}`;
   return (
     <div>
@@ -325,6 +422,50 @@ function BlockEditor({
         <option value="center">Center</option>
         <option value="right">Right</option>
       </select>
+      <button
+        type="button"
+        onClick={() =>
+          transformDocument((document) =>
+            removeBlock(document, sectionId, block.id),
+          )
+        }
+      >
+        Remove block
+      </button>
+    </div>
+  );
+}
+
+function ImageBlockEditor({
+  block,
+  sectionId,
+  asset,
+  transformDocument,
+}: Readonly<{
+  block: Extract<Block, { type: "image" }>;
+  sectionId: string;
+  asset: AssetListItem | undefined;
+  transformDocument: (transform: DocumentTransform) => void;
+}>) {
+  const inputId = `block-${block.id}-alt`;
+  return (
+    <div>
+      <p>Image: {asset?.originalFilename ?? block.assetId}</p>
+      <label htmlFor={inputId}>Alternative text</label>
+      <input
+        id={inputId}
+        value={block.alt}
+        onChange={(event) =>
+          transformDocument((document) =>
+            updateImageAlt(
+              document,
+              sectionId,
+              block.id,
+              event.currentTarget.value,
+            ),
+          )
+        }
+      />
       <button
         type="button"
         onClick={() =>
@@ -469,6 +610,19 @@ export async function requestPageDraft(
   return draft;
 }
 
+export async function requestSiteAssets(
+  tenantId: string,
+  siteId: string,
+): Promise<AssetListItem[]> {
+  const response = await requestApi(
+    `/tenants/${tenantId}/sites/${siteId}/assets`,
+  );
+  if (!response.ok) {
+    throw new Error("Site asset loading failed.");
+  }
+  return assetListResponseSchema.parse(await response.json()).assets;
+}
+
 export async function requestDraftSave(
   tenantId: string,
   siteId: string,
@@ -496,6 +650,39 @@ function applyDraftLoadError(
   return state.status === "loading" && matchesEditorIdentity(state.identity, identity)
     ? { status: "error", identity }
     : state;
+}
+
+export function applySiteAssetLoad(
+  state: SiteAssetState,
+  tenantId: string,
+  siteId: string,
+  assets: AssetListItem[],
+): SiteAssetState {
+  return state.status === "loading" &&
+    state.tenantId === tenantId &&
+    state.siteId === siteId
+    ? { status: "loaded", tenantId, siteId, assets }
+    : state;
+}
+
+function applySiteAssetLoadError(
+  state: SiteAssetState,
+  tenantId: string,
+  siteId: string,
+): SiteAssetState {
+  return state.status === "loading" &&
+    state.tenantId === tenantId &&
+    state.siteId === siteId
+    ? { status: "error", tenantId, siteId }
+    : state;
+}
+
+function matchesSiteAssetState(
+  state: SiteAssetState,
+  tenantId: string,
+  siteId: string,
+): boolean {
+  return state.tenantId === tenantId && state.siteId === siteId;
 }
 
 export function applySaveValidationError(

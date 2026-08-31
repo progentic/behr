@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import type { DatabaseClient } from "./client";
 import { assets, sites } from "./schema";
@@ -26,6 +26,10 @@ export type AssetPersistence = Readonly<{
     siteId: string,
     metadata: NewAssetMetadata,
   ) => Promise<AssetMetadataRecord | null>;
+  listSiteAssets: (
+    tenantId: string,
+    siteId: string,
+  ) => Promise<AssetMetadataRecord[]>;
 }>;
 
 export function createAssetPersistence(
@@ -36,7 +40,28 @@ export function createAssetPersistence(
       resolveAssetSite(client, tenantId, siteId),
     createAssetMetadata: (tenantId, siteId, metadata) =>
       createAssetMetadata(client, tenantId, siteId, metadata),
+    listSiteAssets: (tenantId, siteId) =>
+      listSiteAssets(client, tenantId, siteId),
   });
+}
+
+async function listSiteAssets(
+  client: DatabaseClient,
+  tenantId: string,
+  siteId: string,
+): Promise<AssetMetadataRecord[]> {
+  return await client.drizzle
+    .select({
+      id: assets.id,
+      originalFilename: assets.originalFilename,
+      contentType: assets.contentType,
+      byteSize: assets.byteSize,
+      createdAt: assets.createdAt,
+    })
+    .from(assets)
+    .innerJoin(sites, eq(sites.id, assets.siteId))
+    .where(and(eq(sites.id, siteId), eq(sites.tenantId, tenantId)))
+    .orderBy(asc(assets.createdAt), asc(assets.id));
 }
 
 async function resolveAssetSite(

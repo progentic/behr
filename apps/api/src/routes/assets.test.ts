@@ -44,6 +44,7 @@ describe("asset upload orchestration", () => {
         createAssetMetadata: async () => {
           throw new Error("simulated metadata failure");
         },
+        listSiteAssets: async () => [],
       },
       root,
     );
@@ -63,6 +64,7 @@ describe("asset upload orchestration", () => {
       {
         resolveAssetSite: async () => true,
         createAssetMetadata: async () => null,
+        listSiteAssets: async () => [],
       },
       root,
     );
@@ -139,6 +141,49 @@ describe("asset upload orchestration", () => {
       error: "Internal server error.",
     });
     expect(await listStoredFiles(root)).toEqual([]);
+  });
+
+  test("lists only strict renderable site assets without trusted origin", async () => {
+    const root = await createTemporaryRoot();
+    const createdAt = new Date("2026-08-31T12:00:00.000Z");
+    const routes = createTestApplication(
+      {
+        resolveAssetSite: async () => true,
+        createAssetMetadata: async () => null,
+        listSiteAssets: async () => [
+          {
+            id: "33333333-3333-4333-8333-333333333333",
+            originalFilename: "photo.jpg",
+            contentType: "image/jpeg",
+            byteSize: 12,
+            createdAt,
+          },
+          {
+            id: "44444444-4444-4444-8444-444444444444",
+            originalFilename: "document.pdf",
+            contentType: "application/pdf",
+            byteSize: 24,
+            createdAt,
+          },
+        ],
+      },
+      root,
+    );
+
+    const response = await routes.request(ASSET_ROUTE);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      assets: [
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          originalFilename: "photo.jpg",
+          contentType: "image/jpeg",
+          byteSize: 12,
+          createdAt: createdAt.toISOString(),
+        },
+      ],
+    });
   });
 });
 
@@ -223,6 +268,7 @@ function createUnusedAssetPersistence(): AssetPersistence {
     createAssetMetadata: async () => {
       throw new Error("Metadata is not used by multipart error tests.");
     },
+    listSiteAssets: async () => [],
   };
 }
 

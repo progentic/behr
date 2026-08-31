@@ -18,19 +18,28 @@ export {
 } from "./auth";
 export {
   ASSET_MAX_BYTE_SIZE,
+  RENDERABLE_ASSET_CONTENT_TYPES,
+  type AssetListItem,
+  type AssetListResponse,
   type AssetUploadResponse,
+  type RenderableAssetContentType,
   assetByteSizeSchema,
   assetContentTypeSchema,
   assetIdSchema,
+  assetListItemSchema,
+  assetListResponseSchema,
   assetOriginalFilenameSchema,
   assetUploadResponseSchema,
+  renderableAssetContentTypeSchema,
 } from "./asset";
 export {
   type Block,
   type HeadingBlock,
+  type ImageBlock,
   type ParagraphBlock,
   blockSchema,
   headingBlockSchema,
+  imageBlockSchema,
   paragraphBlockSchema,
 } from "./block";
 export {

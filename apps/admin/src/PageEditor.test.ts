@@ -1,9 +1,11 @@
-import type { PageDocument, PageDraft } from "@bher/contracts";
-import { updateBlockText } from "@bher/editor";
+import type { AssetListItem, PageDocument, PageDraft } from "@bher/contracts";
+import { addImageBlock, updateBlockText } from "@bher/editor";
 
 import {
   type EditorIdentity,
   type PageEditorState,
+  type SiteAssetState,
+  applySiteAssetLoad,
   applyDocumentEdit,
   applyDraftLoad,
   applySaveError,
@@ -13,6 +15,7 @@ import {
   prepareDraftSave,
   requestDraftSave,
   requestPageDraft,
+  requestSiteAssets,
 } from "./PageEditor";
 
 declare function test(name: string, body: () => void | Promise<void>): void;
@@ -27,6 +30,7 @@ const PAGE_A = "33333333-3333-4333-8333-333333333333";
 const PAGE_B = "44444444-4444-4444-8444-444444444444";
 const SECTION = "55555555-5555-4555-8555-555555555555";
 const PARAGRAPH = "66666666-6666-4666-8666-666666666666";
+const ASSET = "88888888-8888-4888-8888-888888888888";
 
 test("rejects late and same-page re-entry draft loads", () => {
   const a1 = identity(PAGE_A, 1);
@@ -64,7 +68,11 @@ test("preserves newer edits when an older save completes", () => {
   const completed = applySaveSuccess(edited, started.operation);
   expect(completed.status).toBe("loaded");
   if (completed.status === "loaded") {
-    expect(completed.document.sections[0]?.blocks[0]?.text).toBe("Revision 2");
+    const paragraph = completed.document.sections[0]?.blocks[0];
+    expect(paragraph?.type).toBe("paragraph");
+    if (paragraph?.type === "paragraph") {
+      expect(paragraph.text).toBe("Revision 2");
+    }
     expect(completed.save).toEqual({ status: "idle" });
   }
   expect(createEditorSaveOperation(started.state, 11)).toBe(null);
@@ -130,6 +138,62 @@ test("uses existing draft load and immutable save request boundaries", async () 
   });
 });
 
+test("keeps asset-list results scoped to the initiating tenant and site", () => {
+  const asset = assetRecord();
+  const current: SiteAssetState = {
+    status: "loading",
+    tenantId: TENANT,
+    siteId: SITE,
+  };
+  expect(applySiteAssetLoad(current, TENANT, SITE, [asset])).toEqual({
+    status: "loaded",
+    tenantId: TENANT,
+    siteId: SITE,
+    assets: [asset],
+  });
+  expect(
+    applySiteAssetLoad(
+      { ...current, siteId: "99999999-9999-4999-8999-999999999999" },
+      TENANT,
+      SITE,
+      [asset],
+    ),
+  ).toEqual({
+    status: "loading",
+    tenantId: TENANT,
+    siteId: "99999999-9999-4999-8999-999999999999",
+  });
+});
+
+test("requests strict site assets and inserts the selected asset identity", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+  const asset = assetRecord();
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: String(input), init });
+    return Response.json({ assets: [asset] });
+  };
+  try {
+    expect(await requestSiteAssets(TENANT, SITE)).toEqual([asset]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  expect(requests[0]?.url).toBe(`/tenants/${TENANT}/sites/${SITE}/assets`);
+  expect(requests[0]?.init?.credentials).toBe("include");
+  const withImage = addImageBlock(
+    { schemaVersion: 1, sections: [{ id: SECTION, blocks: [] }] },
+    SECTION,
+    "99999999-9999-4999-8999-999999999999",
+    asset.id,
+  );
+  expect(withImage.sections[0]?.blocks[0]).toEqual({
+    id: "99999999-9999-4999-8999-999999999999",
+    type: "image",
+    assetId: ASSET,
+    alt: "",
+  });
+});
+
 function identity(pageId: string, requestEpoch: number): EditorIdentity {
   return { tenantId: TENANT, siteId: SITE, pageId, requestEpoch };
 }
@@ -169,5 +233,15 @@ function document(text: string): PageDocument {
         blocks: [{ id: PARAGRAPH, type: "paragraph", text }],
       },
     ],
+  };
+}
+
+function assetRecord(): AssetListItem {
+  return {
+    id: ASSET,
+    originalFilename: "photo.jpg",
+    contentType: "image/jpeg",
+    byteSize: 12,
+    createdAt: "2026-08-31T12:00:00.000Z",
   };
 }

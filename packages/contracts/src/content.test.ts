@@ -16,6 +16,8 @@ declare function expect<T>(actual: T): {
 const SECTION_ID = "11111111-1111-4111-8111-111111111111";
 const HEADING_ID = "22222222-2222-4222-8222-222222222222";
 const PARAGRAPH_ID = "33333333-3333-4333-8333-333333333333";
+const IMAGE_ID = "44444444-4444-4444-8444-444444444444";
+const ASSET_ID = "55555555-5555-4555-8555-555555555555";
 
 const canonicalDocument = {
   schemaVersion: 1,
@@ -48,6 +50,56 @@ test("parses a representative canonical document", () => {
   );
 });
 
+test("accepts one strict canonical image block", () => {
+  const imageDocument = {
+    schemaVersion: 1,
+    sections: [
+      {
+        id: SECTION_ID,
+        blocks: [
+          { id: IMAGE_ID, type: "image", assetId: ASSET_ID, alt: "" },
+        ],
+      },
+    ],
+  } as const;
+  expect(pageDocumentSchema.parse(imageDocument)).toEqual(imageDocument);
+  expect(
+    pageDocumentSchema.safeParse({
+      ...imageDocument,
+      sections: [
+        {
+          id: SECTION_ID,
+          blocks: [
+            {
+              id: IMAGE_ID,
+              type: "image",
+              assetId: ASSET_ID,
+              alt: "Image",
+              url: "/public/assets/unsafe",
+            },
+          ],
+        },
+      ],
+    }).success,
+  ).toBe(false);
+  expect(
+    pageDocumentSchema.safeParse({
+      schemaVersion: 1,
+      sections: [
+        { id: SECTION_ID, blocks: [{ id: IMAGE_ID, type: "image", assetId: ASSET_ID }] },
+      ],
+    }).success,
+  ).toBe(false);
+  expect(
+    pageDocumentSchema.safeParse({
+      schemaVersion: 1,
+      sections: [
+        { id: SECTION_ID, blocks: [{ id: IMAGE_ID, type: "image", assetId: "invalid", alt: "" }] },
+      ],
+    }).success,
+  ).toBe(false);
+});
+
 test("rejects unsupported blocks and invalid structure", () => {
   expect(
     pageDocumentSchema.safeParse({
@@ -55,7 +107,7 @@ test("rejects unsupported blocks and invalid structure", () => {
       sections: [
         {
           id: SECTION_ID,
-          blocks: [{ id: HEADING_ID, type: "image", text: "unsupported" }],
+          blocks: [{ id: HEADING_ID, type: "video", text: "unsupported" }],
         },
       ],
     }).success,

@@ -1197,3 +1197,94 @@ response confinement, migration/catalog state, and existing regressions.
 Phase L exposes no public asset delivery, GET/list/update/delete route, static
 mount, admin upload control, editor picker, asset-backed block, PageDocument
 change, derivative generation, image processing, or Phase M integration.
+
+---
+
+## Phase M — Asset Integration
+
+### Canonical image identity and site picker
+
+Canonical content now supports one strict image block containing only `id`,
+`type: "image"`, `assetId`, and `alt`. It stores stable identity rather than a
+URL, storage key, filename, MIME type, dimensions, or presentation controls.
+The PageDocument schema remains version 1 and existing heading/paragraph
+documents remain valid.
+
+Owners and members may list renderable assets through:
+
+```text
+GET /tenants/:tenantId/sites/:siteId/assets
+```
+
+The response contains only public-safe metadata and filters to JPEG, PNG, GIF,
+WebP, and AVIF. Admin asset-list state carries tenant/site identity, rejects
+late cross-site completions, and provides one inline selection control per
+section. Selection appends an image block; the image editor exposes alt text
+and the existing remove action. It adds no upload, search, deletion, folders,
+thumbnails, or media-library framework.
+
+### Immutable version usage
+
+Migration `0009_page_version_assets.sql` adds exactly
+`page_version_assets(page_version_id, asset_id)` with a composite primary key,
+asset index, cascading version reference, and non-cascading asset reference.
+
+The API extracts unique image asset IDs after canonical parsing. Page
+persistence then proves every asset belongs to the authoritative page site and
+commits the immutable version, deduplicated usage rows, and draft pointer in the
+existing transaction. Wrong-site and nonexistent references receive the same
+bounded HTTP 400 with no version, usage, or pointer mutation. Generic
+persistence failures retain generic HTTP 500 behavior.
+
+Usage belongs to immutable versions and is never rewritten by later saves,
+publication, or preview-token issuance. It answers what a version references;
+it does not grant delivery authority.
+
+### Current-publication byte authority
+
+Public bytes are available only through:
+
+```text
+GET /public/assets/:assetId
+```
+
+The resolver proves actual Host → domain/site, same-site asset, page on that
+site, current published pointer, same-page immutable version, and the exact
+version/asset usage row. A draft-only or historical non-current usage returns
+404. Another currently published page on the same site may independently keep
+the shared asset public.
+
+### Token-bound preview byte authority
+
+Preview bytes use:
+
+```text
+GET /preview/assets/:assetId
+X-BeHR-Preview-Token: <existing credential>
+```
+
+The resolver proves the unexpired token hash, its page, its exact immutable
+version, same-site ancestry, and usage of the requested asset by that bound
+version. It never follows the current draft and never falls back to public
+delivery. Rotation and expiry retain the existing preview lifecycle.
+
+### Byte delivery and renderer behavior
+
+Both byte routes allow only the explicit image MIME list, return the exact
+stored bytes with the allowlisted `Content-Type`, and set
+`X-Content-Type-Options: nosniff`. Missing bytes after authoritative resolution
+are an internal integrity failure and reach generic HTTP 500 rather than being
+misclassified as not found.
+
+Published image blocks use `/public/assets/:assetId` directly. Preview images
+send the existing token only through its header, convert the response Blob to
+a component-local object URL, and revoke that URL during effect cleanup. The
+token is never placed in an asset URL, query, cookie, log, localStorage, or
+sessionStorage.
+
+### Explicit limitations
+
+Phase M adds no asset update/delete/rename/search, usage-count endpoint,
+signed URL, MIME sniffing, SVG delivery, resizing, thumbnails, derivatives,
+transcoding, media cache, service worker, worker, queue, or Phase N theme
+behavior.
