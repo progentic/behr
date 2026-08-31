@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.3
+Version: 1.4
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -707,39 +707,191 @@ Guidelines
 
 Must:
 
-• Implement preview_tokens table usage
-• Validate preview tokens
-• Allow draft rendering via token
+• Treat preview tokens as bearer authorization credentials, separate from authentication sessions and membership invitations
+• Generate 256 bits of cryptographically secure random material in a URL-safe representation
+• Store only SHA-256 token digests and never persist or log the raw token
+• Return the raw token only in the successful authenticated issuance response
+• Use a 15-minute lifetime and enforce expiry synchronously during preview reads
+• Allow token reuse during its lifetime so browser reloads continue to work
+• Maintain at most one current preview-token row per page through a database-authoritative uniqueness constraint
+• Rotate the credential atomically when a new token is issued for the same page, invalidating the previous raw token
+• Bind each token to the immutable draft version current at issuance
+• Keep an existing token bound to that immutable snapshot when a newer draft is saved
+• Implement preview_tokens with UUID identity, page and version foreign keys, globally unique token hash, expiry, and timezone-aware creation timestamp
+• Cascade page deletion to its preview token and allow bound-version deletion to remove the token
+• Prove during preview resolution that the token page, requested page, and immutable version all belong to the same page
+• Provide authenticated, trusted-origin token issuance at POST /tenants/:tenantId/sites/:siteId/pages/:pageId/preview-tokens
+• Permit both owner and member content collaborators to issue a token for an authoritatively accessible tenant/site/page scope
+• Require no issuance request body unless implementation evidence establishes a concrete need
+• Return only the raw token and ISO expiration metadata from issuance
+• Provide one unauthenticated bearer read at GET /preview/page?slug=<slug>
+• Transport the raw preview credential only through the dedicated X-BeHR-Preview-Token request header
+• Resolve preview authority from actual HTTP Host, validated slug, unexpired token digest, page binding, and same-page immutable version
+• Validate previewed content against the canonical PageDocument before a successful response
+• Return one nondisclosing HTTP 404 for missing, malformed, unknown, expired, rotated, wrong-host, wrong-slug, cross-page, or deleted preview authority
+• Reuse the existing Phase H PageRenderer for canonical preview output
+• Support a browser fragment equivalent to #preview=<token>; send the token to the API header, never the API URL
+• Preserve the existing public read flow when no preview fragment exists
+• Fail a malformed or rejected preview request without silently falling back to published content
+• Enforce preview-token expiry at request time without background cleanup infrastructure
 
 Must not:
 
-• Modify published content
-• Bypass token validation
+• Mutate pages.published_version_id
+• Implement publish authorization, publish routes, page_publications, publication events, or draft promotion
+• Delete immutable page versions
+• Follow the moving pages.draft_version_id after token issuance
+• Accept preview tokens from a query parameter, request body, cookie, hostname, slug, or Authorization header
+• Treat a token as tenant, site, page, or version authority independently of Host and slug
+• Fall back to another draft version or published content after preview failure
+• Expose token hashes, version IDs, draft or published pointers, tenant/site identity, user identity, or membership state
+• Implement preview buttons, editor controls, autosave, page-edit forms, panels, or other Phase K UI
+• Duplicate the Phase H renderer or add API-side HTML rendering
+• Introduce a generic token framework, repository layer, service container, authorization framework, worker, queue, cron job, or fire-and-forget cleanup
+
+Credential Flow
+
+authenticated content collaborator
+    ↓
+issue short-lived preview credential
+    ↓
+credential binds one immutable draft version
+    ↓
+bearer preview request
+    ↓
+Host + slug + valid token
+    ↓
+same-page immutable version
+    ↓
+canonical PageDocument
+    ↓
+existing Phase H renderer
+
+Preview Token Persistence
+
+preview_tokens contains only:
+
+id
+page_id
+version_id
+token_hash
+expires_at
+created_at
+
+The table must enforce a globally unique token hash and one current row per page. It must not duplicate tenant ID, site ID, hostname, slug, or raw token. Those relationships remain derived through authoritative ancestry.
+
+Issuance Semantics
+
+Reissuing a token for one page must resolve the current scoped page and immutable draft version, generate a new credential, atomically replace the existing row, bind the replacement to that current version, and invalidate the previous credential. A focused preview-token credential helper may own this concrete policy; do not generalize it into a reusable token framework.
+
+Preview Read Authority
+
+HTTP Host
+    ↓
+domain
+    ↓
+site
+    ↓
+page slug
+    ↓
+preview token for that page
+    ↓
+unexpired digest match
+    ↓
+bound same-page immutable version
+    ↓
+canonical PageDocument
+
+Preview resolution must prove:
+
+page_versions.id = preview_tokens.version_id
+AND page_versions.page_id = preview_tokens.page_id
+AND preview_tokens.page_id = pages.id
+
+A cross-page token/version relationship must fail closed without triggers, composite circular foreign keys, or repair behavior.
+
+Browser Semantics
+
+No preview fragment uses the existing Phase H public read. A valid #preview=<token> fragment uses the preview read and sends the token in X-BeHR-Preview-Token. A malformed fragment or failed preview request must enter the bounded not-found/unavailable state and must not display published content as though preview succeeded. Unrelated fragments need not become preview state.
 
 Files / Functions
 
+packages/contracts
+
+preview.ts
+index.ts
+
 packages/db
 
-schema/preview_tokens.ts
+schema/preview-tokens.ts
+preview-persistence.ts
+migrations/
+index.ts
 
 apps/api
 
+lib/preview-token.ts
 routes/preview.ts
+routes/pages.ts
+routes/index.ts
+application.ts
+
+apps/web
+
+src/main.tsx
+src/router.ts
+focused preview/router tests as required
+
+Also permitted:
+
+• Focused integration and unit tests
+• Package script and CI gate wiring
+• docs/ARCHITECTURE.md
+• docs/DOCUMENTATION.md
+
+No new dependency is expected. apps/web must continue using its accepted @bher/contracts workspace dependency.
 
 Acceptance Criteria
 
-Valid preview token renders draft.
+1. Authenticated owner can issue a preview token for an accessible page.
+2. Authenticated member can issue a preview token for an accessible page.
+3. Outsider or inaccessible scope cannot issue one.
+4. Issuance requires trusted origin.
+5. Raw token is returned once and never stored.
+6. Database stores only the token hash.
+7. Token lifetime is bounded to 15 minutes and expiry is enforced.
+8. One page has at most one current preview token.
+9. Reissue rotates and invalidates the previous credential.
+10. Token binds the immutable draft version current at issuance.
+11. Saving a newer draft does not change what an existing token renders.
+12. Reissuing after a new draft binds the replacement token to that newer version.
+13. Valid bearer token renders its bound draft through the existing renderer.
+14. Missing, invalid, expired, or rotated token is rejected with nondisclosing HTTP 404.
+15. Wrong Host or slug is rejected.
+16. Cross-page version binding fails closed.
+17. Malformed persisted preview content fails closed with generic HTTP 500.
+18. Preview API requires no authenticated session when a valid bearer token is supplied.
+19. Existing Phase H public routes remain unchanged, including draft-only public HTTP 404 behavior.
+20. Published pointer remains unchanged by issuance and preview reads.
+21. No Phase J or editor behavior exists.
 
-Invalid token is rejected.
+Required Negative Controls
 
-Public routes remain protected.
+• Issue token T1 for draft A, save draft B, prove T1 still renders A, reissue T2, prove T1 returns 404 and T2 renders B
+• Observe pages.published_version_id before and after issuance and reads and prove it is unchanged
+• Create a test-only cross-page token/version mismatch and prove preview returns 404
+• Move a test token expiry into the past and prove preview returns 404
+• Inspect the token row and prove token_hash differs from the raw token and no raw-token column exists
+• Send ?token=<valid token> without X-BeHR-Preview-Token and prove the request remains not found
+
+Malformed persisted preview content must return the generic HTTP 500 response without Zod details, malformed JSON, repair, another draft, or published fallback.
 
 Output Format
 
 Files created
 Files modified
 Commands executed
-Preview tests
+Preview lifecycle and security tests
 
 ────────
 
