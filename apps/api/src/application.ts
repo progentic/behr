@@ -1,5 +1,6 @@
 import {
   type Environment,
+  createAssetPersistence,
   createAuthPersistence,
   createDatabaseClient,
   createMembershipPersistence,
@@ -17,11 +18,13 @@ import {
   type PublicPagePersistence,
   type PreviewPersistence,
   type PublishPersistence,
+  type AssetPersistence,
 } from "@bher/db";
 import { Hono } from "hono";
 
 import { loadApiConfig } from "./env";
 import { type AuthService, createAuthService } from "./lib/auth";
+import { type AssetStorage, createAssetStorage } from "./lib/asset-storage";
 import { createJsonResponse } from "./lib/http";
 import { createApiRoutes } from "./routes";
 import type { ApiBindings } from "./types";
@@ -53,6 +56,8 @@ export function createApiApplication(environment: Environment): ApiApplication {
   const publicPagePersistence = createPublicPagePersistence(database);
   const previewPersistence = createPreviewPersistence(database);
   const publishPersistence = createPublishPersistence(database);
+  const assetPersistence = createAssetPersistence(database);
+  const assetStorage = createAssetStorage(apiConfig.assets.storageRoot);
   const app = createHttpApplication(
     auth,
     tenantPersistence,
@@ -62,6 +67,8 @@ export function createApiApplication(environment: Environment): ApiApplication {
     publicPagePersistence,
     previewPersistence,
     publishPersistence,
+    assetPersistence,
+    assetStorage,
     apiConfig.auth.adminOrigin,
   );
   return Object.freeze({
@@ -81,6 +88,8 @@ function createHttpApplication(
   publicPagePersistence: PublicPagePersistence,
   previewPersistence: PreviewPersistence,
   publishPersistence: PublishPersistence,
+  assetPersistence: AssetPersistence,
+  assetStorage: AssetStorage,
   adminOrigin: string,
 ): Hono<ApiBindings> {
   const app = new Hono<ApiBindings>();
@@ -96,6 +105,8 @@ function createHttpApplication(
       publicPagePersistence,
       previewPersistence,
       publishPersistence,
+      assetPersistence,
+      assetStorage,
       adminOrigin,
     ),
   );

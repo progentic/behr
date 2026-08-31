@@ -17,6 +17,15 @@ export {
   sessionResponseSchema,
 } from "./auth";
 export {
+  ASSET_MAX_BYTE_SIZE,
+  type AssetUploadResponse,
+  assetByteSizeSchema,
+  assetContentTypeSchema,
+  assetIdSchema,
+  assetOriginalFilenameSchema,
+  assetUploadResponseSchema,
+} from "./asset";
+export {
   type Block,
   type HeadingBlock,
   type ParagraphBlock,

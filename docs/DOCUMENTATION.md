@@ -1085,3 +1085,115 @@ Focused editor-domain and admin policy tests cover immutable transformations,
 canonical creation, request paths, tenant/site creation confinement, page-load
 epochs, save-operation identity, invalid-save blocking, and edit-during-save
 preservation. Existing Phase G integration remains the persistence authority.
+
+---
+
+## Phase L — Asset Storage Core
+
+### Site-scoped original storage
+
+Phase L adds one authenticated upload surface:
+
+```text
+POST /tenants/:tenantId/sites/:siteId/assets
+```
+
+Both owners and members may upload because both are established content
+collaborators. Authentication, authoritative tenant membership, valid site
+identity, trusted origin, and the site's tenant ancestry are resolved before
+multipart parsing or file allocation. Invalid or inaccessible tenant/site
+scope remains nondisclosing HTTP 404.
+
+Assets belong to sites through `assets.site_id`; tenant authority continues
+through `sites.tenant_id`. The asset row does not duplicate tenant, page, user,
+hostname, slug, filesystem path, or public URL data.
+
+### Bounded multipart and metadata policy
+
+The request must be `multipart/form-data` with exactly one `file` entry whose
+value is a `File`. Missing, duplicate, string-valued, or additional fields are
+HTTP 400. Hono's upload-local body limiter caps the total request at 11 MiB;
+accepted files contain 1 byte through 10 MiB inclusive.
+
+Original filenames are bounded display metadata: 1–255 characters with no
+NUL, ASCII control, slash, or backslash characters. They never participate in
+the storage path. `File.type` is also untrusted descriptive metadata. Empty,
+overlong, control-bearing, or otherwise unusable values become
+`application/octet-stream`; Phase L performs no MIME sniffing or allowlisting.
+
+The server generates a UUID and logical storage key:
+
+```text
+<siteId>/<assetId>
+```
+
+Request fields, query values, headers, filenames, and MIME metadata have no
+authority over that identity, site ownership, or physical destination.
+
+### Filesystem and database boundaries
+
+Production requires an explicit absolute `ASSET_STORAGE_ROOT`, targeting
+`/var/lib/bhr-cms/uploads`. Development defaults to the gitignored,
+repository-relative `.data/uploads` resolved from the API module location, not
+the process working directory. Upload integration tests use temporary absolute
+roots.
+
+`AssetStorage` is the only production boundary constructing physical asset
+paths. It creates the site directory, opens `<root>/<siteId>/<assetId>` with
+exclusive semantics, writes exact bytes, removes a partial file created by a
+failed invocation, and supports request-level compensating removal. A failed
+exclusive open never removes or truncates the pre-existing collision target.
+
+Migration `0008_assets.sql` adds exactly `assets` with UUID primary key,
+non-cascading indexed site foreign key, globally unique storage key, original
+filename, content type, byte size, and timezone-aware creation timestamp.
+`AssetPersistence` exposes only authoritative site-scope resolution and asset
+metadata insertion. Metadata insertion revalidates and locks the tenant/site
+relationship before inserting.
+
+### Cross-store consistency and response confinement
+
+The request sequence is:
+
+```text
+authenticate and authorize
+→ validate tenant/site scope
+→ validate bounded multipart metadata and size
+→ generate ID/key
+→ exclusively write original bytes
+→ revalidate scope and insert metadata
+→ return strict response
+```
+
+If metadata insertion fails or scope disappears after the precheck, the route
+removes the just-written file before returning an error. This is not a
+filesystem/PostgreSQL transaction. A hard process crash after file write and
+before metadata commit may leave an inert orphan file with no `assets` row;
+Phase L intentionally adds no worker, queue, outbox, startup reconciliation, or
+cleanup daemon.
+
+Successful responses contain exactly:
+
+```text
+id
+originalFilename
+contentType
+byteSize
+createdAt
+```
+
+They never expose a storage key, root, physical path, tenant ID, site ID, or
+database internals.
+
+### Verification and deferred behavior
+
+Focused coverage proves strict contracts, storage-root configuration,
+exclusive-write collision safety, partial-write cleanup, metadata-failure and
+scope-loss compensation, owner/member upload, authorization rejection,
+multipart shape, exact size boundaries, filename traversal rejection,
+content-type fallback, server-controlled path confinement, metadata accuracy,
+response confinement, migration/catalog state, and existing regressions.
+
+Phase L exposes no public asset delivery, GET/list/update/delete route, static
+mount, admin upload control, editor picker, asset-backed block, PageDocument
+change, derivative generation, image processing, or Phase M integration.

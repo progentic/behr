@@ -71,6 +71,8 @@ jobs:
         run: bun run test:preview:integration
       - name: Run publish integration tests
         run: bun run test:publish:integration
+      - name: Run asset integration tests
+        run: bun run test:asset:integration
       - name: Build workspaces
         run: bun run build
       - name: Audit dependencies

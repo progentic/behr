@@ -1,4 +1,5 @@
 export { account, session, user, verification } from "./auth";
+export { assets } from "./assets";
 export { domains } from "./domains";
 export { membershipInvitations } from "./membership-invitations";
 export { memberships, tenantRole } from "./memberships";
@@ -10,6 +11,7 @@ export { sites } from "./sites";
 export { tenants } from "./tenants";
 
 import { account, session, user, verification } from "./auth";
+import { assets } from "./assets";
 import { domains } from "./domains";
 import { membershipInvitations } from "./membership-invitations";
 import { memberships } from "./memberships";
@@ -29,6 +31,7 @@ export const authSchema = {
 
 export const databaseSchema = {
   ...authSchema,
+  assets,
   tenants,
   memberships,
   sites,

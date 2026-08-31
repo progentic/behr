@@ -1,4 +1,5 @@
 import type {
+  AssetPersistence,
   MembershipPersistence,
   PagePersistence,
   PublicPagePersistence,
@@ -11,8 +12,10 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 import type { AuthService } from "../lib/auth";
+import type { AssetStorage } from "../lib/asset-storage";
 import type { ApiBindings } from "../types";
 import { createAuthRoutes } from "./auth";
+import { createAssetRoutes } from "./assets";
 import { createMembershipRoutes } from "./memberships";
 import { createPageRoutes } from "./pages";
 import { createPublicRoutes } from "./public";
@@ -28,6 +31,7 @@ const MEMBERSHIP_ROUTE = "/tenants/:tenantId/members";
 const PAGE_ROUTE = "/tenants/:tenantId/sites/:siteId/pages";
 const PUBLIC_ROUTE = "/public";
 const PREVIEW_ROUTE = "/preview";
+const ASSET_ROUTE = "/tenants/:tenantId/sites/:siteId/assets";
 
 export function createApiRoutes(
   auth: AuthService,
@@ -38,6 +42,8 @@ export function createApiRoutes(
   publicPagePersistence: PublicPagePersistence,
   previewPersistence: PreviewPersistence,
   publishPersistence: PublishPersistence,
+  assetPersistence: AssetPersistence,
+  assetStorage: AssetStorage,
   adminOrigin: string,
 ): Hono<ApiBindings> {
   const routes = new Hono<ApiBindings>();
@@ -72,5 +78,14 @@ export function createApiRoutes(
   );
   routes.route(PUBLIC_ROUTE, createPublicRoutes(publicPagePersistence));
   routes.route(PREVIEW_ROUTE, createPreviewRoutes(previewPersistence));
+  routes.route(
+    ASSET_ROUTE,
+    createAssetRoutes(
+      auth,
+      tenantPersistence,
+      assetPersistence,
+      assetStorage,
+    ),
+  );
   return routes;
 }

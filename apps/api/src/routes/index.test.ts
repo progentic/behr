@@ -52,6 +52,16 @@ test("allows credentialed auth requests only for the configured admin origin", a
       resolvePublishCandidate: async () => null,
       commitPublication: async () => "not-found",
     },
+    {
+      resolveAssetSite: async () => false,
+      createAssetMetadata: async () => null,
+    },
+    {
+      writeOriginal: async () => {
+        throw new Error("Asset storage is not used by this CORS test.");
+      },
+      removeOriginal: async () => undefined,
+    },
     ADMIN_ORIGIN,
   );
   const response = await routes.request("/auth/login", {

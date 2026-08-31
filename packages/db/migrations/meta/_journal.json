@@ -57,6 +57,13 @@
       "when": 1788138095739,
       "tag": "0007_page_publications",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788143684817,
+      "tag": "0008_assets",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,12 @@ export {
   type DrizzleDatabase,
 } from "./client";
 export {
+  type AssetMetadataRecord,
+  type AssetPersistence,
+  type NewAssetMetadata,
+  createAssetPersistence,
+} from "./asset-persistence";
+export {
   type AuthPersistenceAdapter,
 } from "./auth-adapter";
 export { createAuthPersistence, identityExists } from "./auth-persistence";
@@ -54,6 +60,7 @@ export {
 } from "./env";
 export {
   account,
+  assets,
   authSchema,
   databaseSchema,
   domains,

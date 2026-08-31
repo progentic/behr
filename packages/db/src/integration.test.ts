@@ -21,6 +21,7 @@ const DRIZZLE_OBJECT_PREFIX = "__drizzle_migrations";
 const TABLE_OBJECT_KINDS = new Set(["r", "p"]);
 const EXPECTED_APPLICATION_TABLE_NAMES = [
   "account",
+  "assets",
   "domains",
   "membership_invitations",
   "memberships",
@@ -39,6 +40,10 @@ const EXPECTED_CATALOG_OBJECTS = new Set([
   "account_issuer_account_id_uidx",
   "account_pkey",
   "account_user_id_idx",
+  "assets",
+  "assets_pkey",
+  "assets_site_id_idx",
+  "assets_storage_key_uidx",
   "domains",
   "domains_pkey",
   "domains_site_id_unique",
@@ -116,6 +121,7 @@ async function verifyPersistenceBootstrap(): Promise<void> {
     await verifyMigrationIdempotency(context);
     await verifyDatabaseCatalog(context);
     await verifyDatabaseConstraints(context);
+    await verifyAssetCatalog(context);
     await verifyPagePublicationCatalog(context);
     await verifyPreviewTokenColumns(context);
     await verifyConnectionCleanup(context);
@@ -200,6 +206,7 @@ async function verifyDatabaseConstraints(
   const constraints = await listDatabaseConstraints(context.observer);
   expect(constraints).toEqual([
     { name: "account_user_id_user_id_fk", type: "FOREIGN KEY" },
+    { name: "assets_site_id_sites_id_fk", type: "FOREIGN KEY" },
     { name: "domains_site_id_sites_id_fk", type: "FOREIGN KEY" },
     { name: "domains_site_id_unique", type: "UNIQUE" },
     {
@@ -264,6 +271,52 @@ async function verifyDatabaseConstraints(
     "pages_draft_version_id_page_versions_id_fk",
     "pages_published_version_id_page_versions_id_fk",
   ]);
+}
+
+async function verifyAssetCatalog(context: IntegrationContext): Promise<void> {
+  const columns = await context.observer.native<
+    Array<{ name: string; type: string }>
+  >`
+    SELECT column_name AS name, data_type AS type
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'assets'
+    ORDER BY ordinal_position
+  `;
+  expect(columns).toEqual([
+    { name: "id", type: "uuid" },
+    { name: "site_id", type: "uuid" },
+    { name: "storage_key", type: "text" },
+    { name: "original_filename", type: "text" },
+    { name: "content_type", type: "text" },
+    { name: "byte_size", type: "integer" },
+    { name: "created_at", type: "timestamp with time zone" },
+  ]);
+  const foreignKeys = await context.observer.native<
+    Array<{ name: string; deleteRule: string }>
+  >`
+    SELECT constraint_name AS name, delete_rule AS "deleteRule"
+    FROM information_schema.referential_constraints
+    WHERE constraint_schema = 'public'
+      AND constraint_name = 'assets_site_id_sites_id_fk'
+  `;
+  expect(foreignKeys).toEqual([
+    { name: "assets_site_id_sites_id_fk", deleteRule: "NO ACTION" },
+  ]);
+  const indexes = await context.observer.native<
+    Array<{ name: string; definition: string }>
+  >`
+    SELECT indexname AS name, indexdef AS definition
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname IN ('assets_site_id_idx', 'assets_storage_key_uidx')
+    ORDER BY indexname
+  `;
+  expect(indexes.map(({ name }) => name)).toEqual([
+    "assets_site_id_idx",
+    "assets_storage_key_uidx",
+  ]);
+  expect(indexes[1]?.definition).toContain("CREATE UNIQUE INDEX");
 }
 
 async function verifyPagePublicationCatalog(
@@ -458,6 +511,7 @@ async function listDatabaseConstraints(
     WHERE table_schema = 'public'
       AND constraint_name IN (
         'account_user_id_user_id_fk',
+        'assets_site_id_sites_id_fk',
         'domains_site_id_sites_id_fk',
         'domains_site_id_unique',
         'membership_invitations_tenant_id_tenants_id_fk',

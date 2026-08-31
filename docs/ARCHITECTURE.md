@@ -93,6 +93,7 @@ flowchart TD
     Request --> PreviewToken[POST /tenants/:tenantId/sites/:siteId/pages/:pageId/preview-tokens]
     Request --> PreviewPage[GET /preview/page?slug=...]
     Request --> PublishPage[POST /tenants/:tenantId/sites/:siteId/pages/:pageId/publish]
+    Request --> UploadAsset[POST /tenants/:tenantId/sites/:siteId/assets]
 ```
 
 Interpretation:
@@ -177,7 +178,9 @@ resolved from the authoritative database session; the public read is
 unauthenticated and read-only. Phase I adds authenticated preview credential
 issuance and unauthenticated bearer preview reads bound to immutable draft
 snapshots. Phase J adds owner-only publication of the current immutable draft
-and append-only transition history. Assets remain deferred.
+and append-only transition history. Phase L adds authenticated site-scoped
+original-file upload with bounded multipart parsing, server-generated storage
+keys, exclusive filesystem writes, and revalidated metadata persistence.
 
 The currently implemented public API routes are exactly:
 
@@ -201,6 +204,7 @@ The currently implemented public API routes are exactly:
 * `POST /tenants/:tenantId/sites/:siteId/pages/:pageId/preview-tokens`
 * `GET /preview/page?slug=...`
 * `POST /tenants/:tenantId/sites/:siteId/pages/:pageId/publish`
+* `POST /tenants/:tenantId/sites/:siteId/assets`
 
 ---
 
@@ -346,6 +350,18 @@ transitions. Each event references its page, same-page immutable version, and
 the authoritative authenticated publisher. Publication history uses non-cascade
 foreign keys and contains no duplicated tenant, site, slug, or document data.
 
+Phase L adds:
+
+* `assets` — application-generated UUID identity, site foreign key, globally
+  unique logical storage key, original display filename, untrusted content-type
+  metadata, accepted byte size, and creation timestamp
+
+Asset ownership follows `tenant → site → asset`; the row does not duplicate
+tenant, page, or user identity. The site foreign key is deliberately
+non-cascading so future site deletion must reconcile filesystem bytes rather
+than silently removing only metadata. Phase L exposes only metadata insertion;
+there is no production asset update or delete operation.
+
 The database remains the sole session authority. Browser cookies contain only
 the opaque session identifier; they do not authorize a user without a valid
 database session.
@@ -394,18 +410,35 @@ Publishing does not mutate drafts, immutable versions, or preview credentials.
 
 ## 4.6 Local File Storage
 
-The filesystem stores binary assets such as images and uploaded media.
+Phase L stores bounded original files on the local filesystem. Production
+requires an explicit absolute `ASSET_STORAGE_ROOT`, targeting:
 
-Storage roots:
-
+```text
 /var/lib/bhr-cms/uploads
-/var/lib/bhr-cms/derivatives
+```
+
+Non-production defaults to the stable repository-local `.data/uploads`
+directory, derived independently of the caller's working directory. Tests use
+isolated temporary absolute roots.
 
 Constraints:
 
-* Paths are system-generated
-* Users cannot control filesystem paths
-* Files are referenced by logical storage keys
+* Paths are generated only as `<storageRoot>/<siteId>/<assetId>`
+* Original filenames are validated display metadata and never path authority
+* Original creation is exclusive and cannot overwrite an existing object
+* PostgreSQL stores only the logical `<siteId>/<assetId>` key
+* Both owners and members may upload through the trusted-origin protected route
+* Files are limited to 10 MiB inside an 11 MiB multipart request ceiling
+
+The request writes the original first and then inserts metadata after
+revalidating tenant/site ancestry. A handled metadata failure removes the
+just-written file. This is compensation, not a cross-store transaction: a hard
+process crash after the file write but before metadata commit may leave an
+orphan file with no authoritative `assets` row.
+
+The reserved `/var/lib/bhr-cms/derivatives` location remains unimplemented.
+There is no public asset serving, listing, deletion, image processing, editor
+picker, content reference, worker, or orphan-cleanup process in Phase L.
 
 ---
 

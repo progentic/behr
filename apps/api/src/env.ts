@@ -1,9 +1,11 @@
 import type { Environment } from "@bher/db";
+import { isAbsolute, resolve } from "node:path";
 
 const API_PORT_VARIABLE = "API_PORT";
 const BETTER_AUTH_SECRET_VARIABLE = "BETTER_AUTH_SECRET";
 const BETTER_AUTH_URL_VARIABLE = "BETTER_AUTH_URL";
 const ADMIN_ORIGIN_VARIABLE = "ADMIN_ORIGIN";
+const ASSET_STORAGE_ROOT_VARIABLE = "ASSET_STORAGE_ROOT";
 const NODE_ENV_VARIABLE = "NODE_ENV";
 const PRODUCTION_ENVIRONMENT = "production";
 const DEFAULT_API_PORT = 3000;
@@ -13,6 +15,12 @@ const MINIMUM_AUTH_SECRET_LENGTH = 32;
 const HTTP_PROTOCOLS = new Set(["http:", "https:"]);
 const HTTPS_PROTOCOL = "https:";
 const ROOT_PATH = "/";
+const DEFAULT_ASSET_STORAGE_ROOT = resolve(
+  import.meta.dir,
+  "../../..",
+  ".data",
+  "uploads",
+);
 
 export type AuthConfig = Readonly<{
   adminOrigin: string;
@@ -22,9 +30,14 @@ export type AuthConfig = Readonly<{
   trustedOrigins: readonly string[];
 }>;
 
+export type AssetConfig = Readonly<{
+  storageRoot: string;
+}>;
+
 export type ApiConfig = Readonly<{
   port: number;
   auth: AuthConfig;
+  assets: AssetConfig;
 }>;
 
 export class ApiConfigurationError extends Error {
@@ -42,7 +55,15 @@ export function loadApiConfig(environment: Environment): ApiConfig {
   const production = isProductionEnvironment(environment);
   requireProductionHttps(baseUrl, production);
   requireProductionHttps(adminOrigin, production);
-  return createApiConfig(port, secret, baseUrl, adminOrigin, production);
+  const storageRoot = readAssetStorageRoot(environment, production);
+  return createApiConfig(
+    port,
+    secret,
+    baseUrl,
+    adminOrigin,
+    production,
+    storageRoot,
+  );
 }
 
 function readApiPort(environment: Environment): number {
@@ -96,6 +117,27 @@ function isProductionEnvironment(environment: Environment): boolean {
   return environment[NODE_ENV_VARIABLE] === PRODUCTION_ENVIRONMENT;
 }
 
+function readAssetStorageRoot(
+  environment: Environment,
+  production: boolean,
+): string {
+  const configuredRoot = environment[ASSET_STORAGE_ROOT_VARIABLE];
+  if (configuredRoot === undefined || configuredRoot.trim().length === 0) {
+    if (production) {
+      throw new ApiConfigurationError(
+        "ASSET_STORAGE_ROOT is required in production.",
+      );
+    }
+    return DEFAULT_ASSET_STORAGE_ROOT;
+  }
+  if (!isAbsolute(configuredRoot)) {
+    throw new ApiConfigurationError(
+      "ASSET_STORAGE_ROOT must be an absolute path.",
+    );
+  }
+  return resolve(configuredRoot);
+}
+
 function requireProductionHttps(url: URL, production: boolean): void {
   if (production && url.protocol !== HTTPS_PROTOCOL) {
     throw new ApiConfigurationError(
@@ -110,6 +152,7 @@ function createApiConfig(
   baseUrl: URL,
   adminOrigin: URL,
   production: boolean,
+  storageRoot: string,
 ): ApiConfig {
   const origin = baseUrl.origin;
   const trustedOrigins = Array.from(
@@ -117,6 +160,7 @@ function createApiConfig(
   );
   return Object.freeze({
     port,
+    assets: Object.freeze({ storageRoot }),
     auth: Object.freeze({
       adminOrigin: adminOrigin.origin,
       baseUrl: origin,
