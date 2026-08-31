@@ -6,6 +6,7 @@ import {
 } from "@bher/contracts";
 import { useEffect, useState } from "react";
 
+import { PageList } from "./PageList";
 import { SiteCreateForm } from "./SiteCreateForm";
 import { TenantMembers } from "./TenantMembers";
 import { requestApi } from "./lib/api";
@@ -26,6 +27,7 @@ export function SitesPage() {
     status: "loading",
   });
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
   const [siteState, setSiteState] = useState<SiteState>({ status: "idle" });
 
   useEffect(() => {
@@ -36,6 +38,7 @@ export function SitesPage() {
           setTenantState({ status: "loaded", tenants });
           const initialTenantId = tenants[0]?.id ?? null;
           setSelectedTenantId(initialTenantId);
+          setSelectedSiteId(null);
           setSiteState(
             initialTenantId
               ? { status: "loading", tenantId: initialTenantId }
@@ -116,6 +119,7 @@ export function SitesPage() {
             onChange={(event) => {
               const nextTenantId = event.currentTarget.value;
               setSelectedTenantId(nextTenantId);
+              setSelectedSiteId(null);
               setSiteState({ status: "loading", tenantId: nextTenantId });
             }}
           >
@@ -130,7 +134,12 @@ export function SitesPage() {
         <h2>{selectedTenant.name}</h2>
       )}
 
-      <SiteList selectedTenantId={selectedTenant.id} state={siteState} />
+      <SiteList
+        selectedSiteId={selectedSiteId}
+        selectedTenantId={selectedTenant.id}
+        state={siteState}
+        onSelect={setSelectedSiteId}
+      />
       {selectedTenant.role === "owner" &&
       siteState.status === "loaded" &&
       siteState.tenantId === selectedTenant.id ? (
@@ -157,14 +166,31 @@ export function SitesPage() {
       {selectedTenant.role === "owner" ? (
         <TenantMembers key={selectedTenant.id} tenantId={selectedTenant.id} />
       ) : null}
+      {siteState.status === "loaded" &&
+      siteState.tenantId === selectedTenant.id &&
+      selectedSiteId !== null &&
+      siteState.sites.some(({ id }) => id === selectedSiteId) ? (
+        <PageList
+          key={`${selectedTenant.id}:${selectedSiteId}`}
+          tenantId={selectedTenant.id}
+          siteId={selectedSiteId}
+        />
+      ) : null}
     </section>
   );
 }
 
 function SiteList({
+  onSelect,
+  selectedSiteId,
   selectedTenantId,
   state,
-}: Readonly<{ selectedTenantId: string; state: SiteState }>) {
+}: Readonly<{
+  onSelect: (siteId: string) => void;
+  selectedSiteId: string | null;
+  selectedTenantId: string;
+  state: SiteState;
+}>) {
   if (
     state.status === "idle" ||
     state.status === "loading" ||
@@ -182,7 +208,13 @@ function SiteList({
     <ul>
       {state.sites.map((site) => (
         <li key={site.id}>
-          <strong>{site.name}</strong> — {site.hostname}
+          <button
+            type="button"
+            aria-pressed={selectedSiteId === site.id}
+            onClick={() => onSelect(site.id)}
+          >
+            <strong>{site.name}</strong> — {site.hostname}
+          </button>
         </li>
       ))}
     </ul>

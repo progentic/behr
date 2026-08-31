@@ -105,7 +105,8 @@ Admin Panel
 
 The admin provides login, session restoration, logout, tenant-local site
 management, and owner-only membership provisioning and invitation handling.
-Phase G adds no page UI; page listing and editing remain deferred to Phase K.
+Phase K adds tenant/site-scoped page listing, page creation, draft loading,
+structured local editing, and explicit manual draft saving.
 
 Public Website
 
@@ -226,9 +227,9 @@ Phase C implements only the login page, four explicit authentication states,
 current-session resolution, and logout. Phase E adds a minimal authenticated
 site workflow: component-local tenant selection, site loading, and owner-only
 site creation. The pre-Phase G membership work adds owner-only membership
-administration and invite registration. Phase G adds no admin behavior. Page,
-asset, theme, domain-administration, preview, and publishing interfaces remain
-unimplemented.
+administration and invite registration. Phase G adds no admin behavior. Phase K
+adds the first page-authoring interface. Asset, theme,
+domain-administration, preview, and publishing interfaces remain unimplemented.
 
 ---
 
@@ -450,8 +451,9 @@ sequenceDiagram
 
 # 6. Content Publication Flow
 
-This request-driven flow is implemented through Phase J. No editor UI, publish
-button, historical-version selection, approval workflow, or rollback UI exists.
+This request-driven flow is implemented through Phase J. Phase K adds draft
+authoring but no publish button, historical-version selection, approval
+workflow, or rollback UI.
 
 ```mermaid
 sequenceDiagram

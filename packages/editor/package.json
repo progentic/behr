@@ -10,9 +10,13 @@
   },
   "scripts": {
     "build": "tsc --noEmit",
+    "test": "bun test src/index.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@bher/contracts": "workspace:0.1.0"
   }
 }
