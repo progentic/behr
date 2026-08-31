@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.5
+Version: 1.6
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -1166,38 +1166,258 @@ Guidelines
 
 Must:
 
-• Add/remove sections
-• Add/remove blocks
-• Edit block properties
-• Save draft
-• Key asynchronous page load and save state by page ID. A completion belonging to page A must never mutate page B’s visible editor state.
+• Reuse the existing Phase G page list, creation, draft-read, and draft-save APIs without backend changes
+• Permit both owner and member content collaborators to create, edit, and save pages
+• Extend the admin workflow through selected tenant → selected site → page list → selected page → page editor
+• Allow one accessible site to be selected within the current tenant
+• Clear page selection and visible editor authority when tenant or site selection changes
+• Load page lists using state keyed by authoritative tenantId and siteId
+• Create pages with shared title/slug validation and the canonical empty PageDocument
+• Select a newly created page only while its initiating tenant/site identity remains current
+• Keep title and slug read-only after page creation
+• Load one current draft using tenantId, siteId, pageId, and a bounded request-generation identity
+• Reject late page-list, page-load, creation, and save completions that belong to obsolete selections or request epochs
+• Add/remove sections using immutable editor-domain transformations
+• Add/remove only canonical heading and paragraph blocks
+• Edit heading and paragraph text
+• Edit heading level 1 through 6
+• Edit or clear bounded left/center/right text alignment
+• Preserve existing section styles and untouched canonical values
+• Validate local content with pageDocumentSchema before manual save
+• Block invalid local content from reaching the API while preserving local edits
+• Allow editing during an in-flight save without an older save response replacing newer local content
+• Permit only one save request in flight per editor instance
+• Persist manual saves through the existing immutable page-version route
+• Activate packages/editor as the framework-free owner of pure PageDocument transformations
+• Generate new section/block UUIDs in UI code and pass them explicitly to deterministic transformations
 
 Must not:
 
 • Implement drag-and-drop
 • Implement autosave
+• Add page metadata editing, rename/slug routes, or fake local metadata mutation
+• Add editor-specific API routes, database tables, or mutable document storage
+• Change immutable page-version behavior
+• Make editor access owner-only or add an editor role/permission framework
+• Implement section or block reordering
+• Add publish controls, publication state/history UI, or rollback UI
+• Add preview issuance, sharing, iframe, or preview-panel UI
+• Add asset upload/picker, image/file blocks, or media behavior
+• Add React Router, a global store, context solely for editor state, reducer framework, form library, drag/drop library, editor framework, or DOM-testing dependency
+• Add autosave queues, debounce scheduling, optimistic synchronization, or save coordination frameworks
+• Store sessions, drafts, or credentials in Web Storage
+• Add unsaved-navigation guards, beforeunload interception, confirmation modals, or navigation blockers
+
+Admin Workspace
+
+selected tenant
+    ↓
+selected site
+    ↓
+PageList
+    ↓
+selected page ID
+    ↓
+PageEditor
+
+SitesPage evolves from display-only site rows into the bounded tenant/site/page workspace. Ordinary component state owns selection; no routing or global navigation abstraction is introduced.
+
+Existing Backend Authority
+
+Phase K consumes only:
+
+GET  /tenants/:tenantId/sites/:siteId/pages
+POST /tenants/:tenantId/sites/:siteId/pages
+GET  /tenants/:tenantId/sites/:siteId/pages/:pageId
+POST /tenants/:tenantId/sites/:siteId/pages/:pageId/versions
+
+No Phase K file under apps/api or packages/db is expected to change. If implementation evidence requires a backend change, stop and report the discrepancy rather than widening the phase.
+
+Editing Authorization
+
+Owner and member may both create, edit, and save pages. Publication remains separately owner-only under Phase J. Do not add a publisher or editor role.
+
+Site and Page Selection
+
+PageList receives authoritative tenantId and siteId from its parent. Selecting a new tenant clears or replaces the selected site with one from that tenant and clears page/editor selection. Selecting a new site clears page/editor selection immediately. A previous page list or editor document must never remain authoritative beneath a new tenant/site selection.
+
+Page List State
+
+Page-list states are bounded equivalents of:
+
+idle
+loading { tenantId, siteId }
+loaded  { tenantId, siteId, pages }
+error   { tenantId, siteId }
+
+Responses and creation completions may update only a state whose tenant/site identity still matches the initiating request. Use functional/latest-state updates or an equivalent direct identity guard; do not reason from stale captured selection.
+
+Page Creation
+
+Creation validates with existing shared contracts and sends:
+
+title
+slug
+document = { schemaVersion: 1, sections: [] }
+
+Do not fabricate starter content. A matching successful result appends to the current site's list and becomes selected. A late result from another tenant/site is ignored. Conflicts/errors append and select nothing.
+
+Page Metadata
+
+Title and slug may be displayed but are read-only after creation. Phase K adds no metadata mutation API or local imitation of one.
+
+Page Editor State
+
+PageEditor receives tenantId, siteId, and pageId. Its loaded state carries that authoritative identity, the local PageDocument, and a bounded request epoch. Loading a different page immediately makes previous content non-authoritative.
+
+Every page-load completion must match the current page and current request epoch. In the A → B → A sequence, the first A request cannot overwrite the later A request merely because page IDs match.
+
+Manual Save
+
+Save draft validates the current local document with pageDocumentSchema before sending. Invalid content remains local and displays a concise bounded error without exposing Zod issue structures.
+
+The save request captures the document snapshot current when Save is invoked. While it is in flight, Save is disabled but editing remains available. Completion may update only save-status metadata for the same current page/request epoch and must not replace the local document, so edits made after Save remain intact.
+
+Late save completion for an obsolete page or prior re-entry epoch cannot mark the current editor saved/failed, replace its document, or clear its validation state.
+
+Save states remain bounded equivalents of idle, saving, saved, and error. Do not create a global notification or save-state service.
+
+Unsaved Navigation
+
+Selecting another page, site, or tenant may discard unsaved local edits in Phase K. This limitation is explicit. No navigation guard or confirmation behavior is implemented.
+
+Editor Package Ownership
+
+packages/editor is framework-free and owns pure immutable PageDocument transformations. It must not import React, perform HTTP, resolve authentication or resources, manage save state, access browser storage, or access the database.
+
+Editor Domain Flow
+
+PageEditor
+    ↓
+@bher/editor pure transformations
+    ↓
+PageDocument
+
+HTTP Flow
+
+PageList/PageEditor
+    ↓
+existing requestApi
+    ↓
+existing Phase G routes
+
+Editor Transformations
+
+Expose focused immutable operations equivalent to:
+
+createEmptyPageDocument
+addSection / removeSection
+addHeadingBlock / addParagraphBlock / removeBlock
+updateBlockText
+updateHeadingLevel
+updateTextAlignment
+
+Do not add a generic reducer, arbitrary patch API, command bus, operation registry, plugin framework, or undo/redo system.
+
+New IDs are supplied by the UI. Adding a section appends `{ id, blocks: [] }`. Adding a heading appends a valid level-2 `New heading`; adding a paragraph appends `New paragraph`. Removing a target preserves remaining order and does not automatically remove empty sections.
+
+Heading controls edit text, level, and optional alignment. Paragraph controls edit text and optional alignment. Existing spacing/width section styles are preserved without Phase K design controls. Empty local block text may temporarily be invalid, but cannot be saved.
+
+Transformations do not mutate input documents or nested arrays/objects. Changed operations return new document identity and preserve untouched values/order. Missing targets consistently return the unchanged document.
+
+No Reordering
+
+New sections and blocks append in stored order. Phase K includes no drag/drop, sorting, or up/down controls.
+
+Dependency Edges
+
+Phase K adds only:
+
+@bher/editor → @bher/contracts at workspace:0.1.0
+@bher/admin  → @bher/editor at workspace:0.1.0
+
+These are the first required runtime edges for the editor foundation. Bun lockfile changes are limited to workspace metadata. No external dependency or package-version change is expected; stop if Bun produces unrelated resolution churn.
 
 Files / Functions
 
+packages/editor
+
+package.json
+src/index.ts
+focused editor-domain source files
+focused tests
+
 apps/admin
 
-PageList.tsx
-PageEditor.tsx
+package.json
+src/App.tsx as needed
+src/SitesPage.tsx
+src/PageList.tsx
+src/PageEditor.tsx
+optional src/PageCreateForm.tsx only if it owns a clear component boundary
+src/lib/api.ts only if directly required
+focused tests
+
+Root/support
+
+package.json
+bun.lock
+.github/workflows/ci.yml only if test wiring requires it
+docs/ARCHITECTURE.md
+docs/DOCUMENTATION.md
+
+No backend application or database file belongs to Phase K.
 
 Acceptance Criteria
 
-User can create valid page.
+1. Owner can select an accessible site and list its pages.
+2. Member can select an accessible site and list its pages.
+3. Page-list async state is scoped to tenant/site identity.
+4. User can create a page with valid title, slug, and canonical empty document.
+5. Late creation completion cannot mutate another selected site.
+6. User can select a page and load its current draft.
+7. Late page-load completion cannot replace another selected page.
+8. Same-page re-entry rejects obsolete load completions.
+9. User can add/remove sections.
+10. User can add/remove heading and paragraph blocks.
+11. User can edit block text.
+12. User can edit heading level.
+13. User can edit or clear bounded text alignment.
+14. Existing section styles survive editor operations.
+15. No drag/drop or reordering exists.
+16. Save validates the canonical document before request.
+17. Invalid local content cannot be saved.
+18. Manual save persists a new immutable draft version through the existing API.
+19. Editing during an in-flight save is not overwritten by the older response.
+20. Late save completion cannot mutate another page's visible state.
+21. Only one save request is in flight per editor instance.
+22. Reloading after save returns the persisted document.
+23. Page title and slug remain read-only after creation.
+24. No autosave exists.
+25. No publish or preview UI exists.
+26. No backend/editor-specific API or schema is added.
+27. packages/editor remains framework-free and pure.
+28. Only the approved workspace dependency edges are added.
+29. Phase L remains unstarted.
 
-Document validates successfully.
+Required Negative Controls
 
-Saved document persists.
+• Begin a page-list load for tenant/site A, switch to B, complete A, and prove B state is unchanged
+• Begin creation for site A, switch site/tenant, complete A, and prove no append or selection in the current site
+• Begin page A load, select B, complete A, and prove A content is not visible
+• Execute A1 → B → A2, complete A1, and prove the newer A2/current state is not replaced
+• Save A, select B, complete A save, and prove B document/save state is unchanged
+• Save snapshot 1, edit locally to snapshot 2, complete save, and prove local snapshot 2 remains
+• Clear required block text and prove no save request is issued
+• Audit Phase K changes and prove no apps/api or packages/db modification
+• Audit feature scope and prove no autosave, reordering, publish/preview UI, assets, Web Storage, or new router/store/reducer framework
 
 Output Format
 
 Files created
 Files modified
 Commands executed
-Editor tests
+Editor-domain, admin async-identity, creation, and manual-save tests
 
 ────────
 
