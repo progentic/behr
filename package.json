@@ -30,6 +30,7 @@
     "test:page:integration": "bun run --cwd apps/api test:page:integration",
     "test:public:integration": "bun run --cwd apps/api test:public:integration",
     "test:preview:integration": "bun run --cwd apps/api test:preview:integration",
+    "test:publish:integration": "bun run --cwd apps/api test:publish:integration",
     "test:site:integration": "bun run --cwd apps/api test:site:integration",
     "test:tenant:integration": "bun run --cwd apps/api test:tenant:integration",
     "typecheck": "bun run --filter '*' typecheck"

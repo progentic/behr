@@ -921,3 +921,94 @@ binding, transport rejection, cross-page mismatch, malformed content, and
 published-state isolation. Preview controls or sharing UI, editor behavior,
 publishing, `page_publications`, background cleanup, and all Phase J/K behavior
 remain unimplemented.
+
+---
+
+## Phase J — Publish Workflow
+
+### Owner-only publication policy
+
+Phase J makes publication an explicit owner-only action. Members remain content
+collaborators for drafting and preview, but receive HTTP 403 when attempting to
+change public production state. Outsiders and inaccessible resource paths retain
+nondisclosing behavior.
+
+The single route is:
+
+```text
+POST /tenants/:tenantId/sites/:siteId/pages/:pageId/publish
+```
+
+It reuses the existing page authentication, tenant-membership, ID-validation,
+and trusted-origin chain. It accepts no publication body and ignores
+authority-shaped body/query values. Candidate identity comes only from the
+database current-draft pointer, and publisher identity comes only from the
+authenticated session.
+
+### Candidate validation and consistency
+
+Publication resolves the authoritatively scoped current immutable draft and
+validates its stored JSON with `pageDocumentSchema` before mutation. The commit
+then locks the scoped page and may publish only that exact candidate while it
+remains the same-page current draft.
+
+If draft A is validated and a later save makes B current before commit, the A
+attempt returns HTTP 409. It neither publishes stale A nor substitutes
+unvalidated B. The draft remains B, the published pointer remains unchanged,
+and no event is recorded. The caller may retry to resolve and validate B.
+
+### Atomic transition history
+
+Migration `0007_page_publications.sql` adds exactly `page_publications` with a
+generated UUID, page/version references, authenticated publisher reference, and
+timezone-aware publication timestamp. The table contains no copied content or
+tenant/site/slug metadata and has no production update/delete operation.
+
+A real transition atomically:
+
+```text
+updates pages.published_version_id
+inserts one page_publications event
+```
+
+Both changes commit or roll back together. Actor-FK failure testing proves the
+pointer cannot commit independently of history. Foreign keys use non-cascade
+deletion so identity changes do not silently erase provenance.
+
+### Idempotency and concurrent publication
+
+Publishing an already-public current draft returns:
+
+```json
+{"status":"unchanged"}
+```
+
+and records no event. Two concurrent owner requests for the same candidate are
+serialized by the page row; exactly one returns `published`, the other returns
+`unchanged`, and only one transition event exists. This duplicate-request rule
+is separate from stale-candidate rejection caused by a changing draft.
+
+### Public, draft, and preview isolation
+
+Successful publication immediately affects the existing `/public/page` read
+without changing its algorithm. Publishing A leaves draft A unchanged. Saving B
+later produces draft B while public content remains A until the owner publishes
+B explicitly. Existing immutable versions and prior publication events remain
+unchanged.
+
+Publishing never rotates, deletes, rebinds, or extends preview credentials. A
+preview token bound to A continues previewing A even if another version becomes
+public.
+
+### Verification and deferred behavior
+
+PostgreSQL-backed coverage proves owner/member/outsider policy, trusted-origin
+protection, current-draft selection, canonical validation, authoritative actor,
+same-page history, initial and later publication, public switching, draft
+isolation, idempotency, duplicate concurrency, deterministic stale rejection,
+malformed-candidate failure, atomic rollback, immutable history, and preview
+isolation.
+
+No publisher role, generic RBAC, page ACL, approval workflow, historical-version
+publication, rollback UI, publish button, editor behavior, event bus, queue,
+outbox, worker, or Phase K functionality was introduced.

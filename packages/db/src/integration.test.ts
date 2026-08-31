@@ -24,6 +24,7 @@ const EXPECTED_APPLICATION_TABLE_NAMES = [
   "domains",
   "membership_invitations",
   "memberships",
+  "page_publications",
   "page_versions",
   "pages",
   "preview_tokens",
@@ -48,6 +49,8 @@ const EXPECTED_CATALOG_OBJECTS = new Set([
   "memberships",
   "memberships_tenant_id_user_id_pk",
   "memberships_user_id_idx",
+  "page_publications",
+  "page_publications_pkey",
   "page_versions",
   "page_versions_page_id_idx",
   "page_versions_pkey",
@@ -113,6 +116,7 @@ async function verifyPersistenceBootstrap(): Promise<void> {
     await verifyMigrationIdempotency(context);
     await verifyDatabaseCatalog(context);
     await verifyDatabaseConstraints(context);
+    await verifyPagePublicationCatalog(context);
     await verifyPreviewTokenColumns(context);
     await verifyConnectionCleanup(context);
   } finally {
@@ -206,6 +210,18 @@ async function verifyDatabaseConstraints(
     { name: "memberships_tenant_id_tenants_id_fk", type: "FOREIGN KEY" },
     { name: "memberships_tenant_id_user_id_pk", type: "PRIMARY KEY" },
     { name: "memberships_user_id_user_id_fk", type: "FOREIGN KEY" },
+    {
+      name: "page_publications_page_id_pages_id_fk",
+      type: "FOREIGN KEY",
+    },
+    {
+      name: "page_publications_published_by_user_id_user_id_fk",
+      type: "FOREIGN KEY",
+    },
+    {
+      name: "page_publications_version_id_page_versions_id_fk",
+      type: "FOREIGN KEY",
+    },
     { name: "page_versions_page_id_pages_id_fk", type: "FOREIGN KEY" },
     {
       name: "pages_draft_version_id_page_versions_id_fk",
@@ -247,6 +263,54 @@ async function verifyDatabaseConstraints(
   expect(await listSetNullForeignKeys(context.observer)).toEqual([
     "pages_draft_version_id_page_versions_id_fk",
     "pages_published_version_id_page_versions_id_fk",
+  ]);
+}
+
+async function verifyPagePublicationCatalog(
+  context: IntegrationContext,
+): Promise<void> {
+  const columns = await context.observer.native<Array<{ name: string }>>`
+    SELECT column_name AS name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'page_publications'
+    ORDER BY ordinal_position
+  `;
+  expect(columns.map(({ name }) => name)).toEqual([
+    "id",
+    "page_id",
+    "version_id",
+    "published_by_user_id",
+    "published_at",
+  ]);
+  const foreignKeys = await context.observer.native<
+    Array<{ name: string; deleteRule: string }>
+  >`
+    SELECT
+      constraint_name AS name,
+      delete_rule AS "deleteRule"
+    FROM information_schema.referential_constraints
+    WHERE constraint_schema = 'public'
+      AND constraint_name IN (
+        'page_publications_page_id_pages_id_fk',
+        'page_publications_published_by_user_id_user_id_fk',
+        'page_publications_version_id_page_versions_id_fk'
+      )
+    ORDER BY constraint_name
+  `;
+  expect(foreignKeys).toEqual([
+    {
+      name: "page_publications_page_id_pages_id_fk",
+      deleteRule: "NO ACTION",
+    },
+    {
+      name: "page_publications_published_by_user_id_user_id_fk",
+      deleteRule: "NO ACTION",
+    },
+    {
+      name: "page_publications_version_id_page_versions_id_fk",
+      deleteRule: "NO ACTION",
+    },
   ]);
 }
 
@@ -401,6 +465,9 @@ async function listDatabaseConstraints(
         'memberships_tenant_id_tenants_id_fk',
         'memberships_tenant_id_user_id_pk',
         'memberships_user_id_user_id_fk',
+        'page_publications_page_id_pages_id_fk',
+        'page_publications_published_by_user_id_user_id_fk',
+        'page_publications_version_id_page_versions_id_fk',
         'page_versions_page_id_pages_id_fk',
         'pages_draft_version_id_page_versions_id_fk',
         'pages_published_version_id_page_versions_id_fk',

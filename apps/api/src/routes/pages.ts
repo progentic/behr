@@ -11,6 +11,7 @@ import {
 import {
   type PagePersistence,
   type PreviewPersistence,
+  type PublishPersistence,
   PageScopeNotFoundError,
   PageSlugConflictError,
   type TenantPersistence,
@@ -25,6 +26,7 @@ import { createRequireAuthentication } from "../middleware/auth";
 import { createRequireTrustedOrigin } from "../middleware/origin";
 import { createRequireTenantMembership } from "../middleware/tenant";
 import type { ApiBindings } from "../types";
+import { handlePublishPage } from "./publish";
 
 const OK_STATUS = 200;
 const CREATED_STATUS = 201;
@@ -41,6 +43,7 @@ export function createPageRoutes(
   tenantPersistence: TenantPersistence,
   pagePersistence: PagePersistence,
   previewPersistence: PreviewPersistence,
+  publishPersistence: PublishPersistence,
 ): Hono<ApiBindings> {
   const routes = new Hono<ApiBindings>();
   routes.use("*", createRequireAuthentication(auth));
@@ -66,6 +69,12 @@ export function createPageRoutes(
     createRequireValidPageId(),
     createRequireTrustedOrigin(auth),
     (context) => handleIssuePreviewToken(context, previewPersistence),
+  );
+  routes.post(
+    "/:pageId/publish",
+    createRequireValidPageId(),
+    createRequireTrustedOrigin(auth),
+    (context) => handlePublishPage(context, publishPersistence),
   );
   return routes;
 }

@@ -3,6 +3,7 @@ import type {
   PagePersistence,
   PublicPagePersistence,
   PreviewPersistence,
+  PublishPersistence,
   SitePersistence,
   TenantPersistence,
 } from "@bher/db";
@@ -36,6 +37,7 @@ export function createApiRoutes(
   pagePersistence: PagePersistence,
   publicPagePersistence: PublicPagePersistence,
   previewPersistence: PreviewPersistence,
+  publishPersistence: PublishPersistence,
   adminOrigin: string,
 ): Hono<ApiBindings> {
   const routes = new Hono<ApiBindings>();
@@ -65,6 +67,7 @@ export function createApiRoutes(
       tenantPersistence,
       pagePersistence,
       previewPersistence,
+      publishPersistence,
     ),
   );
   routes.route(PUBLIC_ROUTE, createPublicRoutes(publicPagePersistence));

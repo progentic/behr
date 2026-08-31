@@ -10,6 +10,12 @@ export { createAuthPersistence, identityExists } from "./auth-persistence";
 export { checkDatabaseConnection } from "./check";
 export { migrateDatabase } from "./migrate";
 export {
+  type PublishCandidate,
+  type PublishCommitResult,
+  type PublishPersistence,
+  createPublishPersistence,
+} from "./publish-persistence";
+export {
   type PreviewPageRecord,
   type PreviewPersistence,
   createPreviewPersistence,
@@ -53,6 +59,7 @@ export {
   domains,
   membershipInvitations,
   memberships,
+  pagePublications,
   pageVersions,
   pages,
   previewTokens,

@@ -92,6 +92,7 @@ flowchart TD
     Request --> PublicPage[GET /public/page?slug=...]
     Request --> PreviewToken[POST /tenants/:tenantId/sites/:siteId/pages/:pageId/preview-tokens]
     Request --> PreviewPage[GET /preview/page?slug=...]
+    Request --> PublishPage[POST /tenants/:tenantId/sites/:siteId/pages/:pageId/publish]
 ```
 
 Interpretation:
@@ -174,7 +175,8 @@ public canonical-document response. Authenticated decisions use the user
 resolved from the authoritative database session; the public read is
 unauthenticated and read-only. Phase I adds authenticated preview credential
 issuance and unauthenticated bearer preview reads bound to immutable draft
-snapshots. Publishing mutation and assets remain deferred.
+snapshots. Phase J adds owner-only publication of the current immutable draft
+and append-only transition history. Assets remain deferred.
 
 The currently implemented public API routes are exactly:
 
@@ -197,6 +199,7 @@ The currently implemented public API routes are exactly:
 * `GET /public/page?slug=...`
 * `POST /tenants/:tenantId/sites/:siteId/pages/:pageId/preview-tokens`
 * `GET /preview/page?slug=...`
+* `POST /tenants/:tenantId/sites/:siteId/pages/:pageId/publish`
 
 ---
 
@@ -337,6 +340,11 @@ and database uniqueness enforces one current row per page and globally unique
 token hashes. Rotation replaces the row; expiry is enforced synchronously
 without a cleanup worker.
 
+Phase J adds `page_publications`, an append-only record of actual public-state
+transitions. Each event references its page, same-page immutable version, and
+the authoritative authenticated publisher. Publication history uses non-cascade
+foreign keys and contains no duplicated tenant, site, slug, or document data.
+
 The database remains the sole session authority. Browser cookies contain only
 the opaque session identifier; they do not authorize a user without a valid
 database session.
@@ -373,6 +381,13 @@ same-page version stored on the token row. It never follows the current draft,
 consults the published pointer for authorization, or falls back to public
 content after preview failure. Token issuance and reads do not mutate draft or
 published pointers.
+
+The owner-only publish route resolves and canonically validates the current
+same-page immutable draft, then conditionally commits that exact candidate. A
+real transition updates `published_version_id` and inserts its publication event
+in one transaction. Repeating the same publication is unchanged; a candidate
+made stale by a newer draft returns HTTP 409 without pointer or history changes.
+Publishing does not mutate drafts, immutable versions, or preview credentials.
 
 ---
 
@@ -435,9 +450,8 @@ sequenceDiagram
 
 # 6. Content Publication Flow
 
-This diagram remains the Phase J mutation target. Phase H now represents and
-reads published state through a nullable pointer, but no editor UI, publish
-route, production pointer mutation, or publication history exists yet.
+This request-driven flow is implemented through Phase J. No editor UI, publish
+button, historical-version selection, approval workflow, or rollback UI exists.
 
 ```mermaid
 sequenceDiagram
