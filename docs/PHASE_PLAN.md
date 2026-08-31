@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.6
+Version: 1.7
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -1431,43 +1431,750 @@ Objective
 
 Store assets reliably.
 
-Guidelines
+Ownership Correction
 
-Must:
+High — Phase L asset-storage ownership and phase-surface gap: Version 1.6 required persistent uploads across PostgreSQL and the local filesystem but declared only one schema and one route file, with no asset scope, upload-security policy, storage-root ownership, metadata contract, or cross-store consistency semantics. Version 1.7 defines a bounded site-scoped storage core without pulling Phase M asset integration forward.
 
-• Implement upload endpoint
-• Store files on disk
-• Record metadata
+This correction does not reopen Phase K. Phase K remains complete, and Phase M remains unstarted.
 
-Must not:
+Authority Flow
 
-• Implement editor asset picker
-• Implement image processing pipeline
+authenticated tenant member
+        ↓
+authoritative tenant/site scope
+        ↓
+bounded multipart upload
+        ↓
+system-generated asset identity/storage key
+        ↓
+local filesystem original
+        ↓
+PostgreSQL asset metadata
+
+Asset Ownership
+
+Assets are site-scoped.
+
+Authority follows:
+
+tenant
+  ↓
+site
+  ↓
+asset
+
+The site UUID is the asset ownership relationship. Tenant ancestry must be proven through sites.tenant_id.
+
+Do not make assets globally unscoped, page-owned, user-owned, or tenant-owned independently of sites.
+
+Do not duplicate tenant ownership on the asset row.
+
+Phase M may later record which pages or blocks reference a site asset.
+
+Upload Authorization
+
+Both existing content-collaborator roles may upload:
+
+owner  → allowed
+member → allowed
+
+This matches the existing page-authoring authority.
+
+Do not add an asset role, media-manager role, permission table, or per-asset ACL.
+
+Upload Route
+
+Phase L owns exactly:
+
+POST /tenants/:tenantId/sites/:siteId/assets
+
+The route requires:
+
+• Authenticated session
+• Tenant membership
+• Valid site ID
+• Authoritative proof that the site belongs to the tenant
+• Trusted origin
+• Bounded request body
+• multipart/form-data
+
+Do not add another upload route.
+
+No Asset Read, List, Delete, or Public Delivery
+
+Phase L does not expose:
+
+GET /assets
+GET /assets/:id
+DELETE /assets/:id
+PUT /assets/:id
+PATCH /assets/:id
+
+Phase L does not expose a public file-serving route or public URL.
+
+Do not mount the upload root as static files, return a file URL or physical path, add nginx rules, add /public/assets/*, or modify the public renderer.
+
+Stored bytes remain outside public HTTP authority.
+
+Upload Transport
+
+Use multipart/form-data with exactly one field named file.
+
+Requirements:
+
+• Exactly one file entry
+• The entry must be a File
+• No additional multipart fields
+• No duplicate file parts
+
+Malformed multipart, a missing file, a duplicate file, a non-File file field, or any extra field returns HTTP 400.
+
+Do not accept filesystem path strings, base64 JSON payloads, remote URLs, client-selected asset IDs, or caller-selected storage keys.
+
+File and Request Size Policy
+
+The v1 maximum original asset size is:
+
+10 MiB
+10 × 1024 × 1024
+10,485,760 bytes
+
+Valid files contain 1 byte through 10 MiB inclusive.
+
+Empty files return HTTP 400.
+
+Files larger than 10 MiB return HTTP 413.
+
+Protect multipart parsing with Hono's existing body-limit capability. The total upload request-body ceiling is 11 MiB, allowing bounded multipart framing overhead while preventing unbounded buffering before the file-size rule is evaluated.
+
+Apply the 11 MiB body limit only to the upload route or asset route surface. Do not change unrelated JSON route limits.
+
+Do not add a custom stream-size framework or a new upload package.
+
+Filename Policy
+
+The client-provided original filename is metadata only and must never affect the filesystem path.
+
+Accept only a display filename with these constraints:
+
+• Length 1 through 255 characters
+• No NUL
+• No ASCII control characters
+• No /
+• No backslash character
+
+Reject path-bearing or malformed names with HTTP 400. A name such as ../../outside.txt or ..\outside.txt must not be normalized into an accepted path-shaped name.
+
+Do not preserve client directory structure or join the original filename into the storage destination.
+
+Content-Type Policy
+
+Multipart File.type is untrusted descriptive metadata.
+
+If the supplied content type is empty or unusable, persist application/octet-stream.
+
+Bound stored content-type metadata to at most 255 characters.
+
+Do not use declared MIME type as authorization, execution policy, a file extension, or filesystem authority.
+
+Phase L performs no MIME sniffing, MIME allowlisting, image decoding, SVG sanitization, PDF parsing, virus-scanning framework, media transcoding, or image-processing pipeline.
+
+Because Phase L exposes no public file-serving route, otherwise valid bounded bytes remain inert stored data. Phase M must make its own safe rendering decision before embedding an asset.
+
+Storage Root Configuration
+
+Phase L adds this API-runtime configuration value:
+
+ASSET_STORAGE_ROOT
+
+Production
+
+When NODE_ENV=production, ASSET_STORAGE_ROOT must be explicitly configured and absolute.
+
+The production deployment target is:
+
+ASSET_STORAGE_ROOT=/var/lib/bhr-cms/uploads
+
+Do not silently write production uploads into the source tree.
+
+Development and Test
+
+For non-production environments, an explicit ASSET_STORAGE_ROOT override must be absolute.
+
+When it is absent or empty, use one stable repository-local default:
+
+.data/uploads
+
+Derive that default from the API module/package location rather than process.cwd(), so bun run dev, bun run dev:api-only, and tests do not resolve different roots because of --cwd.
+
+Add .data/ to .gitignore.
+
+Tests that upload files must use an explicit temporary absolute directory.
+
+Add .env.example documentation equivalent to:
+
+# Optional local override for original asset storage.
+# Development defaults to the repository .data/uploads directory.
+# Production must set an absolute path; target: /var/lib/bhr-cms/uploads.
+ASSET_STORAGE_ROOT=
+
+The reserved derivative root /var/lib/bhr-cms/derivatives remains future work. Do not add derivative configuration, create derivatives, generate thumbnails, or transform images.
+
+System-Generated Asset Identity
+
+Generate assetId as a UUID inside the application using platform cryptography.
+
+Do not accept an asset ID from the request.
+
+Use the same generated ID as filesystem and metadata identity.
+
+Storage Key
+
+Use an internal logical storage key equivalent to:
+
+<siteId>/<assetId>
+
+Both components are validated or system-generated UUIDs. The key contains no extension, original filename, or arbitrary path fragment.
+
+Persist the logical key in PostgreSQL.
+
+The physical destination derives only from:
+
+configured storage root
+        +
+system-generated storage key
+
+Equivalent physical path:
+
+ASSET_STORAGE_ROOT/<siteId>/<assetId>
+
+Do not expose the physical path to the HTTP caller or store an absolute physical path in PostgreSQL.
+
+Exclusive Creation and Partial-Write Cleanup
+
+Filesystem creation must be exclusive. A storage-key collision must fail without truncating, replacing, or otherwise modifying existing bytes.
+
+If a write fails after creating a partial file:
+
+• Close the file
+• Attempt to remove the incomplete file
+• Persist no asset metadata
+
+Asset Metadata Table
+
+Phase L creates exactly one application table:
+
+assets
+
+Required columns:
+
+id
+site_id
+storage_key
+original_filename
+content_type
+byte_size
+created_at
+
+id
+
+• UUID primary key
+• Generated by the application/system
+• A database UUID default may remain when consistent with repository conventions, but upload uses the same application-generated ID embedded in the storage key
+
+site_id
+
+• UUID
+• NOT NULL
+• References sites.id
+• Indexed
+• Non-cascading
+
+The non-cascading relationship prevents a future site deletion from silently deleting metadata while filesystem bytes remain. Phase L does not add site deletion.
+
+storage_key
+
+• NOT NULL
+• Globally unique
+
+original_filename
+
+• Validated display metadata only
+• Not unique
+• Not a path or public URL
+
+content_type
+
+• Normalized untrusted metadata or application/octet-stream
+
+byte_size
+
+• Actual accepted byte count from the received File
+• Equal to bytes written to disk
+• Never accepted from a caller-supplied size field
+
+created_at
+
+• Timezone-aware
+• NOT NULL
+• Database-default current timestamp
+
+Do not add tenant_id, page_id, user_id, hostname, slug, filesystem_path, public_url, or speculative metadata to assets.
+
+Upload Response Contract
+
+Add a strict shared response equivalent to:
+
+{
+  id: string;
+  originalFilename: string;
+  contentType: string;
+  byteSize: number;
+  createdAt: string;
+}
+
+Do not expose storageKey, physical path, filesystem root, siteId, tenantId, or database internals.
+
+Phase L may add shared contracts for asset ID, original filename, content-type metadata, byte size, and the upload response.
+
+Do not add an asset block or content-reference contract. Phase M owns content integration.
+
+Asset Persistence Boundary
+
+Create one focused database boundary equivalent to AssetPersistence with only the operations required by upload, including:
+
+resolveAssetSite(tenantId, siteId)
+createAssetMetadata(tenantId, siteId, metadata)
+
+resolveAssetSite proves:
+
+sites.id = siteId
+AND sites.tenant_id = tenantId
+
+before bytes are written.
+
+createAssetMetadata must prove the same relationship again while inserting. If the site relationship was removed or changed after precheck, metadata creation fails closed.
+
+Do not add generic asset CRUD, repository classes, asset services, or a generic unit-of-work abstraction.
+
+Filesystem Boundary
+
+Create one focused API-runtime boundary equivalent to AssetStorage.
+
+It owns only:
+
+• Storage-root resolution
+• Exclusive original-byte write
+• Internal storage-key-to-path translation
+• Compensating removal
+
+It does not own authentication, tenant/site authorization, database writes, multipart parsing, or public URLs.
+
+Do not create a general filesystem framework.
+
+Cross-Store Ordering
+
+The filesystem and PostgreSQL cannot form one real transaction. Do not claim otherwise.
+
+Use this bounded request flow:
+
+1. Authenticate and authorize tenant membership.
+2. Validate authoritative tenant/site scope.
+3. Validate multipart shape, file metadata, and file size.
+4. Generate the asset ID and storage key.
+5. Write bytes successfully under the exclusive key.
+6. Insert matching PostgreSQL metadata after revalidating site scope.
+7. Return the strict response.
+
+Metadata Failure Compensation
+
+If metadata insertion fails after a successful filesystem write, remove the just-written file and return through the existing error or nondisclosure boundary.
+
+A handled metadata failure must not leave a final asset file behind.
+
+Scope-Race Compensation
+
+If initial site validation succeeds but the authoritative site relationship no longer exists when metadata insertion rechecks it:
+
+• Remove the just-written file
+• Return nondisclosing HTTP 404
+• Commit no metadata
+
+Handled Failure Guarantee
+
+No committed assets row may point to a failed or missing write. A failed metadata insert triggers filesystem compensation.
+
+Process-Crash Limitation
+
+A process crash after a successful filesystem write but before metadata commit may leave an orphan file with no database row. This is preferable to committing metadata that points to missing bytes.
+
+Document this limitation explicitly. Phase L does not add a cleanup daemon, background orphan scanner, queue, two-phase commit, outbox, startup reconciliation framework, or worker. A future operational phase may address orphan reconciliation if required.
+
+Route Policy Chain
+
+Reuse the existing authentication, tenant-membership, and trusted-origin middleware:
+
+createRequireAuthentication
+createRequireTenantMembership
+createRequireTrustedOrigin
+
+Validate the site ID through the existing siteIdSchema.
+
+Do not copy session logic, introduce another tenant-authority model, or create configurable asset authorization middleware.
+
+HTTP Semantics
+
+• Unauthenticated → 401
+• Outsider or inaccessible tenant/site → 404
+• Invalid site ID → nondisclosing 404
+• Untrusted or missing origin → 403
+• Malformed multipart, missing/duplicate file, non-File file field, or extra fields → 400
+• Empty file → 400
+• File larger than 10 MiB or request body larger than 11 MiB → 413
+• Internal filesystem or database failure → existing generic 500
+
+Do not expose physical paths, storage roots, SQL, constraint names, or database details.
+
+No Caller Storage Authority
+
+Request fields, headers, query parameters, and original filename have zero authority over assetId, storageKey, or physical path.
+
+No Editor or Content Integration
+
+Do not modify apps/admin or packages/editor in Phase L.
+
+Do not add an upload button, asset browser, asset picker, image block, file block, media library, or page picker.
+
+Do not modify PageDocument. Existing heading and paragraph blocks remain unchanged. Asset-backed blocks belong to Phase M.
 
 Files / Functions
 
+packages/contracts
+
+package.json only if the existing test script must include the new focused test
+src/asset.ts
+src/asset.test.ts
+src/index.ts
+
 packages/db
 
-schema/assets.ts
+src/schema/assets.ts
+src/asset-persistence.ts
+src/schema/index.ts
+src/index.ts
+migrations/
+migrations/meta/
+src/integration.test.ts
+package.json only if test wiring requires it
 
 apps/api
 
-routes/assets.ts
+src/env.ts
+src/env.test.ts
+src/application.ts
+src/lib/asset-storage.ts
+src/routes/assets.ts
+src/routes/index.ts
+src/asset.integration.test.ts
+package.json
+
+Narrowly justified asset route or storage unit tests may be added inside the existing API test surface.
+
+Root / Repository
+
+.env.example
+.gitignore
+package.json
+.github/workflows/ci.yml
+docs/ARCHITECTURE.md
+docs/DOCUMENTATION.md
+
+No unnamed support surface exists.
+
+Files Outside Phase L
+
+Do not modify:
+
+apps/admin/
+apps/web/
+packages/editor/
+
+Do not modify page, public-read, preview, publish, or editor runtime behavior. If implementation evidence reveals a direct contradiction, stop for review rather than expanding scope.
+
+Composition
+
+Preserve:
+
+createApiApplication
+    ↓
+createHttpApplication
+    ↓
+createApiRoutes
+
+Compose createAssetPersistence(database) and createAssetStorage(assetConfig) through the existing composition root.
+
+Mount createAssetRoutes(...) at /tenants/:tenantId/sites/:siteId/assets through createApiRoutes.
+
+Do not add another application root, dependency-injection layer, storage service container, or forwarding-only factory.
+
+Configuration Ownership
+
+Extend the existing API configuration with an assets sibling responsibility equivalent to:
+
+ApiConfig {
+  port
+  auth
+  assets: {
+    storageRoot
+  }
+}
+
+Keep authentication configuration cohesive. Do not put filesystem configuration in @bher/db or create a second environment parser.
+
+Dependencies
+
+Use the existing Bun/Web File APIs, Node-compatible filesystem/path APIs available under Bun, Hono body-limit capability, Zod contracts, and Drizzle/PostgreSQL stack.
+
+No new package dependency is expected. bun.lock must remain unchanged.
+
+If an external upload or storage package appears necessary, stop and report the evidence instead of silently adding it.
+
+Migration
+
+Generate the next normal Drizzle migration, expected equivalent to 0008_assets.sql. The exact generated suffix follows repository tooling.
+
+Exactly one new application table is expected: assets.
+
+No existing application table requires Phase L schema mutation.
+
+Testing
+
+Contract Tests
+
+Verify:
+
+• Valid strict asset upload response
+• Unknown response fields rejected
+• Filename length and path-separator boundaries
+• UUID asset ID
+• Positive bounded byte size
+• Content-type fallback and normalization
+
+Do not implement multipart parsing in the contracts package.
+
+Storage Unit Tests
+
+Use a temporary absolute root to prove:
+
+1. Correct bytes are written.
+2. Physical path derives only from storage key.
+3. Original filename is absent from the destination path.
+4. The site directory is created as required.
+5. An existing destination cannot be overwritten.
+6. Failed or partial writes leave no accepted storage authority.
+7. Compensating removal deletes a just-written file.
+
+Do not use the production /var/lib directory in tests.
+
+Asset Integration Gate
+
+Add apps/api/src/asset.integration.test.ts and one test:asset:integration command to the API, root scripts, and CI.
+
+Use real PostgreSQL, the real Hono application, and a real temporary filesystem directory. Do not mock the primary upload lifecycle.
+
+Authorization and Multipart Controls
+
+Prove:
+
+• owner upload → 201
+• member upload → 201
+• unauthenticated → 401
+• outsider → 404
+• invalid site → 404
+• untrusted origin → 403
+• missing file → 400
+• duplicate file parts → 400
+• extra form field → 400
+• non-File file field → 400
+
+For every rejected request, asset row delta and final file delta must both remain zero.
+
+Size Controls
+
+Directly prove:
+
+• Empty file → 400
+• Exactly 10 MiB → accepted
+• 10 MiB + 1 byte → 413
+• Request body larger than 11 MiB → 413
+
+Do not infer enforcement solely from constants.
+
+Filename Traversal Control
+
+Submit a path-bearing filename such as ../../outside.txt or ..\outside.txt and prove HTTP 400, no asset row, no final file, and no file outside the storage root.
+
+Storage-Key Confinement
+
+For a successful upload, inspect assets.storage_key and the physical path. Prove the key contains only server-controlled UUID identity, the original filename is absent, the physical file remains under the configured root, and the response exposes neither key nor physical path.
+
+Metadata Accuracy
+
+Prove direct equality among actual bytes written, assets.byte_size, and response byteSize.
+
+Verify original_filename, content_type, created_at, and site_id against authoritative observed values.
+
+Content-Type Control
+
+Upload a valid file with no usable declared MIME type and prove stored and returned application/octet-stream. Do not infer type from extension or content.
+
+Site-Scope Control
+
+Create sites A and B, upload to A, and prove assets.site_id = A. Caller-supplied query or body metadata cannot redirect the asset to B. No tenant ID is stored on the asset row.
+
+Exclusive-Write Control
+
+Attempt two writes to the same test storage key through the real storage boundary. The first bytes remain intact, the second write is rejected, and no truncation or overwrite occurs.
+
+Database Failure Compensation
+
+Exercise the production-used orchestration with a successful filesystem write followed by metadata failure. Prove the file is removed and no row commits.
+
+A narrow persistence-failure test seam is acceptable only if a real constraint failure cannot be triggered without distorting production design. Do not add a production failure endpoint.
+
+Scope-Race Compensation
+
+Where practical, invalidate site scope between the initial check and metadata insertion and prove nondisclosing not-found, file removal, and no metadata.
+
+Do not add site-deletion production behavior merely for this test. If the race cannot be reproduced safely, report this specific negative control as NOT RUN rather than fabricating PASS.
+
+Response Confinement
+
+The only successful response keys are id, originalFilename, contentType, byteSize, and createdAt.
+
+The response must not contain storageKey, storage root, physical path, tenant ID, site ID, or database internals. The strict shared schema enforces this boundary.
+
+Configuration Tests
+
+Development:
+
+• No configured root → stable repository-local .data/uploads
+• Explicit absolute override → accepted
+• Relative explicit override → rejected
+
+Production:
+
+• Missing or empty root → configuration error
+• Relative root → configuration error
+• Absolute root → accepted
+
+Do not expose path contents in unrelated error messages.
+
+Catalog Verification
+
+Verify exactly one new table, assets, including:
+
+• UUID primary key
+• Non-cascading site foreign key
+• Globally unique storage key
+• Site index
+• Original filename
+• Content type
+• Byte size
+• Timezone-aware created timestamp
+
+Do not weaken existing catalog assertions.
+
+Operation Inventories
+
+Enumerate new production operations.
+
+Filesystem operations are limited to creating/writing an original and compensating removal.
+
+Database operations are limited to authoritative site-scope read and asset metadata insert.
+
+There must be no production asset update, asset-delete API, public asset read, or derivative write.
+
+Enumerate every production location where a physical asset path is constructed. There should be one bounded storage boundary, and no route or persistence code may concatenate caller filename/path data.
+
+Regression and Runtime Smoke
+
+Preserve authentication, tenant, site, membership, page, public-read, preview, publish, and editor behavior.
+
+Verify normal startup using the development storage default:
+
+• Admin root → 200
+• Health → 200
+• Unauthenticated session → 401
+• Unauthenticated upload → 401
+• Clean shutdown
+
+Do not require the production /var/lib directory for local smoke.
+
+Documentation
+
+Update docs/ARCHITECTURE.md and docs/DOCUMENTATION.md to reflect implemented current state only.
+
+Document site-scoped assets, owner/member upload, 10 MiB file and 11 MiB request limits, server-generated storage keys, filename and MIME metadata boundaries, production and development roots, metadata schema, handled-request compensation, crash-orphan limitation, and explicit absence of public serving, listing, deletion, editor picking, and derivatives.
 
 Acceptance Criteria
 
-File uploads succeed.
+1. Owner can upload to an accessible site.
+2. Member can upload to an accessible site.
+3. Outsider or inaccessible scope cannot upload.
+4. Trusted origin is required.
+5. Upload accepts exactly one multipart file field.
+6. Empty files are rejected.
+7. The maximum accepted file is exactly 10 MiB.
+8. Oversized file or request body receives HTTP 413.
+9. Original filename cannot control filesystem path.
+10. Asset ID and storage key are system-generated.
+11. Successful bytes persist under the configured root.
+12. An existing file cannot be overwritten by key collision.
+13. Asset metadata persists with the correct site, filename, content type, byte size, and timestamp.
+14. Storage key is globally unique.
+15. The asset row does not duplicate tenant or page ownership.
+16. Content type remains untrusted metadata.
+17. Empty or unusable content type falls back to application/octet-stream.
+18. The upload response is strict and exposes no storage or path authority.
+19. A handled filesystem failure creates no metadata.
+20. A handled metadata failure removes the just-written file.
+21. A site-scope race fails closed and compensates where safely testable.
+22. Development storage has a stable gitignored default.
+23. Production requires an explicit absolute storage root.
+24. No public asset serving exists.
+25. No asset list or delete API exists.
+26. No editor asset picker exists.
+27. No PageDocument asset integration exists.
+28. No derivative or image-processing behavior exists.
+29. No external dependency is added.
+30. Phase M remains unstarted.
 
-File metadata recorded.
+Required Negative Controls
 
-Files persist on disk.
+• Unauthenticated upload
+• Outsider upload
+• Untrusted-origin upload
+• Invalid site
+• Missing file
+• Duplicate file
+• Extra multipart field
+• Empty file
+• 10 MiB + 1 byte file
+• Request larger than 11 MiB
+• Path-bearing original filename
+• Exclusive-write collision
+• Metadata failure after a successful file write
+• Upload-response storage/path leakage
+
+Where site deletion or race behavior cannot be safely reproduced without introducing future behavior, report it honestly as NOT RUN.
 
 Output Format
 
 Files created
 Files modified
 Commands executed
-Upload tests
+Asset authorization, upload-boundary, filesystem, metadata, compensation, and persistence tests
 
 ────────
 
