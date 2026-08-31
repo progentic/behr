@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.9
+Version: 1.10
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -2989,23 +2989,369 @@ Objective
 
 Control site appearance via tokens.
 
-Guidelines
+Ownership Correction
 
-Must:
+High — Phase N theme-runtime ownership gap: Version 1.9 requires theme persistence, runtime resolution, and renderer application without defining the token contract, site relationship, fallback behavior, read surfaces, or implementation files. Version 1.10 defines one bounded current token set per site and reuses the existing public/preview page responses and renderer without introducing a theme framework or Phase O management behavior.
 
-• Implement themes table
-• Resolve active theme
-• Apply tokens in renderer
+This correction does not reopen Phase M. Phase O remains unstarted.
 
-Must not:
+Minimal v1 Theme Model
 
-• Implement theme editor UI
+A site has at most one persisted current theme-token row.
+
+Authority:
+
+site
+  ↓
+optional themes row
+  ↓
+current bounded token set
+
+If no row exists, use DEFAULT_THEME_TOKENS. Existing sites therefore remain immediately renderable without migration backfill.
+
+Do not introduce named theme collections, presets, inheritance, parent/child themes, an active-theme pointer, history, versioning, a marketplace/catalog, or a theme service.
+
+Theme Token Contract
+
+Define exactly:
+
+{
+  colorScheme: "light" | "dark";
+  fontFamily: "sans" | "serif";
+}
+
+Define one shared default:
+
+{
+  colorScheme: "light",
+  fontFamily: "sans"
+}
+
+The object is strict.
+
+Do not add arbitrary colors, hex values, CSS strings, font URLs, spacing scales, border radii, shadows, component tokens, or custom CSS.
+
+Existing content-level spacing, width, and alignment tokens remain unchanged.
+
+Theme Persistence
+
+Create exactly:
+
+themes
+
+Required columns:
+
+site_id
+color_scheme
+font_family
+
+site_id:
+
+• UUID
+• Primary key
+• Foreign key to sites.id
+• ON DELETE CASCADE
+
+color_scheme:
+
+• TEXT
+• NOT NULL
+
+font_family:
+
+• TEXT
+• NOT NULL
+
+The primary key enforces one current theme row per site.
+
+Do not add id, name, tenant_id, is_active, version, created_by, active-theme selection, or theme history.
+
+Why No Active Pointer
+
+Resolve active theme means resolve the site's one optional current theme row. It does not mean select one record from a theme catalog.
+
+A separate pointer would introduce bidirectional ownership, additional consistency checks, selection persistence, and Phase O behavior without a current requirement.
+
+Phase O may later mutate the bounded values on the site's current row. Do not build that mutation surface in Phase N.
+
+No Theme Mutation API
+
+Phase N adds no POST, PUT, PATCH, or DELETE theme route and no site/tenant theme-management endpoint.
+
+There is no production theme write operation in Phase N.
+
+Runtime integration tests may insert or update theme rows directly through PostgreSQL fixtures to establish known read state. That fixture behavior is not a production API.
+
+Public and Preview Theme Resolution
+
+Extend the existing page-read records so both:
+
+GET /public/page
+GET /preview/page
+
+resolve the current site's optional theme row.
+
+The existing public page response becomes equivalent to:
+
+{
+  title: string;
+  slug: string;
+  document: PageDocument;
+  theme: ThemeTokens;
+}
+
+When a valid row exists, theme contains its persisted tokens. When no row exists, theme is DEFAULT_THEME_TOKENS.
+
+Do not add a separate theme-read HTTP request. One page response contains everything the renderer needs.
+
+Theme Is Current Site State
+
+Theme state does not belong to PageDocument, page_versions, page_version_assets, preview_tokens, or page_publications.
+
+Publishing does not snapshot theme state. Preview-token issuance does not snapshot theme state. A later test-fixture or future Phase O theme update affects subsequent published and valid preview reads immediately.
+
+Do not add theme history or couple themes to page-version/publication/preview identity.
+
+Missing and Malformed Theme Behavior
+
+If no theme row exists, use DEFAULT_THEME_TOKENS.
+
+If a row exists but contains an unsupported token value, fail through the existing generic HTTP 500 boundary.
+
+Do not silently repair, rewrite, strip, or replace malformed persisted values with defaults. Do not leak validation details.
+
+Under Global Rule 15, do not broadly catch theme parsing failures and translate them to HTTP 404.
+
+Renderer Application
+
+Extend the existing shared PageRenderer with the resolved theme.
+
+Use only hard-coded trusted mappings equivalent to:
+
+light → trusted light background and text values
+dark  → trusted dark background and text values
+sans  → trusted system sans-serif stack
+serif → trusted local serif stack
+
+Apply the resulting style to one root wrapper around the rendered page.
+
+Inline React style is acceptable and preferred over a CSS/theme framework.
+
+Do not inject arbitrary CSS, build dynamic CSS variables from user strings, load remote fonts, create ThemeProvider/React context, or add a styling dependency.
+
+Preserve Renderer Context
+
+Phase M already passes document and previewToken to the shared renderer. Phase N adds only theme:
+
+<PageRenderer
+  document={page.document}
+  previewToken={previewToken}
+  theme={page.theme}
+/>
+
+Do not redesign published or preview asset rendering. Existing heading, paragraph, image, public-asset, and preview-asset behavior remains intact.
+
+Public and Preview Persistence Ownership
+
+Keep theme resolution in the existing page-read persistence boundaries.
+
+PublicPagePersistence published-page resolution additionally left-joins the optional same-site theme row.
+
+PreviewPersistence token-bound page resolution additionally left-joins the optional same-site theme row.
+
+Relationship:
+
+themes.site_id = sites.id
+
+Do not create ThemePersistence, ThemeService, ThemeResolver, or ThemeRepository. Phase N requires no new production boundary.
+
+Contract Ownership
+
+Create:
+
+packages/contracts/src/theme.ts
+
+It owns:
+
+themeColorSchemeSchema
+themeFontFamilySchema
+themeTokensSchema
+DEFAULT_THEME_TOKENS
+inferred token types
+
+Extend publicPageResponseSchema to require theme.
+
+Do not add theme fields to authenticated page drafts or canonical PageDocument.
+
+Theme Storage Values
+
+PostgreSQL stores only the token names:
+
+light | dark
+sans | serif
+
+The database does not store color values, rgb/hex expressions, CSS font-family strings, or style objects.
+
+Renderer CSS values remain trusted application constants.
+
+Migration
+
+Generate one normal Drizzle migration expected equivalent to:
+
+0010_themes.sql
+
+The exact generated suffix follows repository tooling.
+
+Expected schema change:
+
++ themes
+
+only.
+
+Do not modify sites or add migration backfill.
+
+Files / Functions
+
+packages/contracts
+
+package.json only to include the focused theme contract test
+src/theme.ts
+src/theme.test.ts
+src/page.ts
+src/index.ts
+
+packages/db
+
+src/schema/themes.ts
+src/schema/index.ts
+src/public-page-persistence.ts
+src/preview-persistence.ts
+src/index.ts
+src/integration.test.ts
+migrations/
+migrations/meta/
+
+apps/api
+
+src/routes/public.ts
+src/routes/preview.ts
+src/public.integration.test.ts
+src/preview.integration.test.ts
+
+apps/web
+
+src/main.tsx
+src/renderer.tsx
+src/renderer.test.tsx
+
+Documentation
+
+docs/ARCHITECTURE.md
+docs/DOCUMENTATION.md
+
+No admin file belongs to Phase N. No application composition change is expected. No unnamed support surface exists.
+
+Dependencies
+
+No external dependency or workspace edge is expected. Use existing Zod, Drizzle, PostgreSQL, and React capabilities.
+
+bun.lock must remain unchanged.
+
+If an external theme or styling package appears necessary, stop and report the discrepancy rather than adding it.
+
+Contract Verification
+
+Future implementation must prove:
+
+• Valid light/sans tokens
+• Valid dark/serif tokens
+• Unknown token rejected
+• Extra field rejected
+• DEFAULT_THEME_TOKENS equals light/sans
+• Public page response requires a valid theme
+
+Database Verification
+
+Prove:
+
+• Exactly one themes row per site
+• Duplicate site row is database-rejected
+• Site deletion cascades its theme row
+• No existing table was modified
+
+Public Page Verification
+
+No theme row:
+
+response.theme = DEFAULT_THEME_TOKENS
+
+Persisted dark/serif row:
+
+response.theme = { colorScheme: "dark", fontFamily: "serif" }
+
+Malformed persisted token:
+
+generic HTTP 500
+
+Preview Page Verification
+
+A valid preview credential uses the same current-site semantics:
+
+• No theme row → default
+• Valid row → persisted tokens
+• Malformed row → generic HTTP 500
+
+Do not repeat the full Phase I credential matrix.
+
+Theme Change Verification
+
+There is no production write API. To prove theme changes affect rendering, an integration test may:
+
+1. Resolve a page without a theme row and observe defaults.
+2. Insert or update the site's row directly in test PostgreSQL.
+3. Resolve the same public and preview page again.
+4. Observe the changed bounded tokens.
+5. Render the response and confirm trusted style mapping changes.
+
+Do not add a temporary runtime mutation route.
+
+Renderer Verification
+
+Prove light/sans and dark/serif produce different trusted root style values and that mappings contain only application-owned constants.
+
+Existing heading, paragraph, image, public-asset, and preview-asset rendering must remain intact.
+
+Explicit Exclusions
+
+Phase N does not implement admin theme UI, site settings UI, theme mutation API, named themes, presets/catalogs, inheritance, history, theme previews, custom CSS, remote fonts, CSS injection, a theme package/framework, or any Phase O behavior.
+
+Keep Phase N runtime-only and read-only.
 
 Acceptance Criteria
 
-Theme changes affect rendering.
+1. Theme tokens are a strict bounded contract.
+2. Default theme is light and sans.
+3. Each site has at most one persisted current theme row.
+4. Sites without a theme row render with defaults.
+5. Persisted valid theme tokens appear in public page responses.
+6. Persisted valid theme tokens appear in preview page responses.
+7. Malformed persisted theme values fail through generic HTTP 500.
+8. Theme state is current site state, not page-version state.
+9. Theme changes affect subsequent public and preview reads.
+10. Renderer maps tokens only to trusted hard-coded style values.
+11. Published and preview asset rendering from Phase M remains unchanged.
+12. No theme mutation API exists.
+13. No theme admin UI exists.
+14. No custom CSS or remote-font behavior exists.
+15. No external dependency is added.
+16. Phase O remains unstarted.
 
-Tokens apply consistently.
+Output Format
+
+Files created
+Files modified
+Commands executed
+Contract, catalog, public/preview resolution, malformed-state, renderer mapping, and Phase M regression tests
 
 ────────
 
