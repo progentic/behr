@@ -1,6 +1,6 @@
 # BeHR CMS — System Architecture
 
-Version: 1.1
+Document Status: Current-state architecture; governance versions are tracked in PHASE_PLAN.md
 Deployment Model: Single VPS
 Architecture Style: Monolithic application with strict internal boundaries
 Primary Stack: Bun, Hono, Better Auth, Drizzle, PostgreSQL, React, nginx
@@ -491,21 +491,52 @@ workflow, or rollback UI.
 ```mermaid
 sequenceDiagram
 
-    participant Editor
+    participant Collaborator
     participant AdminUI
-    participant API
+    participant Owner
+    participant PreviewBrowser
+    participant API as Hono API
     participant DB
 
-    Editor->>AdminUI: Edit page
-    AdminUI->>API: Save draft
+    Collaborator->>AdminUI: Edit page and save
+    AdminUI->>API: POST /tenants/:tenantId/sites/:siteId/pages/:pageId/versions
+    API->>DB: INSERT immutable page_versions row
+    API->>DB: UPDATE pages.draft_version_id in the same transaction
+    DB-->>API: Current draft version B
+    API-->>AdminUI: Saved draft B
 
-    API->>DB: Insert new page version
+    Collaborator->>API: POST /tenants/:tenantId/sites/:siteId/pages/:pageId/preview-tokens
+    Note over Collaborator,API: Authenticated session + trusted origin
+    API->>DB: Resolve same-page current draft B
+    API->>DB: UPSERT hash-only preview token bound to B
+    API-->>Collaborator: Raw bearer token once
 
-    Editor->>AdminUI: Publish page
-    AdminUI->>API: Publish request
+    PreviewBrowser->>API: GET /preview/page with Host, slug, and bearer token
+    API->>DB: Resolve unexpired token and same-page immutable version B
+    DB-->>API: Canonical PageDocument B
+    API-->>PreviewBrowser: Renderable preview response
 
-    API->>DB: Update published pointer
+    Owner->>API: POST /tenants/:tenantId/sites/:siteId/pages/:pageId/publish
+    Note over Owner,API: Authenticated owner session + trusted origin
+    API->>DB: Resolve and validate same-page current draft candidate B
+    API->>DB: Lock page and recheck candidate B
+
+    alt Candidate B is stale
+        DB-->>API: Current draft pointer differs
+        API-->>Owner: HTTP 409, no pointer or history write
+    else Candidate B is already published
+        DB-->>API: Published pointer already equals B
+        API-->>Owner: HTTP 200 unchanged, no history write
+    else Candidate B is current and unpublished
+        API->>DB: UPDATE pages.published_version_id = B
+        API->>DB: INSERT page_publications transition event
+        DB-->>API: Commit both writes in one transaction
+        API-->>Owner: HTTP 200 published
+    end
 ```
+
+Preview-token issuance and publish arrows represent implemented API surfaces,
+not admin controls. Phase K provides draft authoring and manual save only.
 
 ---
 
