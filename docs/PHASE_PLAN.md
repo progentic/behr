@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.7
+Version: 1.8
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -25,6 +25,7 @@ These rules apply to every phase.
 12. Composition-root hygiene: Remove functions that only forward arguments, rename another call, or package already-available values unless they own distinct policy, validation, lifecycle, translation, reuse, or a necessary test seam.
 13. Async UI identity: Any asynchronous UI state whose result belongs to a selectable resource must carry that resource’s authoritative ID. Late load or save completions must not update state belonging to a different current resource. Prefer functional/latest-state updates over mirrored refs or global state unless stronger coordination is actually required.
 14. Cross-layer naming clarity: When similarly named operations exist at different boundaries, names must communicate the boundary when search, stack traces, or review would otherwise be ambiguous. Database mutations, HTTP requests, UI actions, and response translations must not use indistinguishable names when they perform materially different work.
+15. Error-boundary classification: When a boundary catches an exception from a platform, framework, database, filesystem, parser, authentication provider, network API, or other external/runtime dependency and translates it into an application error or HTTP result, translate only failures that the boundary explicitly owns. Prefer stable structured discriminators such as error codes, statuses, or specific error types over broad type checks or message fragments. When a materially adjacent non-owned failure exists and can be exercised without speculative production hooks, verification must prove both sides of the boundary: at least one owned failure is translated as intended and at least one adjacent unowned failure propagates to its upstream boundary. Exact message matching is acceptable only when the pinned runtime exposes no stable structured discriminator; such matching must be exact and covered by a version-specific regression test.
 
 ────────
 
