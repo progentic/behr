@@ -5,6 +5,7 @@ import {
   createMembershipPersistence,
   createPagePersistence,
   createPublicPagePersistence,
+  createPreviewPersistence,
   createSitePersistence,
   createTenantPersistence,
   loadDatabaseConfig,
@@ -13,6 +14,7 @@ import {
   type MembershipPersistence,
   type PagePersistence,
   type PublicPagePersistence,
+  type PreviewPersistence,
 } from "@bher/db";
 import { Hono } from "hono";
 
@@ -47,6 +49,7 @@ export function createApiApplication(environment: Environment): ApiApplication {
   const membershipPersistence = createMembershipPersistence(database);
   const pagePersistence = createPagePersistence(database);
   const publicPagePersistence = createPublicPagePersistence(database);
+  const previewPersistence = createPreviewPersistence(database);
   const app = createHttpApplication(
     auth,
     tenantPersistence,
@@ -54,6 +57,7 @@ export function createApiApplication(environment: Environment): ApiApplication {
     membershipPersistence,
     pagePersistence,
     publicPagePersistence,
+    previewPersistence,
     apiConfig.auth.adminOrigin,
   );
   return Object.freeze({
@@ -71,6 +75,7 @@ function createHttpApplication(
   membershipPersistence: MembershipPersistence,
   pagePersistence: PagePersistence,
   publicPagePersistence: PublicPagePersistence,
+  previewPersistence: PreviewPersistence,
   adminOrigin: string,
 ): Hono<ApiBindings> {
   const app = new Hono<ApiBindings>();
@@ -84,6 +89,7 @@ function createHttpApplication(
       membershipPersistence,
       pagePersistence,
       publicPagePersistence,
+      previewPersistence,
       adminOrigin,
     ),
   );

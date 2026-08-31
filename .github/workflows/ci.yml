@@ -67,6 +67,8 @@ jobs:
         run: bun run test:page:integration
       - name: Run public integration tests
         run: bun run test:public:integration
+      - name: Run preview integration tests
+        run: bun run test:preview:integration
       - name: Build workspaces
         run: bun run build
       - name: Audit dependencies

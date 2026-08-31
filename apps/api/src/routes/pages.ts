@@ -4,11 +4,13 @@ import {
   createPageRequestSchema,
   pageDocumentSchema,
   pageIdSchema,
+  previewTokenResponseSchema,
   savePageDraftRequestSchema,
   siteIdSchema,
 } from "@bher/contracts";
 import {
   type PagePersistence,
+  type PreviewPersistence,
   PageScopeNotFoundError,
   PageSlugConflictError,
   type TenantPersistence,
@@ -18,6 +20,7 @@ import { Hono } from "hono";
 
 import type { AuthService } from "../lib/auth";
 import { createJsonResponse, readJsonBody } from "../lib/http";
+import { generatePreviewCredential } from "../lib/preview-token";
 import { createRequireAuthentication } from "../middleware/auth";
 import { createRequireTrustedOrigin } from "../middleware/origin";
 import { createRequireTenantMembership } from "../middleware/tenant";
@@ -37,6 +40,7 @@ export function createPageRoutes(
   auth: AuthService,
   tenantPersistence: TenantPersistence,
   pagePersistence: PagePersistence,
+  previewPersistence: PreviewPersistence,
 ): Hono<ApiBindings> {
   const routes = new Hono<ApiBindings>();
   routes.use("*", createRequireAuthentication(auth));
@@ -56,6 +60,12 @@ export function createPageRoutes(
     createRequireValidPageId(),
     createRequireTrustedOrigin(auth),
     (context) => handleSaveDraft(context, pagePersistence),
+  );
+  routes.post(
+    "/:pageId/preview-tokens",
+    createRequireValidPageId(),
+    createRequireTrustedOrigin(auth),
+    (context) => handleIssuePreviewToken(context, previewPersistence),
   );
   return routes;
 }
@@ -164,6 +174,28 @@ async function handleSaveDraft(
   return record
     ? createJsonResponse(toPageDraft(record), CREATED_STATUS)
     : createPageNotFoundResponse();
+}
+
+async function handleIssuePreviewToken(
+  context: Context<ApiBindings>,
+  persistence: PreviewPersistence,
+): Promise<Response> {
+  const credential = await generatePreviewCredential();
+  const record = await persistence.createOrRotatePreviewToken(
+    context.get("tenantAccess").id,
+    context.req.param("siteId") ?? "",
+    context.req.param("pageId") ?? "",
+    credential.tokenHash,
+    credential.expiresAt,
+  );
+  if (!record) {
+    return createPageNotFoundResponse();
+  }
+  const body = previewTokenResponseSchema.parse({
+    token: credential.token,
+    expiresAt: record.expiresAt.toISOString(),
+  });
+  return createJsonResponse(body, CREATED_STATUS);
 }
 
 function toPageDraft(record: PersistedPageDraft): PageDraft {

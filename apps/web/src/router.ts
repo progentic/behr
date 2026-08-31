@@ -1,6 +1,12 @@
-import { pageSlugSchema } from "@bher/contracts";
+import { pageSlugSchema, previewTokenSchema } from "@bher/contracts";
 
 const ROOT_PATHNAME = "/";
+const PREVIEW_FRAGMENT_PREFIX = "#preview=";
+
+export type PreviewFragmentResolution =
+  | Readonly<{ status: "public" }>
+  | Readonly<{ status: "preview"; token: string }>
+  | Readonly<{ status: "invalid" }>;
 
 export function resolvePublicSlug(pathname: string): string | null {
   if (pathname === ROOT_PATHNAME) {
@@ -15,6 +21,23 @@ export function resolvePublicSlug(pathname: string): string | null {
   }
   const parsed = pageSlugSchema.safeParse(decoded);
   return parsed.success ? parsed.data : null;
+}
+
+export function resolvePreviewFragment(
+  fragment: string,
+): PreviewFragmentResolution {
+  if (fragment === "" || fragment === "#") {
+    return { status: "public" };
+  }
+  if (!fragment.startsWith(PREVIEW_FRAGMENT_PREFIX)) {
+    return { status: "public" };
+  }
+  const parsed = previewTokenSchema.safeParse(
+    fragment.slice(PREVIEW_FRAGMENT_PREFIX.length),
+  );
+  return parsed.success
+    ? { status: "preview", token: parsed.data }
+    : { status: "invalid" };
 }
 
 function isSingleSegmentPathname(pathname: string): boolean {

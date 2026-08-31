@@ -44,6 +44,10 @@ test("allows credentialed auth requests only for the configured admin origin", a
     {
       resolvePublishedPage: async () => null,
     },
+    {
+      createOrRotatePreviewToken: async () => null,
+      resolvePreviewPage: async () => null,
+    },
     ADMIN_ORIGIN,
   );
   const response = await routes.request("/auth/login", {

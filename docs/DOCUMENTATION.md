@@ -831,3 +831,93 @@ Preview, preview tokens, publish authorization, publish routes, production
 published-pointer mutation, `page_publications`, publication history, editor
 behavior, theme runtime, assets, nginx routing, and all Phase I/Phase J behavior
 remain unimplemented.
+
+---
+
+## Phase I — Preview Surface
+
+### Version 1.4 lifecycle ownership
+
+Version 1.4 makes Phase I responsible for the complete bounded preview
+credential lifecycle rather than token validation alone. Authenticated owners
+and members may issue a credential for an authoritatively scoped page through:
+
+```text
+POST /tenants/:tenantId/sites/:siteId/pages/:pageId/preview-tokens
+```
+
+The unauthenticated preview read is:
+
+```text
+GET /preview/page?slug=<site-local-slug>
+X-BeHR-Preview-Token: <preview credential>
+```
+
+Both JSON boundaries use `Cache-Control: no-store`.
+
+### Credential and persistence policy
+
+Preview credentials contain 32 cryptographically random bytes encoded as 43
+unpadded base64url characters. They expire after 15 minutes and are reusable
+until expiry or rotation. PostgreSQL stores only the SHA-256 hexadecimal digest
+in `preview_tokens`; the raw token exists only in memory, the successful
+issuance response, a browser fragment, and the dedicated request header.
+
+Migration `0006_preview_tokens.sql` adds exactly `preview_tokens` with generated
+UUID identity, page and immutable-version foreign keys, token hash, expiry, and
+creation timestamp. Database constraints enforce one current row per page and
+globally unique token hashes. Page or bound-version deletion cascades to the
+row. Expired rows may remain until rotation or cascade cleanup; no worker,
+timer, queue, or startup sweep exists.
+
+Issuance resolves tenant, site, page, and the same-page current draft version
+inside one transaction. Reissue upserts the page's single row, rotates the
+digest, refreshes expiry/creation time, and binds the replacement credential to
+the immutable draft then current. It does not retain token history.
+
+### Immutable preview authority
+
+An issued credential is a snapshot grant. If token T1 binds version A and a
+later save advances the draft to version B, T1 continues to render A. Reissuing
+T2 binds B and immediately invalidates T1.
+
+Preview resolution proves:
+
+```text
+Host → domain → site → page slug → page token
+     → unexpired digest → same-page immutable version
+     → canonical PageDocument
+```
+
+Wrong Host or slug, missing/malformed/unknown/expired/rotated credentials, and
+cross-page version state all return the same HTTP 404. Malformed persisted
+content reaches the existing generic HTTP 500 boundary without repair or
+fallback. Preview never follows the current draft at read time and never falls
+back to published content.
+
+### Static browser and renderer reuse
+
+The static browser recognizes exactly `#preview=<token>`. The fragment is not
+sent with the initial request and is not percent-decoded or persisted in browser
+storage. A valid fragment sends the credential only in
+`X-BeHR-Preview-Token`; empty or malformed preview fragments fail without
+loading the public page. Unrelated fragments preserve the Phase H public flow.
+
+Preview content is parsed through the existing renderable page contract and
+uses the existing `PageRenderer`. No preview renderer, API-side HTML, alternate
+content model, editor UI, or state-management framework was introduced.
+
+### Isolation and deferred behavior
+
+Issuance and preview reads do not modify `draft_version_id` or
+`published_version_id`. A draft-only page remains HTTP 404 from `/public/page`
+even when a valid preview credential can read it through `/preview/page`.
+Phase J remains the first production writer of published state.
+
+PostgreSQL-backed verification covers owner/member issuance, trusted-origin and
+outsider rejection, credential format/lifetime, independent hash verification,
+database uniqueness, immutable snapshot binding, rotation, expiry, Host/slug
+binding, transport rejection, cross-page mismatch, malformed content, and
+published-state isolation. Preview controls or sharing UI, editor behavior,
+publishing, `page_publications`, background cleanup, and all Phase J/K behavior
+remain unimplemented.

@@ -26,6 +26,7 @@ const EXPECTED_APPLICATION_TABLE_NAMES = [
   "memberships",
   "page_versions",
   "pages",
+  "preview_tokens",
   "session",
   "sites",
   "tenants",
@@ -54,6 +55,10 @@ const EXPECTED_CATALOG_OBJECTS = new Set([
   "pages_pkey",
   "pages_site_id_idx",
   "pages_site_id_slug_uidx",
+  "preview_tokens",
+  "preview_tokens_page_id_unique",
+  "preview_tokens_pkey",
+  "preview_tokens_token_hash_unique",
   "session",
   "session_pkey",
   "session_token_unique",
@@ -108,6 +113,7 @@ async function verifyPersistenceBootstrap(): Promise<void> {
     await verifyMigrationIdempotency(context);
     await verifyDatabaseCatalog(context);
     await verifyDatabaseConstraints(context);
+    await verifyPreviewTokenColumns(context);
     await verifyConnectionCleanup(context);
   } finally {
     await closeIntegrationContext(context);
@@ -210,6 +216,16 @@ async function verifyDatabaseConstraints(
       type: "FOREIGN KEY",
     },
     { name: "pages_site_id_sites_id_fk", type: "FOREIGN KEY" },
+    {
+      name: "preview_tokens_page_id_pages_id_fk",
+      type: "FOREIGN KEY",
+    },
+    { name: "preview_tokens_page_id_unique", type: "UNIQUE" },
+    { name: "preview_tokens_token_hash_unique", type: "UNIQUE" },
+    {
+      name: "preview_tokens_version_id_page_versions_id_fk",
+      type: "FOREIGN KEY",
+    },
     { name: "session_token_unique", type: "UNIQUE" },
     { name: "session_user_id_user_id_fk", type: "FOREIGN KEY" },
     { name: "sites_tenant_id_tenants_id_fk", type: "FOREIGN KEY" },
@@ -223,12 +239,34 @@ async function verifyDatabaseConstraints(
     "memberships_user_id_user_id_fk",
     "page_versions_page_id_pages_id_fk",
     "pages_site_id_sites_id_fk",
+    "preview_tokens_page_id_pages_id_fk",
+    "preview_tokens_version_id_page_versions_id_fk",
     "session_user_id_user_id_fk",
     "sites_tenant_id_tenants_id_fk",
   ]);
   expect(await listSetNullForeignKeys(context.observer)).toEqual([
     "pages_draft_version_id_page_versions_id_fk",
     "pages_published_version_id_page_versions_id_fk",
+  ]);
+}
+
+async function verifyPreviewTokenColumns(
+  context: IntegrationContext,
+): Promise<void> {
+  const rows = await context.observer.native<Array<{ name: string }>>`
+    SELECT column_name AS name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'preview_tokens'
+    ORDER BY ordinal_position
+  `;
+  expect(rows.map(({ name }) => name)).toEqual([
+    "id",
+    "page_id",
+    "version_id",
+    "token_hash",
+    "expires_at",
+    "created_at",
   ]);
 }
 
@@ -367,6 +405,10 @@ async function listDatabaseConstraints(
         'pages_draft_version_id_page_versions_id_fk',
         'pages_published_version_id_page_versions_id_fk',
         'pages_site_id_sites_id_fk',
+        'preview_tokens_page_id_pages_id_fk',
+        'preview_tokens_page_id_unique',
+        'preview_tokens_token_hash_unique',
+        'preview_tokens_version_id_page_versions_id_fk',
         'session_token_unique',
         'session_user_id_user_id_fk',
         'sites_tenant_id_tenants_id_fk',
@@ -390,6 +432,8 @@ async function listCascadeForeignKeys(client: DatabaseClient): Promise<string[]>
         'memberships_user_id_user_id_fk',
         'page_versions_page_id_pages_id_fk',
         'pages_site_id_sites_id_fk',
+        'preview_tokens_page_id_pages_id_fk',
+        'preview_tokens_version_id_page_versions_id_fk',
         'session_user_id_user_id_fk',
         'sites_tenant_id_tenants_id_fk'
       )

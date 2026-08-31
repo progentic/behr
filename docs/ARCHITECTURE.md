@@ -46,13 +46,13 @@ flowchart LR
 
     Browser -->|HTTP localhost:3000| Dev[Bun development listener]
     Dev -->|GET / and assets| AdminApp[React admin]
-    Dev -->|/health, /auth/*, /public/*, /tenants/*| API[Hono API]
-    PublicApp[Static apps/web build] -->|GET /public/page| API
+    Dev -->|/health, /auth/*, /public/*, /preview/*, /tenants/*| API[Hono API]
+    PublicApp[Static apps/web build] -->|GET /public/page or /preview/page| API
     API --> Postgres[(PostgreSQL)]
 ```
 
 The Phase Q production target keeps the same public route paths: nginx will
-serve static application assets and forward `/health`, `/auth/*`, `/public/*`,
+serve static application assets and forward `/health`, `/auth/*`, `/public/*`, `/preview/*`,
 `/tenants`, and `/tenants/*`—including nested site routes—to the Bun API. It must not
 invent an `/api` prefix unless the application routes are changed in a
 separately reviewed phase. Reverse-proxy configuration and SSR remain
@@ -90,6 +90,8 @@ flowchart TD
     Request --> Draft[GET /tenants/:tenantId/sites/:siteId/pages/:pageId]
     Request --> Version[POST /tenants/:tenantId/sites/:siteId/pages/:pageId/versions]
     Request --> PublicPage[GET /public/page?slug=...]
+    Request --> PreviewToken[POST /tenants/:tenantId/sites/:siteId/pages/:pageId/preview-tokens]
+    Request --> PreviewPage[GET /preview/page?slug=...]
 ```
 
 Interpretation:
@@ -170,8 +172,9 @@ scoped page metadata, immutable draft versions, and current-draft resolution.
 Phase H adds nullable published read state, hostname/slug resolution, and the
 public canonical-document response. Authenticated decisions use the user
 resolved from the authoritative database session; the public read is
-unauthenticated and read-only. Publishing mutation, assets, and preview remain
-deferred.
+unauthenticated and read-only. Phase I adds authenticated preview credential
+issuance and unauthenticated bearer preview reads bound to immutable draft
+snapshots. Publishing mutation and assets remain deferred.
 
 The currently implemented public API routes are exactly:
 
@@ -192,6 +195,8 @@ The currently implemented public API routes are exactly:
 * `GET /tenants/:tenantId/sites/:siteId/pages/:pageId`
 * `POST /tenants/:tenantId/sites/:siteId/pages/:pageId/versions`
 * `GET /public/page?slug=...`
+* `POST /tenants/:tenantId/sites/:siteId/pages/:pageId/preview-tokens`
+* `GET /preview/page?slug=...`
 
 ---
 
@@ -245,8 +250,10 @@ Constraints:
 Phase H implements pathname-to-slug translation, same-origin public API reads,
 and deterministic React rendering for canonical heading and paragraph blocks.
 Text is rendered through escaped React text nodes. The static application has
-no database import, server runtime, cache, preview state, theme framework, or
-publication controls.
+no database import, server runtime, cache, theme framework, or publication
+controls. Phase I adds fragment-carried preview credentials and sends them only
+through `X-BeHR-Preview-Token`; successful preview content reuses the same
+renderer.
 
 ---
 
@@ -323,6 +330,13 @@ read state. New pages remain unpublished, draft saves do not change it, and no
 production Phase H operation writes it. The public query additionally proves
 that the referenced version belongs to the same page.
 
+Phase I adds `preview_tokens`, containing one hash-only, 15-minute bearer
+credential per page. Each row binds a page to the immutable draft version that
+was current at issuance. Page and version deletion cascade to the token row,
+and database uniqueness enforces one current row per page and globally unique
+token hashes. Rotation replaces the row; expiry is enforced synchronously
+without a cleanup worker.
+
 The database remains the sole session authority. Browser cookies contain only
 the opaque session identifier; they do not authorize a user without a valid
 database session.
@@ -352,6 +366,13 @@ version. A null or mismatched pointer returns the same generic HTTP 404 and
 never falls back to the draft or latest version. Published JSONB is validated
 against `pageDocumentSchema`; malformed stored content fails through the
 generic HTTP 500 boundary.
+
+The preview route uses a separate authority chain: actual Host, one validated
+slug, an unexpired hash match from `X-BeHR-Preview-Token`, and the immutable
+same-page version stored on the token row. It never follows the current draft,
+consults the published pointer for authorization, or falls back to public
+content after preview failure. Token issuance and reads do not mutate draft or
+published pointers.
 
 ---
 
