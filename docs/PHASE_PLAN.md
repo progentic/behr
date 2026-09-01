@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.12
+Version: 1.13
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -3707,34 +3707,399 @@ Objective
 
 Expose controlled customization.
 
-Guidelines
+Ownership Correction
 
-Must:
+High — Phase O settings-mutation ownership gap: Version 1.12 requires theme selection and site settings management without defining the editable settings, authorization boundary, API contract, persistence operation, or implementation surface. Version 1.13 defines one minimal owner-controlled settings resource consisting only of the existing site name and Phase N theme tokens. Hostname remains read-only and domain administration remains out of scope.
 
-• Implement theme selection
-• Implement site settings editor
-• Use local inline alert/status feedback for settings workflows
+This correction does not reopen Phase N or the Error Reporting Baseline. Phase P remains unstarted.
 
-Must not:
+Settings Resource Model
 
-• Allow arbitrary CSS injection
+Phase O exposes exactly:
+
+{
+  name: string;
+  theme: {
+    colorScheme: "light" | "dark";
+    fontFamily: "sans" | "serif";
+  };
+}
+
+The site name is the existing sites.name value. Theme tokens remain exactly the Phase N ThemeTokens contract.
+
+Do not add another configurable setting.
+
+Hostname and Domain Boundary
+
+The current hostname belongs to the separate domains relation and is already present in SiteSummary.
+
+Phase O may display hostname only as read-only context.
+
+Do not implement hostname editing, domain replacement, additional domains, aliases, redirects, DNS verification, or TLS/domain configuration. Do not modify the domains table.
+
+Theme Selection
+
+Theme selection means choosing only:
+
+color scheme → light | dark
+font family  → sans | serif
+
+The existing one-row-per-site themes row remains the sole persisted theme state.
+
+Do not add theme IDs, names, presets, catalogs, an active-theme pointer, history, duplication, or preview records.
+
+Authorization
+
+Settings read and mutation are owner-only.
+
+Required role:
+
+tenantAccess.role === "owner"
+
+A tenant member does not receive the settings editor and cannot use the settings API. Do not introduce a site-level role model.
+
+Reuse createRequireAuthentication, createRequireTenantMembership, and createRequireTrustedOrigin.
+
+GET settings:
+
+authenticated
+    ↓
+tenant membership
+    ↓
+owner
+    ↓
+valid same-tenant site
+
+PUT settings:
+
+authenticated
+    ↓
+tenant membership
+    ↓
+owner
+    ↓
+trusted origin
+    ↓
+valid same-tenant site
+
+Do not introduce new authentication or authorization middleware.
+
+HTTP Resource
+
+Add exactly:
+
+GET /tenants/:tenantId/sites/:siteId/settings
+PUT /tenants/:tenantId/sites/:siteId/settings
+
+Implement both within apps/api/src/routes/sites.ts. The site router is already mounted at /tenants/:tenantId/sites, so no route-composition change is required.
+
+Do not create routes/settings.ts or routes/themes.ts.
+
+Site Settings Contract
+
+Define one strict response equivalent to:
+
+{
+  site: {
+    id: string;
+    name: string;
+    hostname: string;
+  };
+  theme: {
+    colorScheme: "light" | "dark";
+    fontFamily: "sans" | "serif";
+  };
+}
+
+Use siteSettingsResponseSchema and reuse siteSummarySchema and themeTokensSchema rather than duplicating validation.
+
+Define one strict update request equivalent to:
+
+{
+  name: string;
+  theme: ThemeTokens;
+}
+
+Use updateSiteSettingsRequestSchema. The name uses the same trimming and length limits as site creation. Extract and reuse siteNameSchema within packages/contracts/src/site.ts rather than duplicating or changing the established name rule.
+
+HTTP Outcomes
+
+Successful GET:
+
+200
+SiteSettingsResponse
+
+Successful PUT:
+
+200
+SiteSettingsResponse
+
+Invalid siteId or a site outside the authoritative tenant:
+
+404
+{"error":"Site not found."}
+
+Member settings access:
+
+403
+{"error":"Site settings are not allowed."}
+
+Invalid update body:
+
+400
+{"error":"Site settings request is invalid."}
+
+Unexpected persistence or validation failures continue through the Error Reporting Baseline and generic HTTP 500. Do not add an error framework.
+
+Persistence Ownership
+
+Extend the existing SitePersistence with only focused operations equivalent to:
+
+resolveSiteSettings(tenantId, siteId)
+updateSiteSettings(tenantId, siteId, name, theme)
+
+Do not create ThemePersistence, SettingsPersistence, SiteSettingsRepository, ThemeService, or SettingsService.
+
+Settings are current site-owned state and belong in the existing site persistence boundary.
+
+Resolve Settings
+
+resolveSiteSettings joins:
+
+sites
+  INNER JOIN domains
+  LEFT JOIN themes
+
+scoped by:
+
+sites.tenant_id = tenantId
+sites.id = siteId
+
+Return persisted theme values as nullable raw data. The API applies DEFAULT_THEME_TOKENS only when no themes row exists.
+
+If a themes row exists with unsupported values, siteSettingsResponseSchema.parse throws, the existing Hono boundary emits unhandled_request_error, and the client receives generic HTTP 500.
+
+Do not silently replace a malformed persisted theme with defaults. Only row absence receives the default.
+
+Atomic Settings Update
+
+updateSiteSettings must update:
+
+sites.name
+themes.color_scheme
+themes.font_family
+
+within one database transaction.
+
+Required invariant:
+
+site name write succeeds
+AND
+theme write succeeds
+OR
+neither persists
+
+Do not split the writes across independent requests or transactions.
+
+Use the existing one-row-per-site theme authority:
+
+INSERT themes (...)
+ON CONFLICT (site_id)
+DO UPDATE
+
+The first save creates the row when absent. Later saves update that same row. Selecting light/sans may remain explicitly persisted; do not delete the row solely because it equals DEFAULT_THEME_TOKENS.
+
+The transaction must not update domains.hostname or another domain field.
+
+Schema Boundary
+
+Phase O uses the existing sites, themes, and domains tables.
+
+No table, column, schema file, migration, or migration-metadata change is required. If implementation appears to require one, stop and report the discrepancy.
+
+Admin Settings Editor
+
+Create one focused component:
+
+apps/admin/src/SiteSettings.tsx
+
+It owns loading current settings, editing the site name, selecting color scheme and font family, saving the complete settings resource, and local validation/error/status feedback.
+
+Render exactly the necessary controls:
+
+Site name       → text input
+Hostname        → read-only text
+Color scheme    → Light / Dark select
+Font family     → Sans / Serif select
+Save settings   → button
+
+Do not add a settings framework, live-preview framework, CSS editor, or arbitrary theme-token input.
+
+Owner-Only Rendering
+
+SitesPage renders SiteSettings only when the selected tenant role is owner and the selected site exists in current tenant-keyed loaded site state.
+
+Members retain the existing site/page workflow. Do not add a settings navigation framework.
+
+Async Settings Identity
+
+SiteSettings is keyed by tenantId and siteId. Its asynchronous state carries those authoritative identifiers.
+
+A late load or save for site A must not update settings or site-list state now owned by site B.
+
+Use resource-keyed local state, effect cleanup for late loads, functional parent updates, and identity checks before applying asynchronous results.
+
+Do not add a global store, React context, settings reducer, mirrored current-resource ref, or generic request manager.
+
+Updating Existing Site State
+
+A successful save returns the updated SiteSummary within SiteSettingsResponse.
+
+SitesPage updates the matching site name in its existing tenant-keyed SiteState through a functional updater only when:
+
+• Current state is loaded
+• Current tenantId equals the initiating tenantId
+• The matching siteId exists
+
+Hostname remains unchanged. Do not reload the complete site list solely to display the new name.
 
 Feedback Convention
 
 Field/settings validation, load failure, save failure, and action failure remain near their initiating control and use role="alert".
 
-Saving and successful completion use role="status".
+Settings loading, saving, and successful completion use role="status". The save control may also be disabled while saving.
 
 Phase O does not add a toast provider, notification context/store, event bus, or shared error-state framework.
 
+Contract Verification
+
+Extend apps/api/src/site-contract.test.ts. Do not create another contract test file.
+
+Prove:
+
+• Existing site-name trimming remains unchanged
+• Valid light/sans and dark/serif updates are accepted
+• Blank or overlong names are rejected
+• Unsupported theme tokens are rejected
+• Extra request fields are rejected
+• Settings responses require valid themes and reject extra fields
+
+Keep coverage focused rather than building a combinatorial matrix.
+
+API Integration
+
+Extend apps/api/src/site.integration.test.ts with one focused sequential settings lifecycle.
+
+Prove:
+
+1. Owner GET without a themes row returns the existing SiteSummary and DEFAULT_THEME_TOKENS.
+2. Member settings access returns nondisclosing HTTP 403.
+3. Invalid update returns HTTP 400 with no mutation.
+4. Owner PUT atomically changes the site name and theme to dark/serif.
+5. Hostname remains unchanged.
+6. Exactly one themes row exists.
+7. The existing site list reflects the renamed site.
+8. A second PUT updates the same themes row rather than inserting another.
+9. Cross-tenant and nonexistent sites return nondisclosing HTTP 404.
+10. PUT without trusted origin is rejected with no mutation.
+
+Do not duplicate the complete Phase E site-creation matrix.
+
+Renderer Acceptance
+
+Phase N already proves that the current themes row flows through public/preview responses into PageRenderer's trusted style mapping.
+
+Phase O proves only that its mutation writes the same authoritative themes row. Existing Phase N public, preview, and renderer regressions remain the rendering proof and must remain green in exact-commit CI.
+
+Do not create another renderer or cross-layer end-to-end suite solely to repeat Phase N.
+
+Admin Verification
+
+Create apps/admin/src/SiteSettings.test.ts and add it to the existing apps/admin/package.json test script.
+
+Without adding DOM infrastructure, prove:
+
+• GET uses the expected tenant/site settings path
+• PUT uses the same path with credentials: "include"
+• PUT contains only normalized name and bounded theme values
+• Successful responses are parsed through the shared contract
+• Invalid local input is rejected before request creation
+• A tenant/site identity guard does not apply a late result to another tenant
+
+Files / Functions
+
+packages/contracts
+
+src/site.ts
+src/index.ts
+
+packages/db
+
+src/site-persistence.ts
+
+apps/api
+
+src/routes/sites.ts
+src/site-contract.test.ts
+src/site.integration.test.ts
+
+apps/admin
+
+package.json
+src/SitesPage.tsx
+src/SiteSettings.tsx
+src/SiteSettings.test.ts
+
+Documentation
+
+docs/ARCHITECTURE.md
+docs/DOCUMENTATION.md
+
+No unnamed support surface exists.
+
+Do not modify schema files, migration files or metadata, apps/api/src/application.ts, apps/api/src/routes/index.ts, apps/web, packages/editor, packages/ui, or bun.lock.
+
+Dependencies
+
+Use existing Zod, Drizzle, Hono, React, and requestApi boundaries.
+
+No external dependency, workspace edge, or bun.lock change is expected.
+
+Do not add a form, settings, theme, state, toast, or CSS framework.
+
+Explicit Exclusions
+
+Phase O does not implement domain administration, hostname mutation, named themes, theme presets/catalog, history/versioning, custom colors, arbitrary CSS, remote fonts, a live-preview framework, publish or preview-token controls, asset-management changes, a generic settings table/API, toast system, global state, React error boundaries, client telemetry, or Phase P behavior.
+
 Acceptance Criteria
 
-1. User can change the bounded theme.
-2. Renderer reflects the saved theme.
-3. Validation, load, save, and action failures remain locally surfaced with alert semantics.
-4. Saving and successful completion use status semantics.
-5. Existing earlier surfaces do not require feedback retrofit.
-6. No toast framework is introduced without a concrete workflow that cannot retain feedback locally.
+1. Owner can load settings for the selected same-tenant site.
+2. Missing theme row resolves to Phase N defaults.
+3. Owner can update site name and bounded theme together.
+4. Site name and theme update atomically.
+5. First save creates the site's single themes row when absent.
+6. Later saves update the same row.
+7. Hostname is displayed but cannot be changed.
+8. Member cannot access settings management.
+9. Invalid input causes no mutation.
+10. Cross-tenant or nonexistent site remains nondisclosing.
+11. PUT requires trusted origin.
+12. Malformed persisted theme fails through the existing generic HTTP 500 boundary.
+13. Existing public/preview rendering observes saved theme through Phase N semantics.
+14. Admin async state cannot apply a late result to another tenant/site.
+15. Load, validation, save, and action failures use local alert semantics.
+16. Loading, saving, and successful completion use local status semantics.
+17. No schema or migration changes occur.
+18. No new dependency or lockfile change occurs.
+19. No toast, global-state, settings, or theme framework is added.
+20. Phase P remains unstarted.
+
+Output Format
+
+Files created
+Files modified
+Commands executed
+Contract, authorization, atomic persistence, admin identity, feedback, scope, and regression evidence
 
 ────────
 
