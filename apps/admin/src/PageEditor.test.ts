@@ -1,5 +1,5 @@
 import type { AssetListItem, PageDocument, PageDraft } from "@bher/contracts";
-import { addImageBlock, updateBlockText } from "@bher/editor";
+import { addImageBlock, moveBlock, updateBlockText } from "@bher/editor";
 
 import {
   type EditorIdentity,
@@ -30,7 +30,9 @@ const PAGE_A = "33333333-3333-4333-8333-333333333333";
 const PAGE_B = "44444444-4444-4444-8444-444444444444";
 const SECTION = "55555555-5555-4555-8555-555555555555";
 const PARAGRAPH = "66666666-6666-4666-8666-666666666666";
+const HEADING = "77777777-7777-4777-8777-777777777777";
 const ASSET = "88888888-8888-4888-8888-888888888888";
+const IMAGE = "99999999-9999-4999-8999-999999999999";
 
 test("rejects late and same-page re-entry draft loads", () => {
   const a1 = identity(PAGE_A, 1);
@@ -53,6 +55,8 @@ test("rejects late and same-page re-entry draft loads", () => {
     document: document("A2"),
     revision: 0,
     save: { status: "idle" },
+    fieldErrors: {},
+    formError: null,
   });
 });
 
@@ -94,17 +98,82 @@ test("rejects late save completion for another page or epoch", () => {
 
 test("blocks invalid documents while preserving local content", () => {
   const invalidDocument = document("");
-  expect(prepareDraftSave(invalidDocument)).toBe(null);
+  const preparation = prepareDraftSave(invalidDocument);
+  expect(preparation).toEqual({
+    request: null,
+    fieldErrors: { [PARAGRAPH]: "Paragraph text is required." },
+    formError: "Fix the highlighted page content before saving.",
+  });
   const invalidState = loadedState(PAGE_A, 1, invalidDocument);
-  const rejected = applySaveValidationError(invalidState);
+  const rejected = applySaveValidationError(invalidState, preparation);
   expect(rejected.status).toBe("loaded");
   if (rejected.status === "loaded") {
     expect(rejected.document).toBe(invalidDocument);
-    expect(rejected.save).toEqual({
-      status: "error",
-      message: "The page contains invalid content and cannot be saved.",
+    expect(rejected.save).toEqual({ status: "idle" });
+    expect(rejected.fieldErrors).toEqual({
+      [PARAGRAPH]: "Paragraph text is required.",
     });
+    expect(rejected.formError).toBe(
+      "Fix the highlighted page content before saving.",
+    );
   }
+});
+
+test("maps text validation and keeps empty image alt valid", () => {
+  const invalidText = textAndImageDocument("", "", "");
+  expect(prepareDraftSave(invalidText)).toEqual({
+    request: null,
+    fieldErrors: {
+      [HEADING]: "Heading text is required.",
+      [PARAGRAPH]: "Paragraph text is required.",
+    },
+    formError: "Fix the highlighted page content before saving.",
+  });
+  const validDecorativeImage = textAndImageDocument("Heading", "Paragraph", "");
+  const validPreparation = prepareDraftSave(validDecorativeImage);
+  expect(validPreparation.fieldErrors).toEqual({});
+  expect(validPreparation.formError).toBe(null);
+  expect(validPreparation.request?.document).toEqual(validDecorativeImage);
+
+  const unmapped = {
+    ...validDecorativeImage,
+    schemaVersion: 2 as 1,
+  };
+  expect(prepareDraftSave(unmapped)).toEqual({
+    request: null,
+    fieldErrors: {},
+    formError: "The page contains invalid content and cannot be saved.",
+  });
+});
+
+test("clears an edited block error and keeps reordered save order", () => {
+  const invalidDocument = textAndImageDocument("Heading", "", "");
+  const invalid = loadedState(
+    PAGE_A,
+    1,
+    invalidDocument,
+  );
+  const rejected = applySaveValidationError(
+    invalid,
+    prepareDraftSave(invalidDocument),
+  );
+  const corrected = applyDocumentEdit(
+    rejected,
+    (current) => updateBlockText(current, SECTION, PARAGRAPH, "Corrected"),
+    PARAGRAPH,
+  );
+  expect(corrected.status).toBe("loaded");
+  if (corrected.status === "loaded") {
+    expect(corrected.fieldErrors).toEqual({});
+    expect(corrected.formError).toBe(null);
+  }
+
+  const original = textAndImageDocument("Heading", "Paragraph", "");
+  const reordered = moveBlock(original, SECTION, IMAGE, 0);
+  const preparation = prepareDraftSave(reordered);
+  expect(
+    preparation.request?.document.sections[0]?.blocks.map(({ id }) => id),
+  ).toEqual([IMAGE, HEADING, PARAGRAPH]);
 });
 
 test("uses existing draft load and immutable save request boundaries", async () => {
@@ -117,13 +186,18 @@ test("uses existing draft load and immutable save request boundaries", async () 
   };
   try {
     expect(await requestPageDraft(TENANT, SITE, PAGE_A)).toEqual(responseDraft);
-    const request = prepareDraftSave(responseDraft.draft.document);
-    if (!request) {
+    const preparation = prepareDraftSave(responseDraft.draft.document);
+    if (!preparation.request) {
       throw new Error("Expected valid save request.");
     }
-    expect(await requestDraftSave(TENANT, SITE, PAGE_A, request)).toEqual(
-      responseDraft,
-    );
+    expect(
+      await requestDraftSave(
+        TENANT,
+        SITE,
+        PAGE_A,
+        preparation.request,
+      ),
+    ).toEqual(responseDraft);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -210,6 +284,8 @@ function loadedState(
     document: currentDocument,
     revision: 0,
     save: { status: "idle" },
+    fieldErrors: {},
+    formError: null,
   };
 }
 
@@ -231,6 +307,26 @@ function document(text: string): PageDocument {
       {
         id: SECTION,
         blocks: [{ id: PARAGRAPH, type: "paragraph", text }],
+      },
+    ],
+  };
+}
+
+function textAndImageDocument(
+  heading: string,
+  paragraph: string,
+  alt: string,
+): PageDocument {
+  return {
+    schemaVersion: 1,
+    sections: [
+      {
+        id: SECTION,
+        blocks: [
+          { id: HEADING, type: "heading", level: 2, text: heading },
+          { id: PARAGRAPH, type: "paragraph", text: paragraph },
+          { id: IMAGE, type: "image", assetId: ASSET, alt },
+        ],
       },
     ],
   };

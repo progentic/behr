@@ -1,7 +1,8 @@
 import type { PageSummary } from "@bher/contracts";
 
 import {
-  createPageCreationRequest,
+  PageSlugConflictResponseError,
+  preparePageCreation,
   requestPageCreation,
 } from "./PageCreateForm";
 import {
@@ -76,13 +77,35 @@ test("applies creation and selection only to the initiating site", () => {
   expect(selectPage(matching, PAGE_A.id)).toBe(matching);
 });
 
-test("builds canonical normalized page creation input", () => {
-  expect(createPageCreationRequest("  About  ", "ABOUT-US")).toEqual({
-    title: "About",
-    slug: "about-us",
+test("prepares normalized page creation input and isolated field errors", () => {
+  expect(preparePageCreation("  About  ", "ABOUT-US")).toEqual({
+    request: {
+      title: "About",
+      slug: "about-us",
+      document: { schemaVersion: 1, sections: [] },
+    },
+    fieldErrors: {},
+  });
+  expect(preparePageCreation("", "about")).toEqual({
+    request: null,
+    fieldErrors: { title: "Enter a valid page title." },
+  });
+  expect(preparePageCreation("About", "invalid slug")).toEqual({
+    request: null,
+    fieldErrors: { slug: "Enter a valid page slug." },
+  });
+  expect(preparePageCreation("", "invalid slug")).toEqual({
+    request: null,
+    fieldErrors: {
+      title: "Enter a valid page title.",
+      slug: "Enter a valid page slug.",
+    },
+  });
+  expect(preparePageCreation("Root", "").request).toEqual({
+    title: "Root",
+    slug: "",
     document: { schemaVersion: 1, sections: [] },
   });
-  expect(createPageCreationRequest("", "invalid slug")).toBe(null);
 });
 
 test("uses existing page list and creation request boundaries", async () => {
@@ -104,13 +127,17 @@ test("uses existing page list and creation request boundaries", async () => {
   };
   try {
     expect(await requestPageList(TENANT_A, SITE_X)).toEqual([PAGE_A]);
-    const request = createPageCreationRequest("About", "about");
-    if (!request) {
+    const preparation = preparePageCreation("About", "about");
+    if (!preparation.request) {
       throw new Error("Expected valid creation request.");
     }
-    expect(await requestPageCreation(TENANT_A, SITE_X, request)).toEqual(
-      PAGE_A,
-    );
+    expect(
+      await requestPageCreation(
+        TENANT_A,
+        SITE_X,
+        preparation.request,
+      ),
+    ).toEqual(PAGE_A);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -125,4 +152,33 @@ test("uses existing page list and creation request boundaries", async () => {
     slug: "about",
     document: { schemaVersion: 1, sections: [] },
   });
+});
+
+test("distinguishes page slug conflict from generic request failure", async () => {
+  const originalFetch = globalThis.fetch;
+  const request = preparePageCreation("About", "about").request;
+  if (!request) {
+    throw new Error("Expected valid creation request.");
+  }
+  try {
+    globalThis.fetch = async () => new Response(null, { status: 409 });
+    let conflict: unknown;
+    try {
+      await requestPageCreation(TENANT_A, SITE_X, request);
+    } catch (failure) {
+      conflict = failure;
+    }
+    expect(conflict instanceof PageSlugConflictResponseError).toBe(true);
+
+    globalThis.fetch = async () => new Response(null, { status: 500 });
+    let generic: unknown;
+    try {
+      await requestPageCreation(TENANT_A, SITE_X, request);
+    } catch (failure) {
+      generic = failure;
+    }
+    expect(generic instanceof PageSlugConflictResponseError).toBe(false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

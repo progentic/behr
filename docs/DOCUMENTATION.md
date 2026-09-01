@@ -1455,3 +1455,66 @@ tenant-keyed parent-state protection.
 Phase O adds no schema or migration, dependency, domain administration, custom
 CSS, named themes, theme catalog/framework, live preview, toast system, global
 state, React error boundary, or Phase P behavior.
+
+---
+
+## Phase P — UX Refinement
+
+### Immutable ordering with native interaction
+
+`@bher/editor` now owns `moveSection` and `moveBlock` as pure immutable
+`PageDocument` transforms. Section moves preserve complete section values;
+block moves preserve complete heading, paragraph, or image values and accept no
+destination section, making cross-section relocation unavailable by design.
+
+`PageEditor` uses one component-local drag descriptor with native HTML
+drag-and-drop. `DataTransfer` receives only a fixed initiation marker and is
+never document authority. Matching Move Up/Down buttons call the same domain
+operations, providing keyboard and touch/mobile ordering without a drag library
+or second reorder implementation.
+
+All ordering flows through the existing local edit/revision path. Drag, drop,
+and move controls never call the API or save automatically. The established
+explicit `Save draft` request remains the sole persistence action, including
+for reordered arrays.
+
+### Contract-derived page-authoring validation
+
+Page creation now prepares its normalized request and title/slug errors through
+the existing shared request schema. Touched invalid fields receive connected
+`aria-invalid` and `aria-describedby` feedback. The existing HTTP 409 remains
+the only slug-conflict authority; other server failures stay form-level and no
+server field-error payload was added.
+
+Draft preparation parses the current document through `pageDocumentSchema` and
+maps only current heading/paragraph text issue paths to existing block IDs.
+Unmapped invalid content remains form-level. Invalid local content produces no
+save request, preserves edits, and focuses the first mapped field where
+practical. Generic server HTTP 400 remains form-level because it does not reveal
+whether request shape or asset scope failed.
+
+Image alternative text remains `z.string()`, including the empty decorative
+case. The editor adds only associated explanatory guidance; it adds no blocking
+rule or decorative-image state.
+
+### Local React failure boundaries
+
+The admin and public/preview application mounts each use their own small native
+React class boundary. Generic fallbacks contain no exception, stack, session,
+document, or preview-token detail. Separate local ownership avoids a shared
+boundary package for two application roots.
+
+The boundaries cover descendant React render/lifecycle failures only. They do
+not claim event-handler, promise, API, server, pre-root, or global browser
+coverage. No telemetry transport, window error listener, logger, toast system,
+notification state, drag/drop dependency, validation framework, backend change,
+schema change, or new theme writer was added.
+
+### Verification
+
+Focused editor tests cover immutable movement and identity-preserving no-ops.
+Admin tests cover normalized creation input, isolated field errors, conflict
+classification, mapped and unmapped draft validation, valid empty alt, save
+request order, and existing edit-during-save and late-save protection. Full
+type-check, unit, build, audit, runtime-smoke, scope, dependency, and manual
+browser controls are recorded in the Phase P delivery report.

@@ -3,7 +3,7 @@ import {
   PREVIEW_TOKEN_HEADER,
   publicPageResponseSchema,
 } from "@bher/contracts";
-import { useEffect, useState } from "react";
+import { Component, type PropsWithChildren, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { PageRenderer } from "./renderer";
@@ -16,6 +16,30 @@ import {
 const PUBLIC_PAGE_ENDPOINT = "/public/page";
 const PREVIEW_PAGE_ENDPOINT = "/preview/page";
 const NOT_FOUND_STATUS = 404;
+
+type RenderBoundaryState = Readonly<{ failed: boolean }>;
+
+class WebRenderBoundary extends Component<
+  PropsWithChildren,
+  RenderBoundaryState
+> {
+  state: RenderBoundaryState = { failed: false };
+
+  static getDerivedStateFromError(): RenderBoundaryState {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? (
+      <main>
+        <h1>Page unavailable.</h1>
+        <p>Reload the page to try again.</p>
+      </main>
+    ) : (
+      this.props.children
+    );
+  }
+}
 
 type PublicPageState =
   | Readonly<{ status: "loading"; requestId: string }>
@@ -162,5 +186,9 @@ function renderPublicPageState(
 const container = document.getElementById("root");
 
 if (container) {
-  createRoot(container).render(<App />);
+  createRoot(container).render(
+    <WebRenderBoundary>
+      <App />
+    </WebRenderBoundary>,
+  );
 }

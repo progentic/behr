@@ -6,6 +6,8 @@ import {
   addParagraphBlock,
   addSection,
   createEmptyPageDocument,
+  moveBlock,
+  moveSection,
   removeBlock,
   removeSection,
   updateBlockText,
@@ -23,6 +25,7 @@ declare function expect<T>(actual: T): {
 
 const SECTION_A = "11111111-1111-4111-8111-111111111111";
 const SECTION_B = "22222222-2222-4222-8222-222222222222";
+const SECTION_C = "77777777-7777-4777-8777-777777777777";
 const HEADING = "33333333-3333-4333-8333-333333333333";
 const PARAGRAPH = "44444444-4444-4444-8444-444444444444";
 const IMAGE = "55555555-5555-4555-8555-555555555555";
@@ -167,6 +170,68 @@ test("adds and edits image blocks by section and block identity", () => {
   );
 });
 
+test("moves complete sections immutably in both directions", () => {
+  const original = reorderDocument();
+  const movedLater = moveSection(original, SECTION_A, 2);
+  expect(movedLater.sections.map(({ id }) => id)).toEqual([
+    SECTION_B,
+    SECTION_C,
+    SECTION_A,
+  ]);
+  expect(movedLater.sections[2]).toBe(original.sections[0]);
+  expect(original.sections.map(({ id }) => id)).toEqual([
+    SECTION_A,
+    SECTION_B,
+    SECTION_C,
+  ]);
+
+  const movedEarlier = moveSection(original, SECTION_C, 0);
+  expect(movedEarlier.sections.map(({ id }) => id)).toEqual([
+    SECTION_C,
+    SECTION_A,
+    SECTION_B,
+  ]);
+  expect(movedEarlier.sections[1]).toBe(original.sections[0]);
+  expect(moveSection(original, "missing", 1)).toBe(original);
+  expect(moveSection(original, SECTION_A, -1)).toBe(original);
+  expect(moveSection(original, SECTION_A, 3)).toBe(original);
+  expect(moveSection(original, SECTION_A, 0)).toBe(original);
+});
+
+test("moves complete blocks only within their current section", () => {
+  const original = reorderDocument();
+  const firstSection = original.sections[0];
+  if (!firstSection) {
+    throw new Error("Expected reorder source section.");
+  }
+  const movedLater = moveBlock(original, SECTION_A, HEADING, 2);
+  expect(movedLater.sections[0]?.blocks.map(({ id }) => id)).toEqual([
+    PARAGRAPH,
+    IMAGE,
+    HEADING,
+  ]);
+  expect(movedLater.sections[0]?.blocks[2]).toBe(firstSection.blocks[0]);
+  expect(movedLater.sections[1]).toBe(original.sections[1]);
+
+  const movedEarlier = moveBlock(original, SECTION_A, IMAGE, 0);
+  expect(movedEarlier.sections[0]?.blocks.map(({ id }) => id)).toEqual([
+    IMAGE,
+    HEADING,
+    PARAGRAPH,
+  ]);
+  expect(movedEarlier.sections[0]?.blocks[0]).toBe(firstSection.blocks[2]);
+  expect(original.sections[0]?.blocks.map(({ id }) => id)).toEqual([
+    HEADING,
+    PARAGRAPH,
+    IMAGE,
+  ]);
+  expect(moveBlock(original, SECTION_B, HEADING, 0)).toBe(original);
+  expect(moveBlock(original, SECTION_A, "missing", 0)).toBe(original);
+  expect(moveBlock(original, SECTION_A, HEADING, -1)).toBe(original);
+  expect(moveBlock(original, SECTION_A, HEADING, 3)).toBe(original);
+  expect(moveBlock(original, SECTION_A, HEADING, 0)).toBe(original);
+});
+
 function styledDocument(): PageDocument {
   return {
     schemaVersion: 1,
@@ -185,6 +250,36 @@ function styledDocument(): PageDocument {
           { id: PARAGRAPH, type: "paragraph", text: "Paragraph" },
         ],
       },
+    ],
+  };
+}
+
+function reorderDocument(): PageDocument {
+  return {
+    schemaVersion: 1,
+    sections: [
+      {
+        id: SECTION_A,
+        style: { spacing: "lg", width: "wide" },
+        blocks: [
+          {
+            id: HEADING,
+            type: "heading",
+            level: 2,
+            text: "Heading",
+            style: { align: "center" },
+          },
+          {
+            id: PARAGRAPH,
+            type: "paragraph",
+            text: "Paragraph",
+            style: { align: "right" },
+          },
+          { id: IMAGE, type: "image", assetId: ASSET, alt: "Product" },
+        ],
+      },
+      { id: SECTION_B, blocks: [] },
+      { id: SECTION_C, blocks: [] },
     ],
   };
 }

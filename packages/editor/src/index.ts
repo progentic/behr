@@ -38,6 +38,30 @@ export function removeSection(
   };
 }
 
+export function moveSection(
+  document: PageDocument,
+  sectionId: string,
+  targetIndex: number,
+): PageDocument {
+  const sourceIndex = document.sections.findIndex(({ id }) => id === sectionId);
+  if (
+    sourceIndex === -1 ||
+    !Number.isInteger(targetIndex) ||
+    targetIndex < 0 ||
+    targetIndex >= document.sections.length ||
+    sourceIndex === targetIndex
+  ) {
+    return document;
+  }
+  const sections = [...document.sections];
+  const [section] = sections.splice(sourceIndex, 1);
+  if (!section) {
+    return document;
+  }
+  sections.splice(targetIndex, 0, section);
+  return { ...document, sections };
+}
+
 export function addHeadingBlock(
   document: PageDocument,
   sectionId: string,
@@ -91,6 +115,33 @@ export function removeBlock(
     ...section,
     blocks: section.blocks.filter((_, index) => index !== blockIndex),
   });
+}
+
+export function moveBlock(
+  document: PageDocument,
+  sectionId: string,
+  blockId: string,
+  targetIndex: number,
+): PageDocument {
+  const section = document.sections.find(({ id }) => id === sectionId);
+  const sourceIndex = section?.blocks.findIndex(({ id }) => id === blockId) ?? -1;
+  if (
+    !section ||
+    sourceIndex === -1 ||
+    !Number.isInteger(targetIndex) ||
+    targetIndex < 0 ||
+    targetIndex >= section.blocks.length ||
+    sourceIndex === targetIndex
+  ) {
+    return document;
+  }
+  const blocks = [...section.blocks];
+  const [block] = blocks.splice(sourceIndex, 1);
+  if (!block) {
+    return document;
+  }
+  blocks.splice(targetIndex, 0, block);
+  return replaceSection(document, sectionId, { ...section, blocks });
 }
 
 export function updateBlockText(

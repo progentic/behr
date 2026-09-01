@@ -256,6 +256,12 @@ Phase O adds an owner-only `SiteSettings` workflow for the existing site name
 and light/dark plus sans/serif theme tokens. It keeps hostname visible but
 read-only, uses resource-keyed local state and inline alert/status feedback,
 and updates the current tenant's existing site list after a successful save.
+Phase P adds native section ordering, same-section block ordering, and matching
+Move Up/Down controls through the existing immutable editor transforms. Page
+creation and draft validation use shared contracts for local inline feedback;
+the server remains authoritative and explicit Save draft remains the only
+editor persistence trigger. Empty image alternative text remains valid and is
+accompanied by non-blocking decorative-image guidance.
 Domain administration, custom CSS, theme catalogs/frameworks, preview controls,
 and publishing interfaces remain unimplemented.
 
@@ -294,6 +300,9 @@ placed in the asset URL or browser storage.
 Phase N wraps the existing document output in one trusted root style derived
 from the bounded light/dark and sans/serif tokens. It adds no ThemeProvider,
 context, remote font, or arbitrary CSS path.
+Phase P wraps the shared public/preview application root in one native React
+render boundary. Descendant render/lifecycle failures receive generic page
+unavailable output without exposing errors or preview credentials.
 
 ---
 
@@ -682,6 +691,21 @@ messages, stacks, or causes. Logging is best-effort and cannot replace the safe
 response. No logging dependency, remote collector, client telemetry, or access
 logging is implemented; Phase Q may later own service/journal collection and
 request logging.
+
+## 7.2 Client Render Failure Boundaries
+
+Phase P mounts one small native React boundary around the admin `App` and a
+separate local boundary around the shared public/preview `App`. The admin
+fallback reports that BeHR admin is unavailable; the web fallback reports that
+the page is unavailable. Neither renders exception details, session data,
+document content, or preview credentials.
+
+These boundaries cover React render and lifecycle failures beneath their
+mounted roots only. They do not claim event-handler, rejected-promise, API,
+server, pre-root, or global browser failures. No `window.onerror`,
+`unhandledrejection`, client logger, telemetry endpoint, or shared error-boundary
+package is implemented. Existing inline field, form, save, and settings feedback
+remains local; Phase P adds no toast system.
 
 ---
 

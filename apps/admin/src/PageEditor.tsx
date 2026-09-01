@@ -17,6 +17,8 @@ import {
   addImageBlock,
   addParagraphBlock,
   addSection,
+  moveBlock,
+  moveSection,
   removeBlock,
   removeSection,
   updateBlockText,
@@ -24,13 +26,17 @@ import {
   updateImageAlt,
   updateTextAlignment,
 } from "@bher/editor";
+import type { DragEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { requestApi } from "./lib/api";
 
 const INVALID_DOCUMENT_MESSAGE =
   "The page contains invalid content and cannot be saved.";
+const FIX_DOCUMENT_MESSAGE =
+  "Fix the highlighted page content before saving.";
 const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
+const DRAG_MARKER = "behr-editor-drag";
 
 export type EditorIdentity = Readonly<{
   tenantId: string;
@@ -69,6 +75,8 @@ export type PageEditorState =
       document: PageDocument;
       revision: number;
       save: SaveState;
+      fieldErrors: Readonly<Record<string, string>>;
+      formError: string | null;
     }>;
 
 export type EditorSaveOperation = Readonly<{
@@ -77,6 +85,16 @@ export type EditorSaveOperation = Readonly<{
   submittedDocument: PageDocument;
   submittedRevision: number;
 }>;
+
+export type DraftSavePreparation = Readonly<{
+  request: SavePageDraftRequest | null;
+  fieldErrors: Readonly<Record<string, string>>;
+  formError: string | null;
+}>;
+
+type DraggedEditorItem =
+  | Readonly<{ kind: "section"; sectionId: string }>
+  | Readonly<{ kind: "block"; sectionId: string; blockId: string }>;
 
 type PageEditorProperties = Readonly<{
   tenantId: string;
@@ -102,6 +120,7 @@ export function PageEditor({
     tenantId,
     siteId,
   });
+  const [draggedItem, setDraggedItem] = useState<DraggedEditorItem | null>(null);
 
   useEffect(() => {
     const identity: EditorIdentity = {
@@ -167,14 +186,25 @@ export function PageEditor({
     : { status: "loading" as const, tenantId, siteId };
   const assets = visibleAssets.status === "loaded" ? visibleAssets.assets : [];
 
-  function transformDocument(transform: DocumentTransform): void {
-    setState((current) => applyDocumentEdit(current, transform));
+  function transformDocument(
+    transform: DocumentTransform,
+    clearFieldError?: string,
+  ): void {
+    setState((current) =>
+      applyDocumentEdit(current, transform, clearFieldError),
+    );
   }
 
   async function saveDraft(): Promise<void> {
-    const request = prepareDraftSave(loadedState.document);
-    if (!request) {
-      setState((current) => applySaveValidationError(current));
+    const preparation = prepareDraftSave(loadedState.document);
+    if (!preparation.request) {
+      setState((current) =>
+        applySaveValidationError(current, preparation),
+      );
+      const firstInvalidBlockId = Object.keys(preparation.fieldErrors)[0];
+      if (firstInvalidBlockId) {
+        document.getElementById(`block-${firstInvalidBlockId}`)?.focus();
+      }
       return;
     }
     const operation = createEditorSaveOperation(
@@ -190,7 +220,7 @@ export function PageEditor({
         tenantId,
         siteId,
         pageId,
-        request,
+        preparation.request,
       );
       setState((current) => applySaveSuccess(current, operation.operation));
     } catch {
@@ -204,11 +234,16 @@ export function PageEditor({
       <p>
         Path: <code>/{loadedState.page.slug}</code>
       </p>
-      {loadedState.document.sections.map((section) => (
+      {loadedState.document.sections.map((section, sectionIndex) => (
         <SectionEditor
           key={section.id}
           section={section}
+          sectionIndex={sectionIndex}
+          sectionCount={loadedState.document.sections.length}
           assets={assets}
+          draggedItem={draggedItem}
+          setDraggedItem={setDraggedItem}
+          fieldErrors={loadedState.fieldErrors}
           transformDocument={transformDocument}
         />
       ))}
@@ -231,6 +266,9 @@ export function PageEditor({
       {loadedState.save.status === "error" ? (
         <p role="alert">{loadedState.save.message}</p>
       ) : null}
+      {loadedState.formError ? (
+        <p role="alert">{loadedState.formError}</p>
+      ) : null}
       {loadedState.save.status === "saved" ? (
         <p role="status">Draft saved.</p>
       ) : null}
@@ -247,16 +285,79 @@ export function PageEditor({
 
 function SectionEditor({
   section,
+  sectionIndex,
+  sectionCount,
   assets,
+  draggedItem,
+  setDraggedItem,
+  fieldErrors,
   transformDocument,
 }: Readonly<{
   section: Section;
+  sectionIndex: number;
+  sectionCount: number;
   assets: AssetListItem[];
-  transformDocument: (transform: DocumentTransform) => void;
+  draggedItem: DraggedEditorItem | null;
+  setDraggedItem: (item: DraggedEditorItem | null) => void;
+  fieldErrors: Readonly<Record<string, string>>;
+  transformDocument: (
+    transform: DocumentTransform,
+    clearFieldError?: string,
+  ) => void;
 }>) {
   return (
-    <fieldset>
+    <fieldset
+      onDragOver={(event) => {
+        if (draggedItem?.kind === "section") {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }
+      }}
+      onDrop={(event) => {
+        if (draggedItem?.kind !== "section") {
+          return;
+        }
+        event.preventDefault();
+        transformDocument((document) =>
+          moveSection(document, draggedItem.sectionId, sectionIndex),
+        );
+        setDraggedItem(null);
+      }}
+    >
       <legend>Section</legend>
+      <button
+        type="button"
+        draggable
+        onDragStart={(event) => {
+          setDraggedItem({ kind: "section", sectionId: section.id });
+          initializeDrag(event);
+        }}
+        onDragEnd={() => setDraggedItem(null)}
+      >
+        Drag section
+      </button>
+      <button
+        type="button"
+        disabled={sectionIndex === 0}
+        onClick={() =>
+          transformDocument((document) =>
+            moveSection(document, section.id, sectionIndex - 1),
+          )
+        }
+      >
+        Move section up
+      </button>
+      <button
+        type="button"
+        disabled={sectionIndex === sectionCount - 1}
+        onClick={() =>
+          transformDocument((document) =>
+            moveSection(document, section.id, sectionIndex + 1),
+          )
+        }
+      >
+        Move section down
+      </button>
       <button
         type="button"
         onClick={() =>
@@ -265,12 +366,17 @@ function SectionEditor({
       >
         Remove section
       </button>
-      {section.blocks.map((block) => (
+      {section.blocks.map((block, blockIndex) => (
         <BlockEditor
           key={block.id}
           block={block}
+          blockIndex={blockIndex}
+          blockCount={section.blocks.length}
           assets={assets}
           sectionId={section.id}
+          draggedItem={draggedItem}
+          setDraggedItem={setDraggedItem}
+          fieldError={fieldErrors[block.id]}
           transformDocument={transformDocument}
         />
       ))}
@@ -329,104 +435,189 @@ function SectionEditor({
 
 function BlockEditor({
   block,
+  blockIndex,
+  blockCount,
   assets,
   sectionId,
+  draggedItem,
+  setDraggedItem,
+  fieldError,
   transformDocument,
 }: Readonly<{
   block: Block;
+  blockIndex: number;
+  blockCount: number;
   assets: AssetListItem[];
   sectionId: string;
-  transformDocument: (transform: DocumentTransform) => void;
+  draggedItem: DraggedEditorItem | null;
+  setDraggedItem: (item: DraggedEditorItem | null) => void;
+  fieldError: string | undefined;
+  transformDocument: (
+    transform: DocumentTransform,
+    clearFieldError?: string,
+  ) => void;
 }>) {
-  if (block.type === "image") {
-    return (
-      <ImageBlockEditor
-        block={block}
-        sectionId={sectionId}
-        asset={assets.find(({ id }) => id === block.assetId)}
-        transformDocument={transformDocument}
-      />
-    );
-  }
   const inputId = `block-${block.id}`;
   return (
-    <div>
-      <label htmlFor={inputId}>
-        {block.type === "heading" ? "Heading" : "Paragraph"}
-      </label>
-      {block.type === "heading" ? (
-        <input
-          id={inputId}
-          value={block.text}
-          onChange={(event) =>
-            transformDocument((document) =>
-              updateBlockText(
-                document,
-                sectionId,
-                block.id,
-                event.currentTarget.value,
-              ),
-            )
+    <div
+      onDragOver={(event) => {
+        if (draggedItem?.kind === "block") {
+          event.stopPropagation();
+          if (draggedItem.sectionId === sectionId) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
           }
+        }
+      }}
+      onDrop={(event) => {
+        if (draggedItem?.kind !== "block") {
+          return;
+        }
+        event.stopPropagation();
+        if (draggedItem.sectionId !== sectionId) {
+          return;
+        }
+        event.preventDefault();
+        transformDocument((document) =>
+          moveBlock(document, sectionId, draggedItem.blockId, blockIndex),
+        );
+        setDraggedItem(null);
+      }}
+    >
+      <button
+        type="button"
+        draggable
+        onDragStart={(event) => {
+          event.stopPropagation();
+          setDraggedItem({ kind: "block", sectionId, blockId: block.id });
+          initializeDrag(event);
+        }}
+        onDragEnd={(event) => {
+          event.stopPropagation();
+          setDraggedItem(null);
+        }}
+      >
+        Drag block
+      </button>
+      <button
+        type="button"
+        disabled={blockIndex === 0}
+        onClick={() =>
+          transformDocument((document) =>
+            moveBlock(document, sectionId, block.id, blockIndex - 1),
+          )
+        }
+      >
+        Move block up
+      </button>
+      <button
+        type="button"
+        disabled={blockIndex === blockCount - 1}
+        onClick={() =>
+          transformDocument((document) =>
+            moveBlock(document, sectionId, block.id, blockIndex + 1),
+          )
+        }
+      >
+        Move block down
+      </button>
+      {block.type === "image" ? (
+        <ImageBlockFields
+          block={block}
+          sectionId={sectionId}
+          asset={assets.find(({ id }) => id === block.assetId)}
+          transformDocument={transformDocument}
         />
       ) : (
-        <textarea
-          id={inputId}
-          value={block.text}
-          onChange={(event) =>
-            transformDocument((document) =>
-              updateBlockText(
-                document,
-                sectionId,
-                block.id,
-                event.currentTarget.value,
-              ),
-            )
-          }
-        />
-      )}
-      {block.type === "heading" ? (
         <>
-          <label htmlFor={`${inputId}-level`}>Level</label>
+          <label htmlFor={inputId}>
+            {block.type === "heading" ? "Heading" : "Paragraph"}
+          </label>
+          {block.type === "heading" ? (
+            <input
+              id={inputId}
+              value={block.text}
+              aria-invalid={fieldError ? true : undefined}
+              aria-describedby={fieldError ? `${inputId}-error` : undefined}
+              onChange={(event) =>
+                transformDocument(
+                  (document) =>
+                    updateBlockText(
+                      document,
+                      sectionId,
+                      block.id,
+                      event.currentTarget.value,
+                    ),
+                  block.id,
+                )
+              }
+            />
+          ) : (
+            <textarea
+              id={inputId}
+              value={block.text}
+              aria-invalid={fieldError ? true : undefined}
+              aria-describedby={fieldError ? `${inputId}-error` : undefined}
+              onChange={(event) =>
+                transformDocument(
+                  (document) =>
+                    updateBlockText(
+                      document,
+                      sectionId,
+                      block.id,
+                      event.currentTarget.value,
+                    ),
+                  block.id,
+                )
+              }
+            />
+          )}
+          {fieldError ? <p id={`${inputId}-error`}>{fieldError}</p> : null}
+          {block.type === "heading" ? (
+            <>
+              <label htmlFor={`${inputId}-level`}>Level</label>
+              <select
+                id={`${inputId}-level`}
+                value={block.level}
+                onChange={(event) => {
+                  const level = readHeadingLevel(event.currentTarget.value);
+                  transformDocument((document) =>
+                    updateHeadingLevel(document, sectionId, block.id, level),
+                  );
+                }}
+              >
+                {HEADING_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : null}
+          <label htmlFor={`${inputId}-alignment`}>Alignment</label>
           <select
-            id={`${inputId}-level`}
-            value={block.level}
+            id={`${inputId}-alignment`}
+            value={block.style?.align ?? ""}
             onChange={(event) => {
-              const level = readHeadingLevel(event.currentTarget.value);
+              const alignment = readTextAlignment(event.currentTarget.value);
               transformDocument((document) =>
-                updateHeadingLevel(document, sectionId, block.id, level),
+                updateTextAlignment(document, sectionId, block.id, alignment),
               );
             }}
           >
-            {HEADING_LEVELS.map((level) => (
-              <option key={level} value={level}>
-                {level}
-              </option>
-            ))}
+            <option value="">Default</option>
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
           </select>
         </>
-      ) : null}
-      <label htmlFor={`${inputId}-alignment`}>Alignment</label>
-      <select
-        id={`${inputId}-alignment`}
-        value={block.style?.align ?? ""}
-        onChange={(event) => {
-          const alignment = readTextAlignment(event.currentTarget.value);
-          transformDocument((document) =>
-            updateTextAlignment(document, sectionId, block.id, alignment),
-          );
-        }}
-      >
-        <option value="">Default</option>
-        <option value="left">Left</option>
-        <option value="center">Center</option>
-        <option value="right">Right</option>
-      </select>
+      )}
       <button
         type="button"
         onClick={() =>
-          transformDocument((document) =>
-            removeBlock(document, sectionId, block.id),
+          transformDocument(
+            (document) => removeBlock(document, sectionId, block.id),
+            block.id,
           )
         }
       >
@@ -436,7 +627,7 @@ function BlockEditor({
   );
 }
 
-function ImageBlockEditor({
+function ImageBlockFields({
   block,
   sectionId,
   asset,
@@ -445,16 +636,21 @@ function ImageBlockEditor({
   block: Extract<Block, { type: "image" }>;
   sectionId: string;
   asset: AssetListItem | undefined;
-  transformDocument: (transform: DocumentTransform) => void;
+  transformDocument: (
+    transform: DocumentTransform,
+    clearFieldError?: string,
+  ) => void;
 }>) {
   const inputId = `block-${block.id}-alt`;
+  const hintId = `${inputId}-hint`;
   return (
-    <div>
+    <>
       <p>Image: {asset?.originalFilename ?? block.assetId}</p>
       <label htmlFor={inputId}>Alternative text</label>
       <input
         id={inputId}
         value={block.alt}
+        aria-describedby={hintId}
         onChange={(event) =>
           transformDocument((document) =>
             updateImageAlt(
@@ -466,17 +662,11 @@ function ImageBlockEditor({
           )
         }
       />
-      <button
-        type="button"
-        onClick={() =>
-          transformDocument((document) =>
-            removeBlock(document, sectionId, block.id),
-          )
-        }
-      >
-        Remove block
-      </button>
-    </div>
+      <p id={hintId}>
+        Empty alternative text marks this image as decorative. Leave it empty
+        only when the image is purely decorative.
+      </p>
+    </>
   );
 }
 
@@ -499,12 +689,15 @@ export function applyDraftLoad(
     document: draft.draft.document,
     revision: 0,
     save: { status: "idle" },
+    fieldErrors: {},
+    formError: null,
   };
 }
 
 export function applyDocumentEdit(
   state: PageEditorState,
   transform: DocumentTransform,
+  clearFieldError?: string,
 ): PageEditorState {
   if (state.status !== "loaded") {
     return state;
@@ -513,11 +706,20 @@ export function applyDocumentEdit(
   if (document === state.document) {
     return state;
   }
+  const fieldErrors = clearFieldError
+    ? removeFieldError(state.fieldErrors, clearFieldError)
+    : state.fieldErrors;
+  const clearedError = fieldErrors !== state.fieldErrors;
   return {
     ...state,
     document,
     revision: state.revision + 1,
     save: state.save.status === "saving" ? state.save : { status: "idle" },
+    fieldErrors,
+    formError:
+      clearedError && Object.keys(fieldErrors).length === 0
+        ? null
+        : state.formError,
   };
 }
 
@@ -546,6 +748,8 @@ export function createEditorSaveOperation(
         operationId,
         submittedRevision: state.revision,
       },
+      fieldErrors: {},
+      formError: null,
     },
   };
 }
@@ -581,15 +785,45 @@ export function applySaveError(
 
 export function prepareDraftSave(
   document: PageDocument,
-): SavePageDraftRequest | null {
+): DraftSavePreparation {
   const canonical = pageDocumentSchema.safeParse(document);
-  if (!canonical.success) {
-    return null;
+  if (canonical.success) {
+    const request = savePageDraftRequestSchema.safeParse({
+      document: canonical.data,
+    });
+    return request.success
+      ? { request: request.data, fieldErrors: {}, formError: null }
+      : { request: null, fieldErrors: {}, formError: INVALID_DOCUMENT_MESSAGE };
   }
-  const request = savePageDraftRequestSchema.safeParse({
-    document: canonical.data,
-  });
-  return request.success ? request.data : null;
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of canonical.error.issues) {
+    const [sectionsKey, sectionIndex, blocksKey, blockIndex, fieldKey] =
+      issue.path;
+    if (
+      sectionsKey !== "sections" ||
+      typeof sectionIndex !== "number" ||
+      blocksKey !== "blocks" ||
+      typeof blockIndex !== "number" ||
+      fieldKey !== "text"
+    ) {
+      continue;
+    }
+    const block = document.sections[sectionIndex]?.blocks[blockIndex];
+    if (block?.type === "heading") {
+      fieldErrors[block.id] = "Heading text is required.";
+    }
+    if (block?.type === "paragraph") {
+      fieldErrors[block.id] = "Paragraph text is required.";
+    }
+  }
+  return {
+    request: null,
+    fieldErrors,
+    formError:
+      Object.keys(fieldErrors).length > 0
+        ? FIX_DOCUMENT_MESSAGE
+        : INVALID_DOCUMENT_MESSAGE,
+  };
 }
 
 export async function requestPageDraft(
@@ -687,13 +921,27 @@ function matchesSiteAssetState(
 
 export function applySaveValidationError(
   state: PageEditorState,
+  preparation: DraftSavePreparation,
 ): PageEditorState {
   return state.status === "loaded" && state.save.status !== "saving"
     ? {
         ...state,
-        save: { status: "error", message: INVALID_DOCUMENT_MESSAGE },
+        save: { status: "idle" },
+        fieldErrors: preparation.fieldErrors,
+        formError: preparation.formError,
       }
     : state;
+}
+
+function removeFieldError(
+  fieldErrors: Readonly<Record<string, string>>,
+  blockId: string,
+): Readonly<Record<string, string>> {
+  if (!(blockId in fieldErrors)) {
+    return fieldErrors;
+  }
+  const { [blockId]: _removed, ...remaining } = fieldErrors;
+  return remaining;
 }
 
 function matchesSaveOperation(
@@ -729,6 +977,11 @@ function matchesResourceIdentity(
     identity.siteId === resource.siteId &&
     identity.pageId === resource.pageId
   );
+}
+
+function initializeDrag(event: DragEvent<HTMLElement>): void {
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", DRAG_MARKER);
 }
 
 function readHeadingLevel(value: string): HeadingBlock["level"] {

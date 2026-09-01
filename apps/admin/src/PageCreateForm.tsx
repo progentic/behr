@@ -6,11 +6,23 @@ import {
 } from "@bher/contracts";
 import { createEmptyPageDocument } from "@bher/editor";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { requestApi } from "./lib/api";
 
 const CONFLICT_STATUS = 409;
+const TITLE_ERROR_ID = "page-title-error";
+const SLUG_ERROR_ID = "page-slug-error";
+
+type PageCreationFieldErrors = Readonly<{
+  title?: string;
+  slug?: string;
+}>;
+
+type PageCreationPreparation = Readonly<{
+  request: CreatePageRequest | null;
+  fieldErrors: PageCreationFieldErrors;
+}>;
 
 type PageCreateFormProperties = Readonly<{
   tenantId: string;
@@ -26,31 +38,58 @@ export function PageCreateForm({
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [touched, setTouched] = useState({ title: false, slug: false });
+  const [fieldErrors, setFieldErrors] = useState<PageCreationFieldErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const titleInput = useRef<HTMLInputElement>(null);
+  const slugInput = useRef<HTMLInputElement>(null);
 
   async function submitPage(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    setError(null);
-    const request = createPageCreationRequest(title, slug);
-    if (!request) {
-      setError("Enter a valid page title and slug.");
+    setFormError(null);
+    setTouched({ title: true, slug: true });
+    const preparation = preparePageCreation(title, slug);
+    setFieldErrors(preparation.fieldErrors);
+    if (!preparation.request) {
+      if (preparation.fieldErrors.title) {
+        titleInput.current?.focus();
+      } else if (preparation.fieldErrors.slug) {
+        slugInput.current?.focus();
+      }
       return;
     }
     setSubmitting(true);
     try {
-      const page = await requestPageCreation(tenantId, siteId, request);
+      const page = await requestPageCreation(
+        tenantId,
+        siteId,
+        preparation.request,
+      );
       setTitle("");
       setSlug("");
+      setTouched({ title: false, slug: false });
+      setFieldErrors({});
       onCreated(page);
     } catch (failure) {
-      setError(
-        failure instanceof PageSlugConflictResponseError
-          ? "That slug already exists in this site."
-          : "The page could not be created.",
-      );
+      if (failure instanceof PageSlugConflictResponseError) {
+        setTouched((current) => ({ ...current, slug: true }));
+        setFieldErrors((current) => ({
+          ...current,
+          slug: "That slug already exists in this site.",
+        }));
+        slugInput.current?.focus();
+      } else {
+        setFormError("The page could not be created.");
+      }
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function validatePageCreationField(field: "title" | "slug"): void {
+    setTouched((current) => ({ ...current, [field]: true }));
+    const nextError = preparePageCreation(title, slug).fieldErrors[field];
+    setFieldErrors((current) => ({ ...current, [field]: nextError }));
   }
 
   return (
@@ -59,21 +98,52 @@ export function PageCreateForm({
       <form onSubmit={(event) => void submitPage(event)}>
         <label htmlFor="page-title">Title</label>
         <input
+          ref={titleInput}
           id="page-title"
           maxLength={200}
-          required
           value={title}
-          onChange={(event) => setTitle(event.currentTarget.value)}
+          aria-invalid={fieldErrors.title ? true : undefined}
+          aria-describedby={fieldErrors.title ? TITLE_ERROR_ID : undefined}
+          onBlur={() => validatePageCreationField("title")}
+          onChange={(event) => {
+            const nextTitle = event.currentTarget.value;
+            setTitle(nextTitle);
+            if (touched.title) {
+              setFieldErrors((current) => ({
+                ...current,
+                title: preparePageCreation(nextTitle, slug).fieldErrors.title,
+              }));
+            }
+          }}
         />
+        {fieldErrors.title ? (
+          <p id={TITLE_ERROR_ID}>{fieldErrors.title}</p>
+        ) : null}
         <label htmlFor="page-slug">Slug</label>
         <input
+          ref={slugInput}
           id="page-slug"
           maxLength={200}
           placeholder="about-us"
           value={slug}
-          onChange={(event) => setSlug(event.currentTarget.value)}
+          aria-invalid={fieldErrors.slug ? true : undefined}
+          aria-describedby={fieldErrors.slug ? SLUG_ERROR_ID : undefined}
+          onBlur={() => validatePageCreationField("slug")}
+          onChange={(event) => {
+            const nextSlug = event.currentTarget.value;
+            setSlug(nextSlug);
+            if (touched.slug) {
+              setFieldErrors((current) => ({
+                ...current,
+                slug: preparePageCreation(title, nextSlug).fieldErrors.slug,
+              }));
+            }
+          }}
         />
-        {error ? <p role="alert">{error}</p> : null}
+        {fieldErrors.slug ? (
+          <p id={SLUG_ERROR_ID}>{fieldErrors.slug}</p>
+        ) : null}
+        {formError ? <p role="alert">{formError}</p> : null}
         <button type="submit" disabled={submitting}>
           {submitting ? "Creating…" : "Create page"}
         </button>
@@ -82,16 +152,28 @@ export function PageCreateForm({
   );
 }
 
-export function createPageCreationRequest(
+export function preparePageCreation(
   title: string,
   slug: string,
-): CreatePageRequest | null {
+): PageCreationPreparation {
   const parsed = createPageRequestSchema.safeParse({
     title,
     slug,
     document: createEmptyPageDocument(),
   });
-  return parsed.success ? parsed.data : null;
+  if (parsed.success) {
+    return { request: parsed.data, fieldErrors: {} };
+  }
+  const fieldErrors: { title?: string; slug?: string } = {};
+  for (const issue of parsed.error.issues) {
+    if (issue.path[0] === "title") {
+      fieldErrors.title = "Enter a valid page title.";
+    }
+    if (issue.path[0] === "slug") {
+      fieldErrors.slug = "Enter a valid page slug.";
+    }
+  }
+  return { request: null, fieldErrors };
 }
 
 export async function requestPageCreation(
@@ -112,4 +194,4 @@ export async function requestPageCreation(
   return pageDraftSchema.parse(await response.json()).page;
 }
 
-class PageSlugConflictResponseError extends Error {}
+export class PageSlugConflictResponseError extends Error {}
