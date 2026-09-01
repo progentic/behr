@@ -32,6 +32,7 @@ import type { ApiBindings } from "./types";
 const HEALTH_ROUTE = "/health";
 const ROUTE_ROOT = "/";
 const INTERNAL_ERROR_STATUS = 500;
+const SAFE_ERROR_TYPE_PATTERN = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
 
 export type ApiApplication = Readonly<{
   app: Hono<ApiBindings>;
@@ -40,6 +41,7 @@ export type ApiApplication = Readonly<{
   server: Readonly<{
     port: number;
     fetch: Hono<ApiBindings>["fetch"];
+    error: (error: Error) => Response;
   }>;
 }>;
 
@@ -75,7 +77,11 @@ export function createApiApplication(environment: Environment): ApiApplication {
     app,
     auth,
     close: () => database.close(),
-    server: Object.freeze({ port: apiConfig.port, fetch: app.fetch }),
+    server: Object.freeze({
+      port: apiConfig.port,
+      fetch: app.fetch,
+      error: handleUnhandledServerError,
+    }),
   });
 }
 
@@ -110,11 +116,68 @@ function createHttpApplication(
       adminOrigin,
     ),
   );
-  app.onError(() =>
-    createJsonResponse(
-      { error: "Internal server error." },
-      INTERNAL_ERROR_STATUS,
-    ),
-  );
+  app.onError((error, context) => {
+    writeUnhandledRequestError(
+      error,
+      context.req.method,
+      context.req.url,
+    );
+    return createInternalErrorResponse();
+  });
   return app;
+}
+
+function handleUnhandledServerError(error: Error): Response {
+  writeUnhandledServerError(error);
+  return createInternalErrorResponse();
+}
+
+function createInternalErrorResponse(): Response {
+  return createJsonResponse(
+    { error: "Internal server error." },
+    INTERNAL_ERROR_STATUS,
+  );
+}
+
+function writeUnhandledRequestError(
+  error: Error,
+  method: string,
+  requestUrl: string,
+): void {
+  try {
+    console.error(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "error",
+        event: "unhandled_request_error",
+        method,
+        pathname: new URL(requestUrl).pathname,
+        errorType: readErrorType(error),
+      }),
+    );
+  } catch {
+    // Error reporting must not break the fail-closed response.
+  }
+}
+
+function writeUnhandledServerError(error: Error): void {
+  try {
+    console.error(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "error",
+        event: "unhandled_server_error",
+        errorType: readErrorType(error),
+      }),
+    );
+  } catch {
+    // Error reporting must not break the fail-closed response.
+  }
+}
+
+function readErrorType(error: Error): string {
+  const name: unknown = error.name;
+  return typeof name === "string" && SAFE_ERROR_TYPE_PATTERN.test(name)
+    ? name
+    : "Error";
 }

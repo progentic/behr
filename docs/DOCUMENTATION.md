@@ -1342,3 +1342,56 @@ Phase N has no production theme insert/update/delete operation and exposes no
 theme or settings route. Integration fixtures write rows directly only to prove
 read semantics. Phase O remains responsible for future authorized theme and
 settings management UI.
+
+---
+
+## Error Reporting Baseline — Safe Server Failure Reporting
+
+### Nested fail-closed boundaries
+
+The Hono application continues to return exactly:
+
+```json
+{"error":"Internal server error."}
+```
+
+for propagated `Error` instances. It now also writes one structured
+`unhandled_request_error` record to stderr with only timestamp, level, event,
+HTTP method, pathname without query, and a bounded error type.
+
+Pinned Hono 4.13.5 does not pass non-Error throws to `app.onError`. The exported
+Bun server options therefore include an explicit outer `error` callback. It
+records one `unhandled_server_error` with no request context and returns the
+same generic JSON 500. The normal production export and the integrated
+`development: true` listener share this callback.
+
+### Redaction and sink policy
+
+Neither boundary logs error messages, stacks, causes, query strings, headers,
+cookies, request/response bodies, credentials, preview or invitation tokens,
+session IDs, asset bytes, SQL, or physical paths. Error names survive only when
+they match the bounded identifier rule; otherwise the type is `Error`.
+
+The sink is one best-effort `console.error(JSON.stringify(record))` call.
+Logging exceptions are suppressed so the client-safe response remains
+authoritative. There is no logger interface, dependency, retry, file sink,
+remote collector, telemetry endpoint, or route-level error logging.
+
+### Executed boundary matrix
+
+Focused application-composition tests prove:
+
+```text
+handled 404       → no request/server log → existing 404
+propagated Error  → one request log       → generic JSON 500
+escaped non-Error → one Bun server log    → generic JSON 500
+```
+
+The non-Error cases use real temporary Bun listeners in both normal and
+development modes. Sensitive thrown/query values and contextual error output
+are absent from responses and logs. Existing malformed persisted public/theme,
+missing authorized file, and malformed draft integrations remain the
+authoritative integrity-failure paths feeding Hono's global boundary.
+
+This baseline reports server request failures only. Browser render-failure
+fallbacks remain assigned to Phase P, and no client telemetry is authorized.

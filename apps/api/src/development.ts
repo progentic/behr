@@ -37,6 +37,7 @@ export async function startDevelopmentServer(
       port: application.server.port,
       routes: { [ADMIN_ROUTE]: adminDocument },
       fetch: (request) => application.app.fetch(request),
+      error: application.server.error,
     });
     return Object.freeze({
       close: async () => {

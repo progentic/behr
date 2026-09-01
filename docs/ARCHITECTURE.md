@@ -635,6 +635,32 @@ same-origin scripts, connections, and form actions. Clickjacking protection
 must be delivered as an HTTP header by the reverse proxy in Phase Q because
 `frame-ancestors` is not enforced from a meta CSP.
 
+## 7.1 Server Failure Reporting
+
+Unexpected server failures have two nested fail-closed boundaries:
+
+```text
+request → Hono app.onError → Bun server error callback
+```
+
+Hono 4.13.5 sends propagated `Error` instances to `app.onError`. That boundary
+emits one redacted JSON `unhandled_request_error` record containing timestamp,
+level, event, method, pathname, and bounded error type, then returns the generic
+JSON HTTP 500 response.
+
+Non-Error throws escape Hono. The Bun server `error` callback emits one minimal
+`unhandled_server_error` record containing only timestamp, level, event, and
+bounded error type, then returns the same generic response. The integrated
+development listener uses this explicit callback even with `development: true`,
+so Bun's contextual development error page is not exposed.
+
+Both logs use stderr as the v1 sink. They never include query strings, headers,
+cookies, bodies, credentials, tokens, session IDs, physical paths, raw error
+messages, stacks, or causes. Logging is best-effort and cannot replace the safe
+response. No logging dependency, remote collector, client telemetry, or access
+logging is implemented; Phase Q may later own service/journal collection and
+request logging.
+
 ---
 
 # 8. Deployment Model
