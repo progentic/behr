@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.13
+Version: 1.14
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -3711,6 +3711,8 @@ Ownership Correction
 
 High — Phase O settings-mutation ownership gap: Version 1.12 requires theme selection and site settings management without defining the editable settings, authorization boundary, API contract, persistence operation, or implementation surface. Version 1.13 defines one minimal owner-controlled settings resource consisting only of the existing site name and Phase N theme tokens. Hostname remains read-only and domain administration remains out of scope.
 
+High — Phase O route-composition test surface omission: Phase O widens SitePersistence with resolveSiteSettings and updateSiteSettings, while the existing apps/api/src/routes/index.test.ts CORS regression constructs a structural SitePersistence fake. The widened interface therefore produces TypeScript TS2739 until that existing fake includes the two required members. Version 1.14 adds only this existing test file to the Phase O surface for structural compatibility. It does not expand Phase O behavior, route composition, or test coverage.
+
 This correction does not reopen Phase N or the Error Reporting Baseline. Phase P remains unstarted.
 
 Settings Resource Model
@@ -4040,8 +4042,11 @@ src/site-persistence.ts
 apps/api
 
 src/routes/sites.ts
+src/routes/index.test.ts
 src/site-contract.test.ts
 src/site.integration.test.ts
+
+apps/api/src/routes/index.test.ts is authorized only to add fail-fast unused resolveSiteSettings and updateSiteSettings members to its existing SitePersistence fake. This compatibility-only edit exists because the Phase O interface expansion makes that structural fake incomplete. It does not authorize new settings or CORS coverage, assertions, route-composition changes, test refactoring, mock helpers, fixture infrastructure, or changes to another persistence fake. If either added method is invoked or another incompatibility appears, stop and report the newly reached behavior rather than making the fake operational.
 
 apps/admin
 
