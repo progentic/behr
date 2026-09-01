@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.15
+Version: 1.16
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -4442,45 +4442,562 @@ Objective
 
 Make system deployable and recoverable.
 
-Guidelines
+Ownership Correction
 
-Must:
+High — Phase Q production-operations ownership and recoverability gap: Version 1.15 requires deployment, nginx, systemd, backup, restore, and health integration without defining the production network boundary, host routing, TLS ownership, filesystem layout, backup consistency, restore safety, deployment lifecycle, or verification surface. Version 1.16 defines one single-VPS Linux deployment with nginx as the only externally exposed service, a loopback-only Bun API, operator-managed TLS, maintenance-window database-plus-asset backups, bounded destructive restore semantics, and one deterministic deployment workflow without adding business behavior, distributed infrastructure, or an operations framework.
 
-• Implement backup script
-• Implement restore script
-• Integrate the existing health endpoint with deployment monitoring
-• Configure nginx
-• Configure systemd
+This correction does not reopen Phase P.
 
-Must not:
+Supported Production Model
 
-• Introduce new runtime behavior
+Phase Q targets one Linux VPS:
+
+nginx
+    ↓
+one Bun API process
+    ↓
+PostgreSQL
+local asset filesystem
+
+PostgreSQL may be local to the VPS or externally hosted when operationally justified. The API remains one process.
+
+Do not add Docker, Kubernetes, containers as deployment authority, load balancers, multiple API processes, workers, queues, Redis, object storage, or service discovery.
+
+Required Host Capabilities
+
+The operator-provisioned host supplies Linux, systemd, nginx, Bash 5+, Bun 1.4.0, git, curl, tar, gzip, sha256sum, flock, openssl, and PostgreSQL client tools psql, pg_dump, and pg_restore.
+
+Package installation is outside BeHR scripts. Do not add apt, yum, or other host-package automation.
+
+Production Filesystem Layout
+
+Use exactly:
+
+Application          /opt/bhr-cms
+Environment          /etc/bhr-cms/bhr-api.env
+Asset originals      /var/lib/bhr-cms/uploads
+Backups              /var/backups/bhr-cms
+TLS certificate      /etc/bhr-cms/tls/fullchain.pem
+TLS private key      /etc/bhr-cms/tls/privkey.pem
+systemd service      bhr-api.service
+service user/group   bhr-cms:bhr-cms
+
+User creation and initial directory provisioning are operator responsibilities. Deployment validates these prerequisites rather than creating a new host-security model.
+
+Required production permissions are equivalent to:
+
+/etc/bhr-cms/bhr-api.env      root:root       0600
+/var/lib/bhr-cms/uploads      bhr-cms:bhr-cms 0750
+/var/backups/bhr-cms          root:root       0700
+/etc/bhr-cms/tls/privkey.pem  root-only readable
+
+Never print environment-file or private-key contents.
+
+API Network Boundary
+
+The production Bun API listens only on 127.0.0.1. nginx is the sole externally listening HTTP service.
+
+Extend ApiApplication.server with hostname: "127.0.0.1" or an equivalent fixed loopback value. This is an operational binding correction, not product behavior.
+
+Do not add API_HOST, API_BIND_ADDRESS, LISTEN_INTERFACE, a host configuration object, or a network-service abstraction. The integrated development server retains its existing explicit development hostname.
+
+Production verification must use a real built API and Linux socket inspection such as ss to prove 127.0.0.1:<API_PORT> is listening while 0.0.0.0:<API_PORT> and [::]:<API_PORT> are not. Source inspection alone is insufficient.
+
+Production Environment Contract
+
+/etc/bhr-cms/bhr-api.env contains the existing runtime variables as shell-compatible KEY=value assignments, quoted where necessary. Phase Q adds no application secret format or secret manager. Deploy, backup, and restore may source this root-owned file without printing it.
+
+Deployment validates:
+
+• NODE_ENV=production
+• ADMIN_ORIGIN uses HTTPS
+• BETTER_AUTH_URL uses HTTPS
+• ADMIN_ORIGIN equals BETTER_AUTH_URL
+• Neither origin contains a non-default explicit port
+• API_PORT is a valid TCP port
+• ASSET_STORAGE_ROOT=/var/lib/bhr-cms/uploads
+• DATABASE_URL is present
+• BETTER_AUTH_SECRET is present
+
+The same-origin rule preserves the current relative admin HTTP model. Do not duplicate these checks in application contracts.
+
+Derive the admin hostname from ADMIN_ORIGIN. Do not add BHR_ADMIN_HOST. The deploy script may use the installed Bun runtime for URL parsing instead of ad hoc shell parsing.
+
+The admin hostname is reserved and cannot also be a tenant public domain. Deployment queries PostgreSQL and rejects when domains.hostname equals the production admin hostname. This is an operational preflight, not a new database constraint or domain API.
+
+TLS Ownership
+
+nginx uses:
+
+/etc/bhr-cms/tls/fullchain.pem
+/etc/bhr-cms/tls/privkey.pem
+
+Certificate provisioning and renewal are external operator responsibilities. Do not implement Certbot, ACME, DNS automation, certificate workers/daemons, TLS tables, or domain verification.
+
+The installed operator-managed certificate must cover every tenant hostname intended to be reachable over HTTPS, through a suitable wildcard, SAN, or other certificate. A stored hostname not covered by the installed certificate remains unavailable with a valid HTTPS identity until the operator updates it. Do not change the domain model to solve certificate lifecycle.
+
+nginx Configuration Ownership
+
+Create one bounded template:
+
+infra/nginx/bhr-cms.conf
+
+It accepts only:
+
+__BHR_ADMIN_HOST__
+__BHR_API_PORT__
+
+deploy.sh renders these validated substitutions without a templating engine.
+
+nginx listens publicly on ports 80 and 443. Port 80 only redirects to HTTPS; it serves no production application content.
+
+Admin HTTPS Server
+
+The exact admin hostname uses:
+
+server_name <ADMIN_ORIGIN hostname>
+root /opt/bhr-cms/apps/admin/dist
+
+It serves built admin static files and proxies existing API routes without inventing /api.
+
+The admin host proxies:
+
+/health
+/auth/*
+/tenants
+/tenants/*
+/public/*
+/preview/*
+
+to http://127.0.0.1:<API_PORT>.
+
+Every proxy preserves Host, X-Forwarded-Proto, X-Forwarded-For, and X-Real-IP. proxy_set_header Host $host is required because public and preview authority already depends on the actual request host.
+
+Use client_max_body_size 11m on the admin proxy. Existing Hono 11 MiB request and 10 MiB file limits remain authoritative.
+
+Authentication Rate Limiting
+
+Define one client-IP request-rate zone for exactly POST /auth/login and POST /auth/register with a bounded policy equivalent to ten requests per minute, burst ten, and HTTP 429 when exceeded.
+
+Do not add application rate-limit storage or rate-limit every authenticated mutation prospectively.
+
+Public/Tenant HTTPS Server
+
+Use one default catch-all tenant server:
+
+server_name _
+root /opt/bhr-cms/apps/web/dist
+
+Actual content authority remains in Host-resolved API queries. nginx does not query PostgreSQL.
+
+Tenant hosts proxy only /health, /public/*, and /preview/* to the loopback API while preserving Host.
+
+Tenant hosts return nginx HTTP 404 directly for /auth, /auth/*, /tenants, and /tenants/*. They never expose the admin static application.
+
+All other tenant-host requests serve apps/web/dist with the built index.html fallback for client pathname routing. Do not introduce SSR.
+
+Reverse Proxy Security Headers
+
+The admin HTTPS response delivers frame protection equivalent to Content-Security-Policy: frame-ancestors 'none'. X-Frame-Options: DENY may also be included. This completes the Phase C deferred clickjacking boundary without modifying admin HTML CSP.
+
+Both HTTPS servers use bounded headers equivalent to:
+
+Strict-Transport-Security: max-age=31536000
+X-Content-Type-Options: nosniff
+
+Do not use includeSubDomains because tenant/domain hierarchy is not globally owned by BeHR. Do not build a security-header framework.
+
+Request Logging and Sinks
+
+nginx owns production access logging. Define one concise format containing remote address, timestamp, method, $uri path, HTTP version, status, response bytes, host, and request duration.
+
+Use $uri rather than a request target containing query strings. Do not log query strings, cookies, Authorization, preview credentials, invitation tokens, bodies, or session IDs.
+
+Use normal nginx access/error logs and the systemd journal for Bun stdout/stderr. Existing API structured error logs remain unchanged. Do not add a log shipper, ELK agent, OpenTelemetry, Sentry, Datadog, or remote collector.
+
+systemd Ownership
+
+Create infra/systemd/bhr-api.service with equivalent core settings:
+
+User=bhr-cms
+Group=bhr-cms
+WorkingDirectory=/opt/bhr-cms
+EnvironmentFile=/etc/bhr-cms/bhr-api.env
+ExecStart=/usr/local/bin/bun /opt/bhr-cms/apps/api/dist/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+The unit runs the built API, not the development server.
+
+Use bounded native hardening equivalent to:
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/bhr-cms/uploads
+UMask=0027
+
+Do not add speculative quotas, namespace frameworks, or outbound network restrictions that assume PostgreSQL is local.
+
+stdout/stderr flow to journald and remain available through journalctl -u bhr-api. Do not add application log files.
+
+ExecStart never runs install, build, migration, bootstrap, backup, or restore. Those remain explicit operations.
+
+Deployment Workflow
+
+Create infra/scripts/deploy.sh for the checkout already selected at /opt/bhr-cms.
+
+It must not run git pull, fetch, checkout, or reset. Revision selection belongs to the operator or CI.
+
+Before service mutation, validate:
+
+• Effective root privileges
+• Repository path exactly /opt/bhr-cms
+• Clean tracked Git state
+• Required host commands
+• Bun 1.4.0
+• Private environment file
+• All Phase Q production environment rules
+• Existing asset directory writable by bhr-cms
+• TLS files readable by nginx
+• Admin hostname absent from domains.hostname
+• Valid migration history
+• PostgreSQL connectivity
+
+Do not expose secrets in failures.
+
+Deployment then runs:
+
+bun install --frozen-lockfile
+bun run typecheck
+bun run build
+bun run db:migration:check
+bun run db:check
+
+before changing the running service. Do not run the full integration matrix during production deployment; exact-commit CI owns normal regressions.
+
+Configuration installation:
+
+1. Render the validated nginx template.
+2. Install it under /etc/nginx/conf.d/.
+3. Install bhr-api.service under /etc/systemd/system/.
+4. Run nginx -t.
+5. Run systemctl daemon-reload.
+
+nginx syntax failure occurs before reloading the existing configuration.
+
+After build and configuration validation, stop bhr-api if running, run bun run db:migrate, then start/restart bhr-api. This is a maintenance-window deployment; do not claim zero downtime or add blue/green releases, release symlinks, or multiple API versions.
+
+After starting, poll http://127.0.0.1:<API_PORT>/health for at most a bounded period such as 30 seconds. Require HTTP 200 with exactly {"status":"ok"}.
+
+After internal health succeeds, reload nginx and verify the admin health route through local TLS/SNI using curl --resolve with the installed certificate. Do not use -k.
+
+If deployment fails after migration or service replacement, report the stage and leave diagnostics intact. Do not guess a database downgrade or build an automatic rollback manager. Recovery uses an explicitly selected code revision and/or verified backup.
+
+Deployment never invokes auth:bootstrap.
+
+Operations Lock
+
+backup.sh, restore.sh, and deploy.sh serialize through one host-local flock:
+
+/run/lock/bhr-cms-ops.lock
+
+Another operation refuses rather than queues. Do not add a lock daemon or database operations-lock table.
+
+Backup Ownership and Consistency
+
+Create infra/scripts/backup.sh to produce one coordinated PostgreSQL-plus-asset backup.
+
+Because PostgreSQL and the local filesystem cannot share a transaction, v1 backup uses a short maintenance window:
+
+validate prerequisites
+    ↓
+acquire operations lock
+    ↓
+stop bhr-api
+    ↓
+dump PostgreSQL
+    ↓
+archive asset originals
+    ↓
+finalize backup archive
+    ↓
+restart bhr-api
+    ↓
+verify health
+
+Stopping the sole API prevents BeHR mutations during both captures. Do not claim online cross-store consistency.
+
+Once the API has stopped, bounded trap/cleanup behavior attempts a restart if backup creation fails and reports a restart failure separately.
+
+Create database.dump using pg_dump custom format with --no-owner and --no-acl. Pass database authority through environment/libpq behavior rather than a command-line URI that exposes credentials. Never echo DATABASE_URL.
+
+Create assets.tar from exactly the contents beneath /var/lib/bhr-cms/uploads, preserving <siteId>/<assetId>. Do not include unrelated /var/lib/bhr-cms data.
+
+Backup Archive Format
+
+Use temporary staging and atomic final rename to create:
+
+/var/backups/bhr-cms/bhr-cms-<UTC timestamp>.tar.gz
+
+The archive contains exactly:
+
+database.dump
+assets.tar
+manifest.txt
+SHA256SUMS
+
+manifest.txt contains only non-secret format version, UTC creation timestamp, and Git commit SHA. Never record DATABASE_URL, BETTER_AUTH_SECRET, tokens, TLS keys, or environment content.
+
+SHA256SUMS covers database.dump, assets.tar, and manifest.txt. Restore verifies these before destructive action.
+
+The final archive is root-owned mode 0600 in a root-owned 0700 backup directory. It is never web-readable.
+
+Do not include the checkout, node_modules, dist output, environment files, TLS keys, nginx/journal logs, or temporary files. The manifest Git SHA is code provenance.
+
+Restore Ownership and Confirmation
+
+Create infra/scripts/restore.sh accepting one explicit backup archive path. Restore is destructive maintenance.
+
+Require an explicit --confirm-restore acknowledgement. Without it, refuse before service stop, database mutation, or asset mutation. An interactive prompt is not sufficient as the only guard.
+
+Validate Before Mutation
+
+Before stopping the API:
+
+1. Validate archive existence/type.
+2. Reject outer members outside database.dump, assets.tar, manifest.txt, and SHA256SUMS.
+3. Extract to a temporary directory.
+4. Verify SHA256SUMS.
+5. Validate all required components.
+6. Reject absolute, traversal, or .. asset members.
+7. Verify database.dump is readable by pg_restore.
+
+Do not extract an unvalidated root-owned archive over production paths.
+
+Extract assets into a temporary sibling/staging directory. Do not extract directly into the live upload root.
+
+Database and Asset Restore
+
+With bhr-api stopped, restore into the existing target database using:
+
+pg_restore
+--clean
+--if-exists
+--no-owner
+--no-acl
+--single-transaction
+
+Do not create or drop the database; database/role provisioning is operator-owned.
+
+After database restore succeeds:
+
+1. Preserve the current upload root under a temporary pre-restore sibling name.
+2. Rename the staged restored root into /var/lib/bhr-cms/uploads on the same filesystem.
+3. Restore bhr-cms ownership and required permissions.
+4. Keep pre-restore assets until final health succeeds.
+
+Do not copy individual files into live state while the service runs.
+
+Then run bun run db:migrate so an older valid backup advances to the deployed code schema. Migrations never run before archive validation.
+
+Start bhr-api and verify loopback /health. On success, remove the pre-restore asset root and report success.
+
+Restore Failure Policy
+
+If restore fails after destructive work begins, do not serve known or uncertain partial state. Leave or return bhr-api to stopped state, preserve available pre-restore assets, report the failed stage, and require explicit operator recovery.
+
+Do not attempt database rollback beyond pg_restore --single-transaction and do not silently restart after an uncertain restore.
+
+Health and Local Observability
+
+Phase Q uses only GET /health. Do not add readiness, liveness, metrics, or status routes.
+
+The endpoint proves the Bun/Hono process is serving requests. It does not become a database or filesystem deep-health check.
+
+Database health remains bun run db:check. Asset availability and free space remain filesystem inspection. Document local signals using curl, bun run db:check, df, journalctl, and nginx log inspection without installing a monitoring agent.
+
+Production Route Topology
+
+Admin host:
+
+https://admin-host/              → admin static application
+https://admin-host/auth/*        → Bun API
+https://admin-host/tenants*      → Bun API
+https://admin-host/health        → Bun API
+
+Tenant host:
+
+https://tenant-host/             → public web application
+https://tenant-host/<slug>       → public web application
+https://tenant-host/public/*     → Bun API with Host preserved
+https://tenant-host/preview/*    → Bun API with Host preserved
+https://tenant-host/health       → Bun API with Host preserved
+tenant /auth* and /tenants*      → nginx HTTP 404
+
+Explicit Exclusions
+
+Phase Q adds no business/API behavior, content contract, schema, migration, domain administration, automated DNS/TLS, Certbot/ACME, firewall or OS-package management, database/service-user provisioning, containerization, worker/queue, object storage/CDN, remote monitoring/log shipping, metrics backend, backup scheduler/timer/cron, zero-downtime deployment, automatic migration rollback, release/symlink framework, secret manager, or multiple API processes.
+
+Backup scheduling remains operator responsibility.
 
 Files / Functions
+
+apps/api
+
+src/application.ts
+src/index.test.ts
+
+Only the fixed loopback server option and focused verification are authorized. Do not change routes or business behavior.
 
 infra/scripts
 
 backup.sh
 restore.sh
 deploy.sh
+README.md
 
 infra/nginx
 
 bhr-cms.conf
+README.md
 
 infra/systemd
 
 bhr-api.service
+README.md
+
+.github/workflows/ci.yml
+
+CI may add only shell syntax checks equivalent to:
+
+bash -n infra/scripts/backup.sh
+bash -n infra/scripts/restore.sh
+bash -n infra/scripts/deploy.sh
+
+Ordinary CI does not install nginx, systemd, or PostgreSQL operational packages.
+
+Documentation
+
+docs/ARCHITECTURE.md
+docs/DOCUMENTATION.md
+
+No unnamed support surface exists.
+
+Dependencies
+
+Use host-native operational tools. No package.json, workspace edge, Bun operations package, or bun.lock change is expected.
+
+Repository Verification
+
+Extend the existing API unit surface to prove application.server.hostname equals 127.0.0.1 while port, fetch, error, and existing behavior remain intact.
+
+Run bash -n for all three operational scripts.
+
+Where nginx exists on Linux, render the committed template with a valid test admin hostname/API port, prove no unresolved token remains, and run nginx syntax validation. If nginx is unavailable, report NOT RUN; source inspection is not syntax execution.
+
+Where systemd tooling exists, run systemd-analyze verify or equivalent. Otherwise report NOT RUN.
+
+Run normal repository gates:
+
+bun --version
+bun install --frozen-lockfile
+bun run typecheck
+bun run test
+bun run build
+bun audit
+
+Run bun run db:migration:check when PostgreSQL tooling/environment permits. No schema or migration generation is expected. Do not locally rerun every business integration solely because infrastructure changed; exact-commit CI owns the normal complete matrix.
+
+Real Linux/VPS Acceptance
+
+Production acceptance is a distinct required gate on a disposable Linux VPS/VM or equivalent with systemd, nginx, PostgreSQL clients, a real filesystem, TLS test certificate, and the real built Bun production process.
+
+If unavailable, report overall Phase Q operational acceptance as INCONCLUSIVE. Do not represent syntax or unit tests as a successful deployment.
+
+The Linux gate must execute and prove:
+
+• Bun listens on loopback only; nginx listens publicly on 80/443
+• Admin static, health, and unauthenticated session routing
+• Tenant static/public/preview routing with real Host/SNI preservation
+• Tenant /auth* and /tenants* return nginx 404
+• Excess login/register requests receive HTTP 429
+• Admin HTTPS response includes frame protection
+• nginx access logging omits query strings and credentials
+• systemd runs the API as bhr-cms with declared hardening and journal output
+
+Backup acceptance populates a disposable database marker and known asset bytes, runs backup.sh, verifies API health afterward, and proves the final restrictive archive contains exactly database.dump, assets.tar, manifest.txt, and SHA256SUMS with valid checksums, Git provenance, and no environment/TLS material.
+
+Restore negative controls prove missing --confirm-restore refuses without mutation, checksum corruption fails before service/database/assets mutation, and an absolute/traversal asset entry is rejected before production mutation or outside-file creation.
+
+Positive restore mutates the disposable marker/assets, restores a valid backup, migrates forward, restarts the API, and proves the original database marker, asset bytes, and health.
+
+Deployment acceptance executes validated production environment, frozen install, typecheck, build, migration-history and DB checks, nginx render/test, systemd install/verify, migration, API restart, loopback health, nginx reload, and TLS/admin health.
+
+A dirty tracked checkout control proves deploy refuses before migration, service restart, or nginx reload.
+
+An operations-lock control holds /run/lock/bhr-cms-ops.lock and proves backup, restore, and deploy each refuse rather than queue or overlap.
+
+Documentation During Implementation
+
+Update current-state architecture with nginx external ownership, loopback API, admin/public routing, TLS responsibility and limitation, systemd/journald lifecycle, production paths, backup downtime/consistency, restore safety, health semantics, and explicit absence of automated TLS/DNS/scheduling/rollback.
+
+Record implementation rationale and actual evidence in DOCUMENTATION.md, including why backup stops the API, DB/assets form one set, restore validates before mutation, pg_restore is transactional, deploy never changes Git revision or auto-rolls back, TLS remains operator-managed, and no monitoring/logging framework was added.
 
 Acceptance Criteria
 
-Deployment succeeds.
+1. nginx is the only externally listening HTTP service.
+2. Bun API binds only to loopback.
+3. Production admin and API use one HTTPS origin.
+4. Admin and tenant host routing are distinct.
+5. Tenant hosts cannot reach admin API paths through nginx.
+6. Actual Host is preserved to public and preview reads.
+7. HTTP redirects to HTTPS.
+8. Operator-managed TLS is configured and TLS automation is absent.
+9. The installed certificate limitation for tenant hosts is documented.
+10. Admin frame protection is delivered as an HTTP header.
+11. Login/register receive bounded nginx rate limiting.
+12. Access logs omit query strings and credentials.
+13. Bun stdout/stderr reaches journald.
+14. systemd runs Bun as unprivileged bhr-cms with bounded filesystem access.
+15. Service restarts on process failure.
+16. Deploy uses frozen dependencies and builds before service mutation.
+17. Deploy validates migration history, database connectivity, environment, TLS, paths, and reserved admin host.
+18. Deploy never changes Git revision or invokes bootstrap.
+19. Deploy runs migrations only in an explicit maintenance window.
+20. Deploy verifies loopback and nginx/TLS health.
+21. Deployment has no automatic rollback or zero-downtime framework.
+22. Backup contains PostgreSQL and asset originals as one coordinated set.
+23. Backup stops the sole API during cross-store capture.
+24. Backup failure attempts service restart.
+25. Backup excludes environment secrets and TLS keys.
+26. Backup records commit provenance and checksums with restrictive permissions.
+27. Restore requires explicit destructive confirmation.
+28. Restore validates members, checksums, database dump, and asset paths before stopping the service.
+29. Restore rejects traversal and unknown members.
+30. Database restore uses pg_restore --single-transaction.
+31. Assets restore through staging and same-filesystem swap.
+32. Restored database migrates forward to current code.
+33. Successful restore returns API health and only then removes pre-restore assets.
+34. Failed uncertain restore does not serve partial state.
+35. Backup, restore, and deploy cannot run concurrently.
+36. Existing /health semantics remain process-only and unchanged.
+37. Required local operational signals are documented without an agent.
+38. No new API, content, persistence, schema, or migration behavior exists.
+39. No package dependency or lockfile change exists.
+40. No worker, queue, container, monitoring service, TLS daemon, or backup scheduler exists.
+41. Shell syntax and focused API binding verification pass.
+42. Linux/VPS deployment, routing, backup, restore, and lock acceptance are actually executed before production-ready PASS; otherwise operational acceptance is INCONCLUSIVE.
 
-Backup executes successfully.
+Output Format
 
-Restore executes successfully.
-
-Health endpoint responds.
+Files created
+Files modified
+Commands executed
+API binding, shell, nginx, systemd, routing, TLS, rate-limit, logging, deploy, backup, restore, health, dependency, scope, regression, and Linux/VPS acceptance evidence
 
 ────────
 
