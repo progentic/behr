@@ -20,6 +20,14 @@ test("allows credentialed auth requests only for the configured admin origin", a
         throw new Error("Site creation is not used by this CORS test.");
       },
       listSites: async () => [],
+      resolveSiteSettings: async () => {
+        throw new Error(
+          "Site settings resolution is not used by this CORS test.",
+        );
+      },
+      updateSiteSettings: async () => {
+        throw new Error("Site settings update is not used by this CORS test.");
+      },
     },
     {
       listMembers: async () => [],

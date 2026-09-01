@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun run --hot index.html",
     "build": "bun build ./index.html --outdir dist",
-    "test": "bun test src/PageList.test.ts src/PageEditor.test.ts",
+    "test": "bun test src/PageList.test.ts src/PageEditor.test.ts src/SiteSettings.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

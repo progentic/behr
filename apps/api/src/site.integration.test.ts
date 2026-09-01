@@ -1,14 +1,17 @@
 import { expect, test } from "bun:test";
 import {
+  DEFAULT_THEME_TOKENS,
   type SiteSummary,
   type TenantAccess,
   siteListResponseSchema,
+  siteSettingsResponseSchema,
   siteSummarySchema,
   tenantAccessSchema,
 } from "@bher/contracts";
 import {
   type DatabaseClient,
   createDatabaseClient,
+  createSitePersistence,
   loadDatabaseConfig,
   memberships,
 } from "@bher/db";
@@ -24,6 +27,14 @@ type TestIdentity = Readonly<{
   name: string;
   email: string;
   password: string;
+}>;
+
+type StoredSiteSettings = Readonly<{
+  name: string;
+  hostname: string;
+  themeCount: number;
+  colorScheme: string | null;
+  fontFamily: string | null;
 }>;
 
 test("enforces the site and hostname lifecycle", verifySiteLifecycle);
@@ -210,6 +221,213 @@ async function verifySiteLifecycle(): Promise<void> {
       await listSites(application, ownerTenant.id, ownerCookie),
     ).toEqual([ownerSite]);
 
+    const settingsPath = `/tenants/${ownerTenant.id}/sites/${ownerSite.id}/settings`;
+    expect((await application.app.request(settingsPath)).status).toBe(401);
+
+    const defaultSettingsResponse = await application.app.request(
+      settingsPath,
+      { headers: { cookie: ownerCookie } },
+    );
+    expect(defaultSettingsResponse.status).toBe(200);
+    expect(
+      siteSettingsResponseSchema.parse(await defaultSettingsResponse.json()),
+    ).toEqual({ site: ownerSite, theme: DEFAULT_THEME_TOKENS });
+    expect(await readStoredSiteSettings(observer, ownerSite.id)).toEqual({
+      name: ownerSite.name,
+      hostname: ownerSite.hostname,
+      themeCount: 0,
+      colorScheme: null,
+      fontFamily: null,
+    });
+
+    const memberSettingsGet = await application.app.request(settingsPath, {
+      headers: { cookie: memberCookie },
+    });
+    expect(memberSettingsGet.status).toBe(403);
+    expect(await memberSettingsGet.json()).toEqual({
+      error: "Site settings are not allowed.",
+    });
+    const memberSettingsPut = await requestSiteSettingsUpdate(
+      application,
+      settingsPath,
+      origin,
+      memberCookie,
+      {
+        name: "Member Mutation",
+        theme: { colorScheme: "dark", fontFamily: "serif" },
+      },
+    );
+    expect(memberSettingsPut.status).toBe(403);
+    expect(await readStoredSiteSettings(observer, ownerSite.id)).toEqual({
+      name: ownerSite.name,
+      hostname: ownerSite.hostname,
+      themeCount: 0,
+      colorScheme: null,
+      fontFamily: null,
+    });
+
+    const invalidUpdate = await requestSiteSettingsUpdate(
+      application,
+      settingsPath,
+      origin,
+      ownerCookie,
+      {
+        name: "Changed",
+        hostname: "attacker.example.com",
+        theme: { colorScheme: "dark", fontFamily: "serif" },
+      },
+    );
+    expect(invalidUpdate.status).toBe(400);
+    expect(await invalidUpdate.json()).toEqual({
+      error: "Site settings request is invalid.",
+    });
+    expect(await readStoredSiteSettings(observer, ownerSite.id)).toEqual({
+      name: ownerSite.name,
+      hostname: ownerSite.hostname,
+      themeCount: 0,
+      colorScheme: null,
+      fontFamily: null,
+    });
+
+    const untrustedUpdate = await application.app.request(settingsPath, {
+      method: "PUT",
+      headers: new Headers({
+        "content-type": JSON_CONTENT_TYPE,
+        cookie: ownerCookie,
+      }),
+      body: JSON.stringify({
+        name: "Untrusted Mutation",
+        theme: { colorScheme: "dark", fontFamily: "serif" },
+      }),
+    });
+    expect(untrustedUpdate.status).toBe(403);
+    expect(await readStoredSiteSettings(observer, ownerSite.id)).toEqual({
+      name: ownerSite.name,
+      hostname: ownerSite.hostname,
+      themeCount: 0,
+      colorScheme: null,
+      fontFamily: null,
+    });
+
+    const firstUpdateResponse = await requestSiteSettingsUpdate(
+      application,
+      settingsPath,
+      origin,
+      ownerCookie,
+      {
+        name: "  Renamed Site  ",
+        theme: { colorScheme: "dark", fontFamily: "serif" },
+      },
+    );
+    expect(firstUpdateResponse.status).toBe(200);
+    const firstUpdate = siteSettingsResponseSchema.parse(
+      await firstUpdateResponse.json(),
+    );
+    expect(firstUpdate).toEqual({
+      site: { ...ownerSite, name: "Renamed Site" },
+      theme: { colorScheme: "dark", fontFamily: "serif" },
+    });
+    expect(await readStoredSiteSettings(observer, ownerSite.id)).toEqual({
+      name: "Renamed Site",
+      hostname: ownerSite.hostname,
+      themeCount: 1,
+      colorScheme: "dark",
+      fontFamily: "serif",
+    });
+    expect(
+      await listSites(application, ownerTenant.id, ownerCookie),
+    ).toEqual([firstUpdate.site]);
+
+    const secondUpdateResponse = await requestSiteSettingsUpdate(
+      application,
+      settingsPath,
+      origin,
+      ownerCookie,
+      {
+        name: "Final Site Name",
+        theme: { colorScheme: "light", fontFamily: "sans" },
+      },
+    );
+    expect(secondUpdateResponse.status).toBe(200);
+    const secondUpdate = siteSettingsResponseSchema.parse(
+      await secondUpdateResponse.json(),
+    );
+    expect(secondUpdate).toEqual({
+      site: { ...ownerSite, name: "Final Site Name" },
+      theme: DEFAULT_THEME_TOKENS,
+    });
+    expect(await readStoredSiteSettings(observer, ownerSite.id)).toEqual({
+      name: "Final Site Name",
+      hostname: ownerSite.hostname,
+      themeCount: 1,
+      colorScheme: "light",
+      fontFamily: "sans",
+    });
+
+    const wrongTenantSettings = await application.app.request(
+      `/tenants/${memberTenant.id}/sites/${ownerSite.id}/settings`,
+      { headers: { cookie: memberCookie } },
+    );
+    expect(wrongTenantSettings.status).toBe(404);
+    expect(await wrongTenantSettings.json()).toEqual({
+      error: "Site not found.",
+    });
+    const missingSiteSettings = await application.app.request(
+      `/tenants/${ownerTenant.id}/sites/${crypto.randomUUID()}/settings`,
+      { headers: { cookie: ownerCookie } },
+    );
+    expect(missingSiteSettings.status).toBe(404);
+    expect(await missingSiteSettings.json()).toEqual({
+      error: "Site not found.",
+    });
+    const malformedSiteSettings = await application.app.request(
+      `/tenants/${ownerTenant.id}/sites/not-a-uuid/settings`,
+      { headers: { cookie: ownerCookie } },
+    );
+    expect(malformedSiteSettings.status).toBe(404);
+    expect(await malformedSiteSettings.json()).toEqual({
+      error: "Site not found.",
+    });
+
+    const sitePersistence = createSitePersistence(observer);
+    await expect(
+      sitePersistence.updateSiteSettings(
+        ownerTenant.id,
+        ownerSite.id,
+        "Rolled Back Name",
+        {
+          colorScheme: null as unknown as string,
+          fontFamily: "serif",
+        },
+      ),
+    ).rejects.toThrow();
+    expect(await readStoredSiteSettings(observer, ownerSite.id)).toEqual({
+      name: "Final Site Name",
+      hostname: ownerSite.hostname,
+      themeCount: 1,
+      colorScheme: "light",
+      fontFamily: "sans",
+    });
+
+    await observer.native`
+      UPDATE themes SET color_scheme = 'neon' WHERE site_id = ${ownerSite.id}
+    `;
+    const malformedThemeResponse = await application.app.request(
+      settingsPath,
+      { headers: { cookie: ownerCookie } },
+    );
+    expect(malformedThemeResponse.status).toBe(500);
+    const malformedThemeBody = await malformedThemeResponse.json();
+    expect(malformedThemeBody).toEqual({ error: "Internal server error." });
+    expect(JSON.stringify(malformedThemeBody)).not.toContain("neon");
+    expect(JSON.stringify(malformedThemeBody)).not.toContain("Zod");
+    expect((await readStoredSiteSettings(observer, ownerSite.id)).colorScheme).toBe(
+      "neon",
+    );
+    await observer.native`
+      UPDATE themes SET color_scheme = 'light' WHERE site_id = ${ownerSite.id}
+    `;
+
     expect((await application.app.request("/health")).status).toBe(200);
     expect(
       (await application.app.request("/auth/session", {
@@ -265,6 +483,43 @@ async function listSites(
   });
   expect(response.status).toBe(200);
   return siteListResponseSchema.parse(await response.json()).sites;
+}
+
+async function requestSiteSettingsUpdate(
+  application: ApiApplication,
+  path: string,
+  origin: string,
+  cookie: string,
+  body: unknown,
+): Promise<Response> {
+  return await application.app.request(path, {
+    method: "PUT",
+    headers: createRequestHeaders(origin, cookie),
+    body: JSON.stringify(body),
+  });
+}
+
+async function readStoredSiteSettings(
+  observer: DatabaseClient,
+  siteId: string,
+): Promise<StoredSiteSettings> {
+  const [record] = await observer.native<StoredSiteSettings[]>`
+    SELECT
+      sites.name,
+      domains.hostname,
+      count(themes.site_id)::int AS "themeCount",
+      max(themes.color_scheme) AS "colorScheme",
+      max(themes.font_family) AS "fontFamily"
+    FROM sites
+    INNER JOIN domains ON domains.site_id = sites.id
+    LEFT JOIN themes ON themes.site_id = sites.id
+    WHERE sites.id = ${siteId}
+    GROUP BY sites.id, domains.hostname
+  `;
+  if (!record) {
+    throw new Error("Expected stored site settings.");
+  }
+  return record;
 }
 
 async function authenticateIdentity(

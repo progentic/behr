@@ -89,12 +89,17 @@ export {
 export {
   type CreateSiteRequest,
   type SiteListResponse,
+  type SiteSettingsResponse,
   type SiteSummary,
+  type UpdateSiteSettingsRequest,
   createSiteRequestSchema,
   hostnameSchema,
   siteIdSchema,
   siteListResponseSchema,
+  siteNameSchema,
+  siteSettingsResponseSchema,
   siteSummarySchema,
+  updateSiteSettingsRequestSchema,
 } from "./site";
 export {
   type ContentWidthToken,

@@ -85,6 +85,7 @@ flowchart TD
     Request --> TenantAccess[GET /tenants/:tenantId]
     Request --> CreateSite[POST /tenants/:tenantId/sites]
     Request --> ListSites[GET /tenants/:tenantId/sites]
+    Request --> SiteSettings[GET/PUT /tenants/:tenantId/sites/:siteId/settings]
     Request --> Members[GET/POST /tenants/:tenantId/members]
     Request --> Pages[GET/POST /tenants/:tenantId/sites/:siteId/pages]
     Request --> Draft[GET /tenants/:tenantId/sites/:siteId/pages/:pageId]
@@ -189,6 +190,9 @@ site asset picker, current-publication byte delivery, and exact token-bound
 preview byte delivery.
 Phase N adds one optional current theme-token row per site and includes the
 resolved bounded theme in existing public and preview page responses.
+Phase O adds owner-only settings reads and trusted-origin updates for the
+existing site name and bounded current theme row. Hostname remains read-only
+domain context.
 
 The currently implemented public API routes are exactly:
 
@@ -202,6 +206,8 @@ The currently implemented public API routes are exactly:
 * `GET /tenants/:tenantId`
 * `POST /tenants/:tenantId/sites`
 * `GET /tenants/:tenantId/sites`
+* `GET /tenants/:tenantId/sites/:siteId/settings`
+* `PUT /tenants/:tenantId/sites/:siteId/settings`
 * `GET /tenants/:tenantId/members`
 * `POST /tenants/:tenantId/members`
 * `GET /tenants/:tenantId/sites/:siteId/pages`
@@ -246,8 +252,12 @@ administration and invite registration. Phase G adds no admin behavior. Phase K
 adds the first page-authoring interface. Phase M adds a tenant/site-keyed
 renderable-asset list and inline image selection with alt-text editing. Upload,
 deletion, search, and broader media management remain absent from the admin.
-Theme, domain-administration, preview-control, and publishing interfaces remain
-unimplemented.
+Phase O adds an owner-only `SiteSettings` workflow for the existing site name
+and light/dark plus sans/serif theme tokens. It keeps hostname visible but
+read-only, uses resource-keyed local state and inline alert/status feedback,
+and updates the current tenant's existing site list after a successful save.
+Domain administration, custom CSS, theme catalogs/frameworks, preview controls,
+and publishing interfaces remain unimplemented.
 
 ---
 
@@ -396,6 +406,14 @@ Phase N adds `themes`, containing exactly one optional current row per site:
 the row. Existing sites have no backfill; absence resolves to the shared
 light/sans default.
 
+Phase O introduces no schema. Its owner-only settings mutation updates
+`sites.name` and inserts or updates the site's one `themes` row in the same
+transaction. The transaction resolves the site through its tenant and existing
+domain, returns hostname only as read-only context, and never mutates `domains`.
+An absent theme row receives defaults at the API response boundary; malformed
+stored tokens continue to fail through generic HTTP 500 rather than being
+repaired or replaced.
+
 The database remains the sole session authority. Browser cookies contain only
 the opaque session identifier; they do not authorize a user without a valid
 database session.
@@ -406,9 +424,13 @@ the authenticated session user ID. Invalid, nonexistent, and inaccessible
 tenant IDs all return HTTP 404 without disclosing tenant existence.
 
 Site routes reuse this tenant context. Owners may create and list sites;
-members may list sites but receive HTTP 403 for creation. Phase H resolves a
-validated HTTP Host against the globally unique stored hostname for public
-reads; it does not add domain administration or production proxy routing.
+members may list sites but receive HTTP 403 for creation. Phase O adds
+owner-only settings GET and PUT beneath the same route group. PUT retains
+trusted-origin protection, both operations prove the site belongs to the path
+tenant, and inaccessible sites return nondisclosing HTTP 404. Phase H resolves
+a validated HTTP Host against the globally unique stored hostname for public
+reads; neither Phase H nor Phase O adds domain administration or production
+proxy routing.
 
 Page routes additionally prove that the requested site belongs to that tenant
 and that the requested page belongs to that site. Both owners and members may

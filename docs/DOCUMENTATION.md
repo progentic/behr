@@ -1395,3 +1395,63 @@ authoritative integrity-failure paths feeding Hono's global boundary.
 
 This baseline reports server request failures only. Browser render-failure
 fallbacks remain assigned to Phase P, and no client telemetry is authorized.
+
+---
+
+## Phase O — Theme and Site Settings UI
+
+### One bounded owner-controlled resource
+
+Phase O adds exactly:
+
+```text
+GET /tenants/:tenantId/sites/:siteId/settings
+PUT /tenants/:tenantId/sites/:siteId/settings
+```
+
+Both routes require an authenticated tenant owner. PUT also retains the
+existing trusted-origin mutation boundary. The strict resource contains the
+existing site summary and the existing Phase N theme tokens; update input
+contains only normalized site name plus light/dark and sans/serif selections.
+
+Hostname remains read-only because domain identity belongs to the separate
+`domains` relation. No hostname value is accepted in update input, and the
+settings transaction never changes domain persistence.
+
+### Existing persistence ownership and atomicity
+
+`SitePersistence` resolves settings through tenant-scoped `sites`, the site's
+required domain, and its optional current `themes` row. Absence remains distinct
+from malformed storage: an absent row receives `DEFAULT_THEME_TOKENS` at the API
+boundary, while unsupported persisted tokens fail strict response validation
+through the existing generic HTTP 500 boundary.
+
+One transaction updates `sites.name` and upserts the site's single theme row.
+The first save creates that row and later saves update it, including an explicit
+light/sans selection. PostgreSQL rollback coverage proves a rejected theme
+write cannot leave the site-name write committed.
+
+### Admin ownership and feedback
+
+The owner-only `SiteSettings` component is keyed by tenant and site. It loads
+and saves through the existing credentialed `requestApi` boundary, retains all
+form state locally, disables editable controls during the one permitted
+in-flight save, and reports failures with local alert semantics and progress or
+success with local status semantics.
+
+On success, `SitesPage` uses a functional state update that applies the returned
+site only to the matching currently loaded tenant and existing site ID. This
+updates the visible name without reloading the complete site list and prevents
+a late result from crossing tenant-owned state.
+
+### Verification and exclusions
+
+Focused contract, admin, and PostgreSQL integration coverage verifies strict
+request/response confinement, owner/member and trusted-origin behavior,
+default read-without-write semantics, theme upsert, hostname preservation,
+nondisclosing site scope, transactional rollback, malformed-theme failure, and
+tenant-keyed parent-state protection.
+
+Phase O adds no schema or migration, dependency, domain administration, custom
+CSS, named themes, theme catalog/framework, live preview, toast system, global
+state, React error boundary, or Phase P behavior.

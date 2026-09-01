@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 
 import { PageList } from "./PageList";
 import { SiteCreateForm } from "./SiteCreateForm";
+import { SiteSettings } from "./SiteSettings";
 import { TenantMembers } from "./TenantMembers";
 import { requestApi } from "./lib/api";
 
@@ -16,7 +17,7 @@ type TenantState =
   | Readonly<{ status: "error" }>
   | Readonly<{ status: "loaded"; tenants: TenantAccess[] }>;
 
-type SiteState =
+export type SiteState =
   | Readonly<{ status: "idle" }>
   | Readonly<{ status: "loading"; tenantId: string }>
   | Readonly<{ status: "error"; tenantId: string }>
@@ -106,6 +107,12 @@ export function SitesPage() {
     return <p role="alert">The selected tenant is unavailable.</p>;
   }
   const formTenantId = selectedTenant.id;
+  const selectedSite =
+    siteState.status === "loaded" &&
+    siteState.tenantId === selectedTenant.id &&
+    selectedSiteId !== null
+      ? siteState.sites.find(({ id }) => id === selectedSiteId) ?? null
+      : null;
 
   return (
     <section>
@@ -166,18 +173,47 @@ export function SitesPage() {
       {selectedTenant.role === "owner" ? (
         <TenantMembers key={selectedTenant.id} tenantId={selectedTenant.id} />
       ) : null}
-      {siteState.status === "loaded" &&
-      siteState.tenantId === selectedTenant.id &&
-      selectedSiteId !== null &&
-      siteState.sites.some(({ id }) => id === selectedSiteId) ? (
-        <PageList
-          key={`${selectedTenant.id}:${selectedSiteId}`}
+      {selectedTenant.role === "owner" && selectedSite ? (
+        <SiteSettings
+          key={`${selectedTenant.id}:${selectedSite.id}`}
           tenantId={selectedTenant.id}
-          siteId={selectedSiteId}
+          siteId={selectedSite.id}
+          onUpdated={(updatedSite) =>
+            setSiteState((current) =>
+              applyUpdatedSite(current, selectedTenant.id, updatedSite),
+            )
+          }
+        />
+      ) : null}
+      {selectedSite ? (
+        <PageList
+          key={`${selectedTenant.id}:${selectedSite.id}`}
+          tenantId={selectedTenant.id}
+          siteId={selectedSite.id}
         />
       ) : null}
     </section>
   );
+}
+
+export function applyUpdatedSite(
+  state: SiteState,
+  tenantId: string,
+  updatedSite: SiteSummary,
+): SiteState {
+  if (
+    state.status !== "loaded" ||
+    state.tenantId !== tenantId ||
+    !state.sites.some(({ id }) => id === updatedSite.id)
+  ) {
+    return state;
+  }
+  return {
+    ...state,
+    sites: state.sites.map((site) =>
+      site.id === updatedSite.id ? updatedSite : site,
+    ),
+  };
 }
 
 function SiteList({
