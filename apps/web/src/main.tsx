@@ -152,6 +152,7 @@ function renderPublicPageState(
           <PageRenderer
             document={state.page.document}
             previewToken={previewToken}
+            theme={state.page.theme}
           />
         </main>
       );

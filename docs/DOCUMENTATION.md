@@ -1288,3 +1288,57 @@ Phase M adds no asset update/delete/rename/search, usage-count endpoint,
 signed URL, MIME sniffing, SVG delivery, resizing, thumbnails, derivatives,
 transcoding, media cache, service worker, worker, queue, or Phase N theme
 behavior.
+
+---
+
+## Phase N — Theme Runtime Contract
+
+### Minimal current site theme
+
+Each site may have one current `themes` row with only:
+
+```text
+site_id
+color_scheme: light | dark
+font_family: sans | serif
+```
+
+`site_id` is both the primary key and a cascading foreign key to the site. No
+active pointer, name, history, inheritance, preset, or version exists. Sites
+without a row use the shared `{colorScheme: "light", fontFamily: "sans"}`
+default, so no migration backfill is required.
+
+### Current-state read semantics
+
+The existing `/public/page` and `/preview/page` responses now require a strict
+`theme` object. Public content remains authorized by the current published
+version. Preview content remains authorized by the existing token-bound
+immutable version. The optional theme join is supplemental and cannot authorize
+a page.
+
+Theme is current site state rather than immutable page content. Publishing does
+not snapshot it, and preview-token issuance does not bind it. A valid preview
+token continues to reference the same immutable document while subsequent
+reads immediately observe a changed current site theme.
+
+Missing rows receive the shared default at the API response boundary. A stored
+unsupported token is treated as malformed persisted state: complete response
+validation fails through generic HTTP 500 without repair, fallback, token
+disclosure, or validation details.
+
+### Trusted renderer mapping
+
+The shared `PageRenderer` receives `document`, `previewToken`, and `theme`.
+One root wrapper maps the bounded tokens to application-owned background, text,
+and local font-family constants. Existing heading, paragraph, public-image, and
+preview-image behavior remains unchanged.
+
+No arbitrary CSS, dynamic user CSS variables, remote fonts, ThemeProvider,
+React context, styling dependency, or separate theme request exists.
+
+### Read-only Phase N boundary
+
+Phase N has no production theme insert/update/delete operation and exposes no
+theme or settings route. Integration fixtures write rows directly only to prove
+read semantics. Phase O remains responsible for future authorized theme and
+settings management UI.

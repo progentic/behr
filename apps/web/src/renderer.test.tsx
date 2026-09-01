@@ -1,4 +1,8 @@
-import type { PageDocument } from "@bher/contracts";
+import {
+  DEFAULT_THEME_TOKENS,
+  type PageDocument,
+  type ThemeTokens,
+} from "@bher/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { PageRenderer, requestPreviewAsset } from "./renderer";
@@ -19,8 +23,27 @@ const PREVIEW_TOKEN = "A".repeat(43);
 
 test("renders empty canonical content deterministically", () => {
   const document: PageDocument = { schemaVersion: 1, sections: [] };
-  expect(renderDocument(document)).toBe("");
+  expect(renderDocument(document)).toBe(
+    '<div style="background-color:#ffffff;color:#111111;font-family:system-ui, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif"></div>',
+  );
   expect(renderDocument(document)).toBe(renderDocument(document));
+});
+
+test("maps bounded themes to distinct trusted root styles", () => {
+  const document: PageDocument = { schemaVersion: 1, sections: [] };
+  const light = renderDocument(document, null, DEFAULT_THEME_TOKENS);
+  const dark = renderDocument(document, null, {
+    colorScheme: "dark",
+    fontFamily: "serif",
+  });
+  expect(light).toContain("background-color:#ffffff");
+  expect(light).toContain("color:#111111");
+  expect(light).toContain("font-family:system-ui");
+  expect(dark).toContain("background-color:#111111");
+  expect(dark).toContain("color:#f5f5f5");
+  expect(dark).toContain("font-family:Georgia");
+  expect(light).not.toContain("background-color:#111111");
+  expect(dark).not.toContain("background-color:#ffffff");
 });
 
 test("preserves section, block, and heading-level order", () => {
@@ -141,8 +164,13 @@ test("requests preview bytes with header-only credential transport", async () =>
 function renderDocument(
   document: PageDocument,
   previewToken: string | null = null,
+  theme: ThemeTokens = DEFAULT_THEME_TOKENS,
 ): string {
   return renderToStaticMarkup(
-    <PageRenderer document={document} previewToken={previewToken} />,
+    <PageRenderer
+      document={document}
+      previewToken={previewToken}
+      theme={theme}
+    />,
   );
 }

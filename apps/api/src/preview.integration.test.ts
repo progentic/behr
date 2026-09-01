@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  DEFAULT_THEME_TOKENS,
   PREVIEW_TOKEN_HEADER,
   type PageDocument,
   type PageDraft,
@@ -333,6 +334,55 @@ async function verifyPreviewLifecycle(): Promise<void> {
     expect(
       publicPageResponseSchema.parse(await firstPreview.json()).document,
     ).toEqual(DOCUMENT_A);
+    const firstPreviewBody = publicPageResponseSchema.parse(
+      await requestPreviewPageBody(
+        application,
+        EXPECTED_HOSTNAME,
+        "slug=about",
+        firstCredential.token,
+      ),
+    );
+    expect(firstPreviewBody.theme).toEqual(DEFAULT_THEME_TOKENS);
+
+    await observer.native`
+      INSERT INTO themes (site_id, color_scheme, font_family)
+      VALUES (${site.id}, 'dark', 'serif')
+    `;
+    const themedPreview = publicPageResponseSchema.parse(
+      await requestPreviewPageBody(
+        application,
+        EXPECTED_HOSTNAME,
+        "slug=about",
+        firstCredential.token,
+      ),
+    );
+    expect(themedPreview.document).toEqual(firstPreviewBody.document);
+    expect(themedPreview.theme).toEqual({
+      colorScheme: "dark",
+      fontFamily: "serif",
+    });
+    await observer.native`
+      UPDATE themes SET font_family = 'comic' WHERE site_id = ${site.id}
+    `;
+    const malformedThemePreview = await requestPreviewPage(
+      application,
+      EXPECTED_HOSTNAME,
+      "slug=about",
+      { [PREVIEW_TOKEN_HEADER]: firstCredential.token },
+    );
+    expect(malformedThemePreview.status).toBe(500);
+    const malformedThemeBody = await malformedThemePreview.json();
+    expect(malformedThemeBody).toEqual({ error: "Internal server error." });
+    expect(JSON.stringify(malformedThemeBody)).not.toContain("comic");
+    expect(JSON.stringify(malformedThemeBody)).not.toContain(
+      firstCredential.token,
+    );
+    expect(JSON.stringify(malformedThemeBody)).not.toContain("Zod");
+    await observer.native`
+      UPDATE themes
+      SET color_scheme = 'dark', font_family = 'serif'
+      WHERE site_id = ${site.id}
+    `;
 
     await expectMalformedTokensRejected(application);
     await expectAlternateTransportsRejected(
@@ -944,6 +994,19 @@ async function requestPreviewPage(
   return await application.app.request(`/preview/page?${query}`, {
     headers: { host: hostname, ...headers },
   });
+}
+
+async function requestPreviewPageBody(
+  application: ApiApplication,
+  hostname: string,
+  query: string,
+  token: string,
+): Promise<unknown> {
+  const response = await requestPreviewPage(application, hostname, query, {
+    [PREVIEW_TOKEN_HEADER]: token,
+  });
+  expect(response.status).toBe(200);
+  return await response.json();
 }
 
 async function requestPreviewAsset(

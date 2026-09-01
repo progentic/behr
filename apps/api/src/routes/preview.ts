@@ -1,4 +1,5 @@
 import {
+  DEFAULT_THEME_TOKENS,
   PREVIEW_TOKEN_HEADER,
   assetIdSchema,
   hostnameSchema,
@@ -83,7 +84,13 @@ async function handleResolvePreviewPage(
     new Date(),
   );
   return record
-    ? createJsonResponse(publicPageResponseSchema.parse(record), OK_STATUS)
+    ? createJsonResponse(
+        publicPageResponseSchema.parse({
+          ...record,
+          theme: record.theme ?? DEFAULT_THEME_TOKENS,
+        }),
+        OK_STATUS,
+      )
     : createPreviewNotFoundResponse();
 }
 

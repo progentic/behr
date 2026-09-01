@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "tsc --noEmit",
-    "test": "bun test src/content.test.ts src/preview.test.ts src/publish.test.ts src/asset.test.ts",
+    "test": "bun test src/content.test.ts src/preview.test.ts src/publish.test.ts src/asset.test.ts src/theme.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

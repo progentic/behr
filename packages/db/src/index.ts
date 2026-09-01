@@ -76,6 +76,7 @@ export {
   previewTokens,
   session,
   sites,
+  themes,
   tenantRole,
   tenants,
   user,

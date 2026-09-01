@@ -9,7 +9,13 @@ import {
   pageVersions,
   previewTokens,
   sites,
+  themes,
 } from "./schema";
+
+type StoredThemeRecord = Readonly<{
+  colorScheme: string;
+  fontFamily: string;
+}>;
 
 type PreviewTokenRecord = Readonly<{
   expiresAt: Date;
@@ -19,6 +25,7 @@ export type PreviewPageRecord = Readonly<{
   title: string;
   slug: string;
   document: unknown;
+  theme: StoredThemeRecord | null;
 }>;
 
 export type PreviewAssetRecord = Readonly<{
@@ -188,9 +195,14 @@ async function resolvePreviewPage(
       title: pages.title,
       slug: pages.slug,
       document: pageVersions.document,
+      theme: {
+        colorScheme: themes.colorScheme,
+        fontFamily: themes.fontFamily,
+      },
     })
     .from(domains)
     .innerJoin(sites, eq(sites.id, domains.siteId))
+    .leftJoin(themes, eq(themes.siteId, sites.id))
     .innerJoin(pages, eq(pages.siteId, sites.id))
     .innerJoin(previewTokens, eq(previewTokens.pageId, pages.id))
     .innerJoin(

@@ -8,12 +8,19 @@ import {
   pageVersionAssets,
   pageVersions,
   sites,
+  themes,
 } from "./schema";
+
+type StoredThemeRecord = Readonly<{
+  colorScheme: string;
+  fontFamily: string;
+}>;
 
 export type PublicPageRecord = Readonly<{
   title: string;
   slug: string;
   document: unknown;
+  theme: StoredThemeRecord | null;
 }>;
 
 export type PublicAssetRecord = Readonly<{
@@ -92,9 +99,14 @@ async function resolvePublishedPage(
       title: pages.title,
       slug: pages.slug,
       document: pageVersions.document,
+      theme: {
+        colorScheme: themes.colorScheme,
+        fontFamily: themes.fontFamily,
+      },
     })
     .from(domains)
     .innerJoin(sites, eq(sites.id, domains.siteId))
+    .leftJoin(themes, eq(themes.siteId, sites.id))
     .innerJoin(pages, eq(pages.siteId, sites.id))
     .innerJoin(
       pageVersions,

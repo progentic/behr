@@ -187,6 +187,8 @@ keys, exclusive filesystem writes, and revalidated metadata persistence.
 Phase M adds one canonical image block, immutable page-version usage, a minimal
 site asset picker, current-publication byte delivery, and exact token-bound
 preview byte delivery.
+Phase N adds one optional current theme-token row per site and includes the
+resolved bounded theme in existing public and preview page responses.
 
 The currently implemented public API routes are exactly:
 
@@ -279,6 +281,9 @@ images use `/public/assets/:assetId`. Preview images fetch
 `/preview/assets/:assetId` using the existing header-borne token, create a
 temporary object URL, and revoke it during effect cleanup. The token is never
 placed in the asset URL or browser storage.
+Phase N wraps the existing document output in one trusted root style derived
+from the bounded light/dark and sans/serif tokens. It adds no ThemeProvider,
+context, remote font, or arbitrary CSS path.
 
 ---
 
@@ -386,6 +391,11 @@ against the authoritative site and commit version, deduplicated usage, and
 draft pointer in one transaction. Usage is immutable historical evidence, not
 public authority.
 
+Phase N adds `themes`, containing exactly one optional current row per site:
+`site_id` primary key, `color_scheme`, and `font_family`. Site deletion cascades
+the row. Existing sites have no backfill; absence resolves to the shared
+light/sans default.
+
 The database remains the sole session authority. Browser cookies contain only
 the opaque session identifier; they do not authorize a user without a valid
 database session.
@@ -436,6 +446,12 @@ version's usage row. Preview asset reads instead join the existing unexpired
 token hash to its exact immutable version and usage. Neither path follows a
 draft pointer or historical usage alone. Both permit only JPEG, PNG, GIF, WebP,
 and AVIF metadata and return `X-Content-Type-Options: nosniff`.
+
+Public page reads combine the current published page version with the current
+site theme. Preview page reads combine the token-bound immutable version with
+that same current site theme. Theme state is not snapshotted into page versions,
+publication history, or preview credentials. A malformed persisted theme fails
+through the generic HTTP 500 boundary; it is not replaced with defaults.
 
 ---
 

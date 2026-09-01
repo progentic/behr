@@ -109,6 +109,15 @@ export {
   textStyleSchema,
 } from "./style";
 export {
+  DEFAULT_THEME_TOKENS,
+  type ThemeColorScheme,
+  type ThemeFontFamily,
+  type ThemeTokens,
+  themeColorSchemeSchema,
+  themeFontFamilySchema,
+  themeTokensSchema,
+} from "./theme";
+export {
   type CreateTenantRequest,
   type TenantAccess,
   type TenantListResponse,

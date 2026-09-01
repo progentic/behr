@@ -3,26 +3,46 @@ import type {
   HeadingBlock,
   PageDocument,
   Section,
+  ThemeTokens,
 } from "@bher/contracts";
 import { PREVIEW_TOKEN_HEADER } from "@bher/contracts";
-import { type ReactElement, useEffect, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactElement,
+  useEffect,
+  useState,
+} from "react";
 
 type PageRendererProperties = Readonly<{
   document: PageDocument;
   previewToken: string | null;
+  theme: ThemeTokens;
 }>;
 
 export function PageRenderer({
   document,
   previewToken,
+  theme,
 }: PageRendererProperties): ReactElement {
   return (
-    <>
+    <div style={readThemeStyle(theme)}>
       {document.sections.map((section) =>
         renderSection(section, previewToken),
       )}
-    </>
+    </div>
   );
+}
+
+function readThemeStyle(theme: ThemeTokens): CSSProperties {
+  const colors =
+    theme.colorScheme === "light"
+      ? { backgroundColor: "#ffffff", color: "#111111" }
+      : { backgroundColor: "#111111", color: "#f5f5f5" };
+  const fontFamily =
+    theme.fontFamily === "sans"
+      ? 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+      : 'Georgia, "Times New Roman", serif';
+  return { ...colors, fontFamily };
 }
 
 function renderSection(

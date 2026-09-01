@@ -9,6 +9,7 @@ export { pageVersions } from "./page-versions";
 export { pages } from "./pages";
 export { previewTokens } from "./preview-tokens";
 export { sites } from "./sites";
+export { themes } from "./themes";
 export { tenants } from "./tenants";
 
 import { account, session, user, verification } from "./auth";
@@ -22,6 +23,7 @@ import { pageVersions } from "./page-versions";
 import { pages } from "./pages";
 import { previewTokens } from "./preview-tokens";
 import { sites } from "./sites";
+import { themes } from "./themes";
 import { tenants } from "./tenants";
 
 export const authSchema = {
@@ -37,6 +39,7 @@ export const databaseSchema = {
   tenants,
   memberships,
   sites,
+  themes,
   domains,
   membershipInvitations,
   pagePublications,

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_THEME_TOKENS,
   assetIdSchema,
   hostnameSchema,
   pageSlugSchema,
@@ -71,7 +72,13 @@ async function handleResolvePublishedPage(
   }
   const record = await persistence.resolvePublishedPage(hostname, slug);
   return record
-    ? createJsonResponse(publicPageResponseSchema.parse(record), OK_STATUS)
+    ? createJsonResponse(
+        publicPageResponseSchema.parse({
+          ...record,
+          theme: record.theme ?? DEFAULT_THEME_TOKENS,
+        }),
+        OK_STATUS,
+      )
     : createPublicPageNotFoundResponse();
 }
 

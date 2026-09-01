@@ -71,6 +71,13 @@
       "when": 1788214804752,
       "tag": "0009_page_version_assets",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788226696493,
+      "tag": "0010_themes",
+      "breakpoints": true
     }
   ]
 }

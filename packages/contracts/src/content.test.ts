@@ -6,6 +6,7 @@ import {
   publicPageResponseSchema,
   savePageDraftRequestSchema,
 } from "./page";
+import { DEFAULT_THEME_TOKENS } from "./theme";
 
 declare function test(name: string, body: () => void): void;
 declare function expect<T>(actual: T): {
@@ -193,17 +194,20 @@ test("exposes only canonical public page fields", () => {
       title: "About",
       slug: "about",
       document: canonicalDocument,
+      theme: DEFAULT_THEME_TOKENS,
     }),
   ).toEqual({
     title: "About",
     slug: "about",
     document: canonicalDocument,
+    theme: DEFAULT_THEME_TOKENS,
   });
   expect(
     publicPageResponseSchema.safeParse({
       title: "About",
       slug: "about",
       document: canonicalDocument,
+      theme: DEFAULT_THEME_TOKENS,
       publishedVersionId: SECTION_ID,
     }).success,
   ).toBe(false);

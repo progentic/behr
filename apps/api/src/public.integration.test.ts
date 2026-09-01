@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  DEFAULT_THEME_TOKENS,
   type PageDocument,
   type PageDraft,
   pageDraftSchema,
@@ -399,10 +400,12 @@ async function verifyPublicReadLifecycle(): Promise<void> {
       title: "About",
       slug: "about",
       document: DOCUMENT_A,
+      theme: DEFAULT_THEME_TOKENS,
     });
     expect(Object.keys(publicAbout).sort()).toEqual([
       "document",
       "slug",
+      "theme",
       "title",
     ]);
 
@@ -509,6 +512,44 @@ async function verifyPublicReadLifecycle(): Promise<void> {
     expect(
       await readVersionDocument(observer, malformedPage.draft.id),
     ).toEqual(malformedDocument);
+
+    const publishedBeforeThemeChange = await readPublishedVersionId(
+      observer,
+      aboutPage.page.id,
+    );
+    await observer.native`
+      INSERT INTO themes (site_id, color_scheme, font_family)
+      VALUES (${site.id}, 'dark', 'serif')
+    `;
+    const themedResponse = await requestPublicPage(
+      application,
+      EXPECTED_HOSTNAME,
+      "slug=about",
+    );
+    expect(themedResponse.status).toBe(200);
+    const themedPage = publicPageResponseSchema.parse(
+      await themedResponse.json(),
+    );
+    expect(themedPage).toEqual({
+      ...publicAbout,
+      theme: { colorScheme: "dark", fontFamily: "serif" },
+    });
+    expect(await readPublishedVersionId(observer, aboutPage.page.id)).toBe(
+      publishedBeforeThemeChange,
+    );
+    await observer.native`
+      UPDATE themes SET color_scheme = 'neon' WHERE site_id = ${site.id}
+    `;
+    const malformedThemeResponse = await requestPublicPage(
+      application,
+      EXPECTED_HOSTNAME,
+      "slug=about",
+    );
+    expect(malformedThemeResponse.status).toBe(500);
+    const malformedThemeBody = await malformedThemeResponse.json();
+    expect(malformedThemeBody).toEqual({ error: "Internal server error." });
+    expect(JSON.stringify(malformedThemeBody)).not.toContain("neon");
+    expect(JSON.stringify(malformedThemeBody)).not.toContain("Zod");
 
     const sessionResponse = await application.app.request("/auth/session");
     expect(sessionResponse.status).toBe(401);

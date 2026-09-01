@@ -33,6 +33,7 @@ const EXPECTED_APPLICATION_TABLE_NAMES = [
   "session",
   "sites",
   "tenants",
+  "themes",
   "user",
   "verification",
 ];
@@ -80,6 +81,8 @@ const EXPECTED_CATALOG_OBJECTS = new Set([
   "sites_tenant_id_idx",
   "tenants",
   "tenants_pkey",
+  "themes",
+  "themes_pkey",
   "user",
   "user_email_unique",
   "user_pkey",
@@ -127,6 +130,7 @@ async function verifyPersistenceBootstrap(): Promise<void> {
     await verifyDatabaseConstraints(context);
     await verifyAssetCatalog(context);
     await verifyPageVersionAssetCatalog(context);
+    await verifyThemeCatalog(context);
     await verifyPagePublicationCatalog(context);
     await verifyPreviewTokenColumns(context);
     await verifyConnectionCleanup(context);
@@ -269,6 +273,7 @@ async function verifyDatabaseConstraints(
     { name: "session_token_unique", type: "UNIQUE" },
     { name: "session_user_id_user_id_fk", type: "FOREIGN KEY" },
     { name: "sites_tenant_id_tenants_id_fk", type: "FOREIGN KEY" },
+    { name: "themes_site_id_sites_id_fk", type: "FOREIGN KEY" },
     { name: "user_email_unique", type: "UNIQUE" },
   ]);
   expect(await listCascadeForeignKeys(context.observer)).toEqual([
@@ -284,6 +289,7 @@ async function verifyDatabaseConstraints(
     "preview_tokens_version_id_page_versions_id_fk",
     "session_user_id_user_id_fk",
     "sites_tenant_id_tenants_id_fk",
+    "themes_site_id_sites_id_fk",
   ]);
   expect(await listSetNullForeignKeys(context.observer)).toEqual([
     "pages_draft_version_id_page_versions_id_fk",
@@ -327,6 +333,69 @@ async function verifyPageVersionAssetCatalog(
       deleteRule: "CASCADE",
     },
   ]);
+}
+
+async function verifyThemeCatalog(context: IntegrationContext): Promise<void> {
+  const columns = await context.observer.native<Array<{ name: string }>>`
+    SELECT column_name AS name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'themes'
+    ORDER BY ordinal_position
+  `;
+  expect(columns.map(({ name }) => name)).toEqual([
+    "site_id",
+    "color_scheme",
+    "font_family",
+  ]);
+  const foreignKeys = await context.observer.native<
+    Array<{ name: string; deleteRule: string }>
+  >`
+    SELECT constraint_name AS name, delete_rule AS "deleteRule"
+    FROM information_schema.referential_constraints
+    WHERE constraint_schema = 'public'
+      AND constraint_name = 'themes_site_id_sites_id_fk'
+  `;
+  expect(foreignKeys).toEqual([
+    { name: "themes_site_id_sites_id_fk", deleteRule: "CASCADE" },
+  ]);
+  const indexes = await context.observer.native<Array<{ name: string }>>`
+    SELECT indexname AS name
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename = 'themes'
+    ORDER BY indexname
+  `;
+  expect(indexes.map(({ name }) => name)).toEqual(["themes_pkey"]);
+
+  const tenantId = crypto.randomUUID();
+  const siteId = crypto.randomUUID();
+  await context.observer.native`
+    INSERT INTO tenants (id, name) VALUES (${tenantId}, 'Theme Tenant')
+  `;
+  await context.observer.native`
+    INSERT INTO sites (id, tenant_id, name)
+    VALUES (${siteId}, ${tenantId}, 'Theme Site')
+  `;
+  await context.observer.native`
+    INSERT INTO themes (site_id, color_scheme, font_family)
+    VALUES (${siteId}, 'light', 'sans')
+  `;
+  let duplicateRejected = false;
+  try {
+    await context.observer.native`
+      INSERT INTO themes (site_id, color_scheme, font_family)
+      VALUES (${siteId}, 'dark', 'serif')
+    `;
+  } catch {
+    duplicateRejected = true;
+  }
+  expect(duplicateRejected).toBe(true);
+  await context.observer.native`DELETE FROM tenants WHERE id = ${tenantId}`;
+  const [remaining] = await context.observer.native<Array<{ count: number }>>`
+    SELECT count(*)::int AS count FROM themes WHERE site_id = ${siteId}
+  `;
+  expect(remaining?.count).toBe(0);
 }
 
 async function verifyAssetCatalog(context: IntegrationContext): Promise<void> {
@@ -592,6 +661,7 @@ async function listDatabaseConstraints(
         'session_token_unique',
         'session_user_id_user_id_fk',
         'sites_tenant_id_tenants_id_fk',
+        'themes_site_id_sites_id_fk',
         'user_email_unique'
       )
     ORDER BY constraint_name
@@ -616,7 +686,8 @@ async function listCascadeForeignKeys(client: DatabaseClient): Promise<string[]>
         'preview_tokens_page_id_pages_id_fk',
         'preview_tokens_version_id_page_versions_id_fk',
         'session_user_id_user_id_fk',
-        'sites_tenant_id_tenants_id_fk'
+        'sites_tenant_id_tenants_id_fk',
+        'themes_site_id_sites_id_fk'
       )
     ORDER BY constraint_name
   `;

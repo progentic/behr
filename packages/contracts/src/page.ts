@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { sectionSchema } from "./section";
+import { themeTokensSchema } from "./theme";
 
 export const PAGE_DOCUMENT_SCHEMA_VERSION = 1 as const;
 const PAGE_TITLE_MAX_LENGTH = 200;
@@ -32,6 +33,7 @@ export const publicPageResponseSchema = z
     title: pageTitleSchema,
     slug: pageSlugSchema,
     document: pageDocumentSchema,
+    theme: themeTokensSchema,
   })
   .strict();
 
