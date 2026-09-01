@@ -1,0 +1,25 @@
+[Unit]
+Description=BeHR CMS API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bhr-cms
+Group=bhr-cms
+WorkingDirectory=/opt/bhr-cms
+EnvironmentFile=/etc/bhr-cms/bhr-api.env
+ExecStart=/usr/local/bin/bun /opt/bhr-cms/apps/api/dist/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/bhr-cms/uploads
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

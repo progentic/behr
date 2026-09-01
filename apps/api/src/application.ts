@@ -31,6 +31,7 @@ import type { ApiBindings } from "./types";
 
 const HEALTH_ROUTE = "/health";
 const ROUTE_ROOT = "/";
+const PRODUCTION_HOSTNAME = "127.0.0.1";
 const INTERNAL_ERROR_STATUS = 500;
 const SAFE_ERROR_TYPE_PATTERN = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
 
@@ -39,6 +40,7 @@ export type ApiApplication = Readonly<{
   auth: AuthService;
   close: () => Promise<void>;
   server: Readonly<{
+    hostname: string;
     port: number;
     fetch: Hono<ApiBindings>["fetch"];
     error: (error: Error) => Response;
@@ -78,6 +80,7 @@ export function createApiApplication(environment: Environment): ApiApplication {
     auth,
     close: () => database.close(),
     server: Object.freeze({
+      hostname: PRODUCTION_HOSTNAME,
       port: apiConfig.port,
       fetch: app.fetch,
       error: handleUnhandledServerError,

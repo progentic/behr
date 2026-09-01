@@ -1518,3 +1518,84 @@ classification, mapped and unmapped draft validation, valid empty alt, save
 request order, and existing edit-during-save and late-save protection. Full
 type-check, unit, build, audit, runtime-smoke, scope, dependency, and manual
 browser controls are recorded in the Phase P delivery report.
+
+---
+
+## Phase Q — Production Operations Lock
+
+### External and process authority
+
+Production server options now bind Bun to IPv4 loopback. nginx is the only
+external HTTP boundary: the exact admin host serves the admin build and complete
+API surface, while the default tenant server serves the public build and proxies
+only health/public/preview paths with the actual Host preserved. Tenant hosts
+receive direct nginx 404 responses for auth and tenant-administration paths.
+
+The operator supplies certificate material covering every served hostname.
+BeHR adds no ACME, DNS, renewal, or certificate state. nginx also owns the
+POST-only login/register limit, HTTP-to-HTTPS redirect, frame restriction,
+bounded common headers, and `$uri`-based query-redacted access log.
+
+systemd runs the built API as `bhr-cms:bhr-cms`. The root-owned environment file
+is read by systemd and injected into the process, so Bun needs no direct read
+permission to deployment secrets. Native sandboxing makes the application tree
+read-only and grants application writes only under the upload root. Runtime
+stdout/stderr remains in journald.
+
+### Deterministic deploy ownership
+
+`deploy.sh` operates only on the already selected `/opt/bhr-cms` checkout. It
+does not fetch, switch, reset, or bootstrap. Root preflight validates tracked
+cleanliness, host tools, Bun version, production environment, filesystem and
+TLS permissions, database connectivity/migration history, and admin-host
+reservation before service mutation.
+
+Frozen install, type-check, build, migration history, and DB connectivity run
+before the maintenance window. The script installs and syntax-checks nginx and
+systemd configuration, stops the API only for migration, verifies exact
+loopback health, then reloads nginx and verifies TLS/SNI health. Failure is
+reported by stage; there is no automatic database downgrade or rollback
+manager.
+
+### Coordinated backup
+
+PostgreSQL and local asset originals cannot share a transaction, so
+`backup.sh` requires a previously healthy service and stops the sole mutation
+process during both captures. It uses libpq environment authority so database
+credentials do not appear in command arguments. A finalized root-only archive
+contains exactly `database.dump`, `assets.tar`, `manifest.txt`, and
+`SHA256SUMS`. Failure after stop attempts service restart and preserves any
+already finalized archive.
+
+### Validated destructive restore
+
+`restore.sh` requires `--confirm-restore`. Before service stop it rejects
+unexpected/duplicate/non-regular outer members, invalid checksums or manifest,
+unreadable database dumps, unsafe/special asset tar members, and paths outside
+the canonical UUID/UUID storage shape. Asset extraction occurs in a restrictive
+staging sibling, and Linux `st_dev` identity—not mountpoint text—proves that the
+live and staged roots support same-filesystem rename.
+
+PostgreSQL restore uses `pg_restore --single-transaction` before any asset
+rename. Only after database success does the script rename live assets to
+`uploads.pre-restore` and staging to live, migrate forward, start the service,
+and verify health. The preserved tree is removed only after health succeeds.
+
+Existing staging or pre-restore paths block deploy, backup, and restore. Those
+paths are durable crash evidence; normal shell flags are not. After destructive
+failure, the service remains stopped and all available trees remain for manual
+operator recovery. No marker protocol, recovery journal, `renameat2` exchange,
+or automatic reconciliation was added.
+
+### Verification status boundary
+
+Repository verification includes focused API binding, Bash syntax, ShellCheck,
+type-check, unit, build, audit, migration-history, scope, dependency, and exact
+CI gates. No separate `test-permissions.sh` or operations framework was added.
+
+nginx syntax, systemd effective properties, real service identity/socket
+exposure, TLS routing, rate limiting, log redaction, DAC/sandbox permissions,
+and positive/negative backup/restore/deploy controls require a disposable Linux
+VPS/VM. Until that distinct gate executes, repository implementation may pass
+while production operational acceptance and Phase Q closure remain
+inconclusive.

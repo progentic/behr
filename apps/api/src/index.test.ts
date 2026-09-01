@@ -34,6 +34,10 @@ describe("GET /health", () => {
   });
 });
 
+test("binds the production server to IPv4 loopback", () => {
+  expect(application.server.hostname).toBe("127.0.0.1");
+});
+
 test("enforces the handled, Hono Error, and Bun outer failure matrix", async () => {
   const handled = await captureConsoleErrors(() =>
     application.app.request("/preview/page?slug=about"),

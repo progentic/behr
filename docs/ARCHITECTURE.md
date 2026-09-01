@@ -19,9 +19,10 @@ The system is composed of three primary runtime surfaces:
 * Admin Panel
 * API Backend
 
-The implemented local development workflow serves the admin and API through
-one Bun listener. A single nginx entrypoint remains the Phase Q production
-target; no nginx configuration is implemented yet.
+The local development workflow serves the admin and API through one Bun
+listener. Production uses the committed nginx boundary in front of one
+loopback-only Bun API process. The production configuration and operational
+scripts are implemented; real Linux/VPS acceptance remains a distinct gate.
 
 The architecture explicitly avoids distributed infrastructure assumptions such as:
 
@@ -51,13 +52,11 @@ flowchart LR
     API --> Postgres[(PostgreSQL)]
 ```
 
-The Phase Q production target keeps the same public route paths: nginx will
-serve static application assets and forward `/health`, `/auth/*`, `/public/*`, `/preview/*`,
-`/tenants`, and `/tenants/*`—including nested site routes—to the Bun API. It must not
-invent an `/api` prefix unless the application routes are changed in a
-separately reviewed phase. Reverse-proxy configuration and SSR remain
-unimplemented; Phase H implements the public read model and static renderer
-without pulling that production routing work forward.
+Production keeps the same route paths. The exact admin hostname serves the
+admin build and proxies the complete existing API surface. The catch-all tenant
+server serves the public build, proxies only health/public/preview routes, and
+returns nginx 404 for auth/tenant administration paths. Both preserve Host to
+the loopback API; no `/api` prefix or SSR exists.
 
 ---
 
@@ -128,7 +127,7 @@ A separate customer portal is not implemented and is not part of the current v1 
 
 # 4. Runtime Components
 
-## 4.1 Reverse Proxy — nginx (Phase Q)
+## 4.1 Reverse Proxy — nginx
 
 Responsibilities:
 
@@ -139,10 +138,16 @@ Responsibilities:
 * Rate limiting for sensitive endpoints
 * Request logging
 
-These are future production responsibilities. The reverse proxy is not part of
-the implemented local workflow and no production nginx configuration exists.
-When Phase Q implements it, nginx will be the single externally exposed
-service.
+`infra/nginx/bhr-cms.conf` implements these production responsibilities. nginx
+is the only externally exposed HTTP service. Port 80 redirects to HTTPS; port
+443 separates the exact admin hostname from the default tenant-host surface.
+The template has only validated admin-host and API-port substitutions.
+
+TLS certificate and renewal ownership remains with the operator. The fixed
+certificate files must cover the admin hostname and every tenant hostname
+intended for HTTPS service. nginx also owns bounded login/register rate
+limiting, admin frame protection, HSTS without `includeSubDomains`, nosniff,
+and query-redacted access logging based on `$uri`.
 
 No application service is directly internet-facing.
 
@@ -165,6 +170,10 @@ Responsibilities:
 * Domain routing resolution
 
 The API backend is stateful only through the database and filesystem.
+
+Production server options bind the Bun API to `127.0.0.1`; it is not an
+external listener. The development listener retains its separate explicit
+`localhost` binding.
 
 The Hono application does not render UI components. The development listener
 serves the imported admin document before delegating API requests to Hono.
@@ -711,9 +720,7 @@ remains local; Phase P adds no toast system.
 
 # 8. Deployment Model
 
-The system runs as a single logical deployment.
-
-Target Phase Q process layout:
+The system runs as one logical Linux deployment:
 
 nginx
 Bun API service
@@ -725,6 +732,28 @@ Optional separation:
 PostgreSQL may be hosted externally if operationally justified.
 
 No horizontal scaling assumptions exist in version 1.
+
+Production paths are fixed:
+
+```text
+/opt/bhr-cms                         application checkout
+/etc/bhr-cms/bhr-api.env            root-owned environment
+/var/lib/bhr-cms/uploads             service-owned asset originals
+/var/backups/bhr-cms                 root-owned backups
+/etc/bhr-cms/tls/fullchain.pem       operator certificate
+/etc/bhr-cms/tls/privkey.pem         operator private key
+```
+
+`bhr-api.service` runs the built API as `bhr-cms:bhr-cms`, injects the
+root-owned environment through systemd, restarts on process failure, writes
+stdout/stderr to journald, protects the application/system/home trees, and
+grants write access only to the upload root.
+
+`deploy.sh` validates the selected clean checkout and host prerequisites,
+builds before service mutation, installs and validates nginx/systemd config,
+runs migrations in a maintenance window, verifies loopback health, then reloads
+and verifies nginx/TLS health. It never selects a Git revision, bootstraps an
+identity, claims zero downtime, or attempts automatic rollback.
 
 ---
 
@@ -750,6 +779,18 @@ Asset operations fail.
 
 Each domain must be recoverable independently.
 
+PostgreSQL and asset originals are backed up as one coordinated set while the
+sole API is stopped. Archives contain one custom database dump, one asset tar,
+non-secret provenance, and checksums. Backup failure attempts to restart the
+previously healthy API.
+
+Restore validates outer members, checksums, manifest, database dump, and
+canonical `<site UUID>/<asset UUID>` entries before stopping the service. It
+restores PostgreSQL in one transaction, then swaps staged assets through two
+same-device renames. Interrupted `uploads.staging` or `uploads.pre-restore`
+paths are durable crash evidence: every operation refuses until an operator
+reconciles them. No script auto-selects or deletes an uncertain tree.
+
 ---
 
 # 10. Observability Model
@@ -764,7 +805,10 @@ Required signals:
 * Request logs
 * Error logs
 
-No external monitoring dependency is required for initial deployment.
+nginx access/error logs and the systemd journal are the production sinks.
+`/health` remains process-only; database connectivity uses `db:check`, while
+asset availability and free space use filesystem inspection. No external
+monitoring or log-shipping dependency is installed.
 
 ---
 
