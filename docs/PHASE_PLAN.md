@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.11
+Version: 1.12
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -46,6 +46,8 @@ K — Editor Foundation
 L — Asset Storage Core
 M — Asset Integration
 N — Theme Runtime Contract
+Decision Gate — Failure Feedback and Error Reporting
+Error Reporting Baseline
 O — Theme and Settings UI
 P — UX Refinement
 Q — Production Operations Lock
@@ -3356,6 +3358,345 @@ Contract, catalog, public/preview resolution, malformed-state, renderer mapping,
 
 ────────
 
+Decision Gate — Failure Feedback and Error Reporting
+
+Problem
+
+Unexpected API failures already return a client-safe generic HTTP 500 through Hono, and normal admin failures already use local component state. However, server failures have no operator log, admin feedback has no standing convention, failures escaping Hono have no explicit Bun-level safe response, and React render failures have no owning phase.
+
+High — Cross-cutting failure-feedback and outer-server error-safety ownership gap: BeHR already fails closed for ordinary propagated Error instances and already surfaces normal admin failures through local component state, but the plan does not assign server-side error logging ownership, does not formalize the existing client feedback convention, does not explicitly govern failures that escape Hono's onError, and does not assign top-level React render-failure handling. Version 1.12 defines those boundaries without introducing a toast framework, logging dependency, telemetry system, or global state abstraction.
+
+This decision does not reopen Phase N.
+
+Decision A — Admin Feedback Convention
+
+Preserve the existing inline feedback convention.
+
+Use local role="alert" for persistent workflow failures including field/form validation, resource-load failure, save failure, mutation failure, and action failure where the initiating control remains visible.
+
+Keep feedback near the form, editor, resource, or action that owns it. Do not replace local state with a shared error-state framework.
+
+Use role="status" for loading, saving, successful completion, and non-error progress state.
+
+Do not require a generic shared state type across components.
+
+No Toast Framework
+
+Do not add a toast provider, notification context, global reducer/store, event bus, portal framework, auto-dismiss framework, or third-party notification dependency.
+
+A shared transient notification primitive is authorized only when a later concrete workflow cannot reasonably retain useful feedback near its initiating control. Do not build it prospectively or retrofit existing inline feedback merely for visual uniformity.
+
+Phase O Feedback Rule
+
+Phase O follows:
+
+field/settings validation → inline alert
+load failure              → inline alert
+save failure              → inline alert
+saving                    → inline status
+successful save           → inline status
+
+Phase O alone does not justify a toast system.
+
+Decision B — Layered Server Failure Boundaries
+
+Establish two distinct boundaries:
+
+Request handler
+    ↓
+Hono application
+    ↓
+app.onError
+    ↓
+Bun server
+    ↓
+Bun server error handler
+
+Hono app.onError owns:
+
+propagated Error instance
+    ↓
+safe structured request-error log
+    ↓
+generic JSON HTTP 500
+
+Bun server error owns:
+
+failure that escapes Hono
+    ↓
+safe minimal server-error log
+    ↓
+generic JSON HTTP 500
+
+Do not collapse these responsibilities into a logging framework.
+
+Pinned Hono Behavior
+
+Hono 4.13.5 routes thrown Error instances through configured app.onError and rethrows non-Error values outside Hono.
+
+There is no requirement to normalize non-Error throws inside app.onError. Such a requirement is unreachable under the pinned behavior and must not be reintroduced.
+
+Client-Safe Primary Invariant
+
+Every request-handling failure reaching either governed boundary returns exactly:
+
+500
+{"error":"Internal server error."}
+
+Logging is secondary to fail-closed response behavior. Logging failure must never be required for the response to remain safe.
+
+Existing Integrity Error Paths
+
+Malformed persisted draft:
+
+resolvePageDraft
+    ↓
+toPageDraft
+    ↓
+pageDocumentSchema.parse
+    ↓
+Error propagates to app.onError
+
+Malformed published page/theme:
+
+resolvePublishedPage
+    ↓
+publicPageResponseSchema.parse
+    ↓
+Error propagates to app.onError
+
+Missing authoritative asset bytes:
+
+authorized asset metadata
+    ↓
+AssetStorage.readOriginal
+    ↓
+filesystem readFile
+    ↓
+Error propagates to app.onError
+
+These are unhandled integrity failures, not routine locally translated responses, and are intentionally included in request-error logging.
+
+The later baseline must re-read application.ts, pages.ts, public.ts, preview.ts, and asset-storage.ts before implementation. If any named path has changed to construct a local HTTP 500, stop and report it rather than adding route-level logging or relying on an inaccurate boundary model.
+
+Decision C — React Render Failure Ownership
+
+Top-level React render/lifecycle failure handling is required but belongs to Phase P, not the Error Reporting Baseline or Phase O.
+
+Phase P must add separate top-level generic render-failure fallbacks for the admin application and the public/preview web application. Internal exception details must not be rendered.
+
+Native React boundaries own render/lifecycle failures only. They do not claim to catch event-handler exceptions, arbitrary rejected promises, or server failures.
+
+Do not require a third-party boundary package, global state, event bus, client logger, telemetry SDK, or shared boundary package. Admin and public web may use separate small native implementations.
+
+Client Telemetry Exclusion
+
+Server-side Hono/Bun handling observes server request failures only. Browser exception reporting would require separate governance for endpoint ownership, validation, privacy, redaction, rate limiting, and abuse resistance.
+
+No client telemetry endpoint is authorized. Do not add POST /errors, POST /telemetry, or POST /client-logs.
+
+Phase P error boundaries provide graceful degradation only.
+
+Decision Outcome
+
+The inline admin convention is selected. The Error Reporting Baseline must complete before Phase O. React render boundaries are assigned to Phase P. Client telemetry remains unauthorized.
+
+────────
+
+Error Reporting Baseline
+
+Task
+
+Establish safe server-side error reporting and an outer fail-closed Bun boundary.
+
+Objective
+
+Record unexpected server failures without exposing sensitive diagnostics to clients or logs.
+
+Hono Request Error Logging
+
+For each Error reaching app.onError, emit exactly one JSON record to stderr equivalent to:
+
+{
+  "timestamp": "2026-09-01T00:00:00.000Z",
+  "level": "error",
+  "event": "unhandled_request_error",
+  "method": "GET",
+  "pathname": "/public/page",
+  "errorType": "ZodError"
+}
+
+Use one call equivalent to console.error(JSON.stringify(record)). Do not add a logging dependency.
+
+The Hono record contains exactly timestamp, level, event, method, pathname, and bounded errorType.
+
+pathname excludes query strings.
+
+Bounded Error Type
+
+Use an actual class/name only when it is a safe bounded identifier such as Error, ZodError, or PostgresError. Otherwise use Error.
+
+Do not serialize arbitrary exception properties or create a classifier hierarchy.
+
+Logging Redaction
+
+Never log query strings, headers, cookies, authorization, bodies, response bodies, preview/invitation tokens, session IDs, passwords, multipart data, asset bytes, or physical storage paths.
+
+Never log error.message, error.stack, or error.cause. Raw error text may contain paths, SQL details, user-controlled values, configuration values, or runtime internals.
+
+The v1 baseline prioritizes guaranteed redaction over maximal diagnostics.
+
+Bun Outer Error Boundary
+
+Add an explicit Bun server-level error callback to the server options exported by ApiApplication.
+
+ApiApplication.server may expand only to expose port, fetch, and error.
+
+Failure escaping Hono:
+
+Hono fetch rejects or throws
+    ↓
+Bun server error callback
+    ↓
+minimal structured stderr record
+    ↓
+generic JSON HTTP 500
+
+Do not rely on Bun's implicit/default error page.
+
+Development Server Safety
+
+The integrated development Bun.serve({ development: true }) listener must receive the same application-owned outer error callback.
+
+Development mode does not authorize returning contextual stack/error pages. The explicit callback must continue returning the exact generic JSON 500.
+
+Bun Outer Log
+
+An escaped failure emits exactly one record equivalent to:
+
+{
+  "timestamp": "2026-09-01T00:00:00.000Z",
+  "level": "error",
+  "event": "unhandled_server_error",
+  "errorType": "Error"
+}
+
+The Bun callback does not own request context. Do not invent method, path, hostname, tenant, or user fields, and do not add global mutable request context.
+
+Use only a safe bounded type if available; otherwise Error. Do not log message, stack, cause, or raw thrown value.
+
+Handled and Unhandled Matrix
+
+Required executed evidence:
+
+Failure          Hono log                    Bun outer log               Client
+Handled 404      none                        none                        existing 404
+Propagated Error exactly one request event   none                        generic JSON 500
+Escaped non-Error none                       exactly one server event    generic JSON 500
+
+Do not report this matrix from source inspection alone.
+
+Propagated Error Control
+
+Register a test-only route on the test application equivalent to:
+
+GET /__test/unhandled-error
+throw new Error("Synthetic diagnostic that must not be logged.")
+
+Capture stderr and prove generic JSON 500, exactly one unhandled_request_error, zero server events, method/pathname/bounded type present, and raw message/query absent.
+
+Handled-Failure Negative Control
+
+Exercise an existing handled failure such as GET /preview/page?slug=about without X-BeHR-Preview-Token.
+
+Prove HTTP 404 and zero request/server error events. This Rule 15 exclusion control is mandatory.
+
+Non-Error Throw Control
+
+Register a test-only route only on the test application equivalent to:
+
+GET /__test/non-error
+throw "SENSITIVE_NON_ERROR_VALUE"
+
+Do not add it to production composition.
+
+First prove the value escapes Hono and does not invoke app.onError.
+
+Then start an actual temporary Bun.serve listener using the application's real fetch and error server options. Request:
+
+GET /__test/non-error?secret=DO_NOT_EXPOSE
+
+Expected:
+
+HTTP 500
+Content-Type: application/json
+{"error":"Internal server error."}
+
+application.app.request is insufficient for this acceptance criterion because the behavior belongs outside Hono.
+
+Prove the response contains none of SENSITIVE_NON_ERROR_VALUE, DO_NOT_EXPOSE, stack traces, or Bun contextual error output. Prove the stderr record contains neither sensitive value and uses unhandled_server_error rather than unhandled_request_error.
+
+Repeat the actual temporary listener control with development: true and prove the same safe generic JSON response rather than Bun's development error page.
+
+Existing Integrity Runtime Evidence
+
+Re-run existing integration coverage for malformed persisted draft/public state and missing authorized asset bytes where those cases already exist. Confirm they produce the Hono unhandled_request_error event.
+
+Do not duplicate integrity scenarios solely for logging. If a named scenario lacks existing allowed coverage, report that specific logging observation as NOT RUN after directly verifying source propagation.
+
+Error Reporting Surface
+
+apps/api/src/application.ts
+apps/api/src/index.test.ts
+apps/api/src/development.ts
+docs/ARCHITECTURE.md
+docs/DOCUMENTATION.md
+
+development.ts is required so the integrated listener uses the explicit outer handler.
+
+Do not add a logging module, test-only production file, dependency, package script, or lockfile change.
+
+Local Policy Functions
+
+Small functions in application.ts are justified only when they own actual policy, such as creating the internal response or writing the bounded request/server records.
+
+Do not create Logger, LoggingService, ErrorManager, ErrorReporter, ObservabilityProvider, or another application/composition layer.
+
+Operational Sink
+
+The v1 sink is process stderr only.
+
+Do not add application log files, rotation, syslog client, OpenTelemetry, Sentry, Datadog, ELK, remote collection, or a worker. Phase Q may later own service/journal collection and request logging.
+
+Acceptance Criteria
+
+1. Existing integrity Error paths are confirmed to propagate to Hono app.onError.
+2. Propagated Error instances produce exactly one unhandled_request_error record.
+3. Propagated Error instances return generic JSON 500.
+4. Ordinary handled failures produce no error log.
+5. Hono non-Error bypass is explicitly documented.
+6. No requirement claims non-Error values are normalized inside app.onError.
+7. An explicit Bun server error callback owns failures escaping Hono.
+8. A real HTTP request proving a non-Error throw returns generic JSON 500.
+9. The same behavior is proven with Bun development mode enabled.
+10. Non-Error response/logs expose neither raw value nor query data.
+11. Escaped failures produce exactly one unhandled_server_error record.
+12. Hono logs contain only timestamp, level, event, method, pathname, and bounded error type.
+13. Bun outer logs contain only timestamp, level, event, and bounded error type.
+14. Raw message, stack, cause, bodies, headers, cookies, credentials, tokens, session IDs, physical paths, and query strings are not logged.
+15. No route-level unexpected-error logging is added.
+16. No production test endpoint is added.
+17. No logging dependency is added.
+18. Generic JSON HTTP 500 remains exactly {"error":"Internal server error."}.
+
+Output Format
+
+Files modified
+Commands executed
+Handled, propagated Error, escaped non-Error, redaction, development-mode, and integrity-path evidence
+
+────────
+
 Phase O — Theme and Settings UI
 
 Task
@@ -3372,16 +3713,28 @@ Must:
 
 • Implement theme selection
 • Implement site settings editor
+• Use local inline alert/status feedback for settings workflows
 
 Must not:
 
 • Allow arbitrary CSS injection
 
+Feedback Convention
+
+Field/settings validation, load failure, save failure, and action failure remain near their initiating control and use role="alert".
+
+Saving and successful completion use role="status".
+
+Phase O does not add a toast provider, notification context/store, event bus, or shared error-state framework.
+
 Acceptance Criteria
 
-User can change theme.
-
-Renderer reflects theme.
+1. User can change the bounded theme.
+2. Renderer reflects the saved theme.
+3. Validation, load, save, and action failures remain locally surfaced with alert semantics.
+4. Saving and successful completion use status semantics.
+5. Existing earlier surfaces do not require feedback retrofit.
+6. No toast framework is introduced without a concrete workflow that cannot retain feedback locally.
 
 ────────
 
@@ -3401,17 +3754,45 @@ Must:
 
 • Improve validation UX
 • Add optional drag-and-drop
+• Add top-level render error fallback for the admin application
+• Add top-level render error fallback for the public/preview web application
 
 Must not:
 
 • Change persistence model
 • Change content contract
 
+Render-Failure Boundaries
+
+Use small native React boundaries for render/lifecycle failures. Admin and public web may use separate implementations.
+
+Fallbacks render generic application-unavailable UI without internal exception details.
+
+Do not claim these boundaries catch event-handler exceptions, arbitrary rejected promises, or server failures.
+
+Do not add a third-party boundary package, global state, event bus, client logger, telemetry SDK, or shared boundary package.
+
+Client Telemetry
+
+No POST /errors, POST /telemetry, POST /client-logs, or equivalent browser-exception reporting endpoint is authorized without separate governance.
+
+Notification Ownership
+
+Improve validation UX does not authorize a toast system by itself.
+
+A shared transient notification primitive may be added only when Phase P identifies a concrete workflow whose result cannot be adequately retained near its initiating control. Existing inline alert/status feedback must not be retrofitted solely to enforce one visual mechanism.
+
 Acceptance Criteria
 
-UX improvements function correctly.
-
-No schema changes occur.
+1. UX improvements function correctly.
+2. No schema changes occur.
+3. Admin has a top-level generic render-failure fallback.
+4. Public/preview web has a top-level generic render-failure fallback.
+5. Internal exception details are not rendered.
+6. Boundaries make no claim to catch unrelated async or event-handler failures.
+7. No client telemetry endpoint is introduced without separate governance.
+8. Existing local feedback remains valid.
+9. Shared transient notification UI is added only for a concrete workflow that cannot retain useful local feedback.
 
 ────────
 
