@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.10
+Version: 1.11
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -3218,6 +3218,7 @@ package.json only to include the focused theme contract test
 src/theme.ts
 src/theme.test.ts
 src/page.ts
+src/content.test.ts
 src/index.ts
 
 packages/db
