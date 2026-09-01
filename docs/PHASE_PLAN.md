@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.14
+Version: 1.15
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -4118,51 +4118,317 @@ Objective
 
 Enhance workflow efficiency.
 
-Guidelines
+Ownership Correction
 
-Must:
+High — Phase P UX ownership and verification gap: Version 1.14 names validation refinement, drag-and-drop, and top-level React failure handling without defining their exact behavior, ownership boundaries, implementation files, or verification. Version 1.15 makes native drag-and-drop required for existing editor ordering, confines validation refinement to current page-authoring contracts, and assigns two local native React error boundaries without introducing backend changes, toast infrastructure, a drag/drop dependency, or a client telemetry system.
 
-• Improve validation UX
-• Add optional drag-and-drop
-• Add top-level render error fallback for the admin application
-• Add top-level render error fallback for the public/preview web application
+This correction does not reopen Phase O. Phase Q remains unstarted.
 
-Must not:
+Required Behavior
 
-• Change persistence model
-• Change content contract
+Phase P must:
 
-Render-Failure Boundaries
+• Improve validation UX only for PageCreateForm and PageEditor
+• Add native drag-and-drop ordering for existing page sections and blocks
+• Add equivalent Move Up and Move Down controls
+• Add a top-level render error fallback for the admin application
+• Add a top-level render error fallback for the shared public/preview web application
 
-Use small native React boundaries for render/lifecycle failures. Admin and public web may use separate implementations.
+Phase P must not change the content contract, persistence model, HTTP contracts, or Phase O settings/theme mutation semantics.
 
-Fallbacks render generic application-unavailable UI without internal exception details.
+Reordering Scope
 
-Do not claim these boundaries catch event-handler exceptions, arbitrary rejected promises, or server failures.
+Support exactly:
 
-Do not add a third-party boundary package, global state, event bus, client logger, telemetry SDK, or shared boundary package.
+section reorder
+block reorder within its current section
 
-Client Telemetry
+A block cannot move to another section. Do not add nested section moves, cross-page drag, asset-picker drag, file-upload drag/drop, page ordering, or site ordering.
 
-No POST /errors, POST /telemetry, POST /client-logs, or equivalent browser-exception reporting endpoint is authorized without separate governance.
+Reordering changes only array order within the existing PageDocument. It must preserve schemaVersion, section and block IDs, block types and content, styles, asset IDs, and alternative text.
 
-Notification Ownership
+No content-contract or persistence-model change is authorized.
 
-Improve validation UX does not authorize a toast system by itself.
+Editor Domain Ownership
 
-A shared transient notification primitive may be added only when Phase P identifies a concrete workflow whose result cannot be adequately retained near its initiating control. Existing inline alert/status feedback must not be retrofitted solely to enforce one visual mechanism.
+The existing framework-free packages/editor boundary owns exactly two focused immutable operations equivalent to:
+
+moveSection(document, sectionId, targetIndex)
+moveBlock(document, sectionId, blockId, targetIndex)
+
+Do not add a drag service, reorder manager, command/action system, reducer, operation registry, or generic patch API.
+
+moveSection Semantics
+
+moveSection resolves one section by ID and moves the complete section to a target index within the existing section-array range.
+
+It preserves complete section values and relative order of unaffected sections. It returns a new document only when order changes.
+
+Return the original document when the section is missing, the target index is invalid, or the source already occupies the target index. Never mutate the input document or arrays.
+
+moveBlock Semantics
+
+moveBlock resolves the containing section and block by ID and moves the complete block only within that same section.
+
+It preserves complete block values, relative order of unaffected blocks, and every other section. It returns the original document for a missing section/block, invalid target, or no-op destination.
+
+The operation accepts no destination section ID. Cross-section movement is therefore unavailable through the Phase P editor API.
+
+Native Browser Dragging
+
+Use native HTML drag-and-drop. Do not add dnd-kit, react-dnd, sortablejs, or another drag/drop dependency.
+
+PageEditor may hold one component-local active descriptor equivalent to:
+
+{ kind: "section"; sectionId: string }
+or
+{ kind: "block"; sectionId: string; blockId: string }
+
+This state exists only while dragging. Do not add drag context, a global store, reducer, registry, or generic event manager.
+
+DataTransfer may be used only to initiate native browser dragging. It is not document authority. The component-local descriptor identifies the BeHR resource; external, absent, or mismatched drag payloads are ignored.
+
+Dropping a section at position N invokes moveSection. Dropping a block at position N invokes moveBlock only when the dragged and target section IDs match. A block from section A dropped on section B must not move.
+
+Dropping changes only current local editor state. It does not autosave. The existing explicit Save draft action remains the only persistence trigger.
+
+Accessible Reordering
+
+Every reorderable section and block also exposes Move Up and Move Down controls using the same moveSection and moveBlock operations.
+
+Disable or omit impossible movement at the first and last positions. These controls provide keyboard and touch/mobile operation without another reorder system.
+
+Do not use deprecated aria-grabbed or aria-dropeffect.
+
+Validation Scope and Authority
+
+Validation refinement applies only to PageCreateForm and PageEditor. Do not retrofit login, invitation registration, member provisioning, site creation, or site settings.
+
+Immediate client feedback derives from existing shared Zod contracts. Server validation remains authoritative.
+
+Do not add a validation service/context, form framework, duplicated schema, or new HTTP field-error contract.
+
+Page Creation Validation
+
+PageCreateForm refines only title and slug behavior using createPageRequestSchema and the existing pageTitleSchema/pageSlugSchema semantics. Do not change those contracts.
+
+Field errors appear only after the relevant field has been interacted with, such as blur, or after explicit submit. Initial render has no validation error.
+
+Invalid title or slug controls use aria-invalid and aria-describedby linked to their inline field message.
+
+An invalid explicit submit sends no request, exposes all relevant field errors, and focuses the first invalid field where practical.
+
+The existing page-creation HTTP 409 specifically represents a duplicate site-local slug and may map to the slug field with feedback equivalent to:
+
+That slug already exists in this site.
+
+Do not generalize other 409 responses into field errors. Other request failures remain form-level feedback equivalent to:
+
+The page could not be created.
+
+Do not expose response bodies, Zod issues, SQL, or internal errors.
+
+Page Editor Validation
+
+Editor field-level errors originate only from pageDocumentSchema.safeParse of the current local document.
+
+Map currently actionable empty heading.text and paragraph.text issues to their existing text controls using the Zod issue path and the corresponding current block ID.
+
+Do not build a generic schema-path framework. Unknown or unmapped document errors remain generic form-level validation feedback.
+
+Empty Image Alternative Text
+
+Preserve image alt as z.string(), including alt = "". Empty alternative text represents a decorative image and remains valid.
+
+It does not produce a field error or disable saving. Do not add a decorative-image toggle.
+
+Phase P may add a non-blocking hint associated through aria-describedby equivalent to:
+
+Empty alternative text marks this image as decorative. Leave it empty only when the image is purely decorative.
+
+Explicit Save Validation
+
+Before draft-save HTTP submission, parse the current document with pageDocumentSchema.safeParse.
+
+When invalid:
+
+1. Send no request.
+2. Preserve all local edits.
+3. Populate client-derived inline field errors.
+4. Show a form-level summary equivalent to "Fix the highlighted page content before saving."
+5. Focus the first mapped invalid block input where practical.
+
+Manual save remains explicit. Do not autosave when content becomes valid.
+
+A small PageEditor-local preparation result is permitted when it owns current save validation, equivalent to:
+
+{
+  request: SavePageDraftRequest | null;
+  fieldErrors: Readonly<Record<string, string>>;
+  formError: string | null;
+}
+
+fieldErrors is keyed by existing block/field identity. Do not create a generic validation-result package.
+
+When a user edits a field with an inline error, clear or refresh that stale field error. Revalidate on blur or the next explicit save rather than emitting validation alerts on every keystroke.
+
+Server Save Failures
+
+The existing draft-save HTTP 400 intentionally combines invalid request and invalid asset reference into:
+
+400
+{"error":"Page request is invalid."}
+
+It cannot identify a block, asset, or missing/wrong-site condition and therefore remains form-level generic save feedback. Do not add server-supplied fieldErrors or map this response to a field.
+
+Normal draft save has no optimistic-lock or stale-save HTTP 409. Do not introduce "Draft changed elsewhere" behavior. Publication has separate stale-candidate semantics, but Phase P adds no publish UI.
+
+Any non-success draft-save result not already prevented through client validation remains bounded form-level feedback equivalent to:
+
+The draft could not be saved.
+
+Do not expose internal errors, Zod details, database values, asset-scope detail, or theme corruption.
+
+No Toast System
+
+Phase P adds no Toast, ToastProvider, ToastContext, notification queue/timer, portal, or global notification state.
+
+All current validation and outcome feedback remains beside its initiating control. Do not add toast-ready infrastructure prospectively.
+
+Admin React Failure Boundary
+
+Add one small native React class error boundary directly in apps/admin/src/main.tsx around App at the application mount.
+
+On a React render/lifecycle failure beneath it, render generic fallback UI equivalent to:
+
+BeHR admin is unavailable.
+Reload the page to try again.
+
+Do not render error messages, stacks, component stacks, internal types, user/session data, or send the error elsewhere.
+
+Public and Preview React Failure Boundary
+
+Add a separate small native React class error boundary directly in apps/web/src/main.tsx around the existing web App.
+
+The one boundary covers both published and preview modes because they share the same web application.
+
+Render generic fallback UI equivalent to:
+
+Page unavailable.
+Reload the page to try again.
+
+Do not expose exceptions or preview credentials.
+
+Failure-Boundary Limits
+
+The boundaries own React render/lifecycle failures beneath their mounted roots only. They do not claim to catch event-handler exceptions, arbitrary rejected promises, server/API failures, or errors before the React root mounts.
+
+Do not add window error or unhandledrejection handlers.
+
+No client telemetry is authorized. Do not add POST /errors, POST /telemetry, POST /client-logs, Sentry, OpenTelemetry, a browser logger, or componentDidCatch reporting. getDerivedStateFromError plus local failed state is sufficient.
+
+Theme Ownership
+
+Phase O owns the one production site-theme mutation surface. Phase P adds no new theme writer and does not modify Phase O site-settings mutation semantics.
+
+Do not modify theme persistence, site settings APIs, theme contracts, or renderer theme mapping.
+
+Backend and Contract Boundary
+
+Phase P changes nothing under apps/api, packages/db, or packages/contracts.
+
+Add no route, HTTP response field, persistence operation, schema, table, migration, or migration metadata.
+
+Files / Functions
+
+packages/editor
+
+src/index.ts
+src/index.test.ts
+
+apps/admin
+
+src/PageCreateForm.tsx
+src/PageList.test.ts
+src/PageEditor.tsx
+src/PageEditor.test.ts
+src/main.tsx
+
+apps/web
+
+src/main.tsx
+
+Documentation
+
+docs/ARCHITECTURE.md
+docs/DOCUMENTATION.md
+
+Do not modify package manifests, App.tsx, SitesPage.tsx, SiteSettings.tsx, an API/database/contracts file, or another documentation file. No unnamed support surface exists.
+
+Dependencies
+
+Use existing React, @bher/contracts, @bher/editor, and native browser drag/drop.
+
+No dependency, workspace edge, package-manifest, or bun.lock change is expected.
+
+Verification
+
+Editor-domain tests must prove focused immutable section and same-section block movement in both directions, complete value/style preservation, unaffected relative order, other-section preservation, and original identity for missing, no-op, or invalid moves.
+
+PageList.test.ts must prove valid title/slug input, isolated title and slug errors, and distinct slug-conflict classification without a server field-error payload.
+
+PageEditor.test.ts must prove empty heading and paragraph field errors, valid empty image alt, form-level handling for unmapped invalid state, no request for client-invalid content, valid canonical request preparation, and preservation of existing edit-during-save and late-save guards.
+
+Pure transforms are the automated authority for ordering. Do not add DOM testing infrastructure solely for native drag events.
+
+Manual Browser Acceptance
+
+Where browser execution is available, verify section and same-section block drag, Move Up/Down equivalence, cross-section rejection, explicit save/reload persistence, page-creation field accessibility, editor inline validation, decorative-alt guidance, no autosave, and the admin/web generic render-failure fallbacks through temporary local render throws removed before final diff.
+
+Do not add a production failure route, query flag, environment flag, or committed fault. If a manual control is not executed, report it as NOT RUN rather than inferring it from transform tests.
+
+Regression Boundaries
+
+Preserve explicit manual draft save, tenant/site/page load identity, save operation identity, same-page request epochs, asset-list identity, asset picker ownership, image asset identity, and Phase O settings semantics.
+
+Do not add autosave, debounce, save-on-drop, save-on-blur, a save queue, background write, optimistic remote synchronization, file drag/upload, or a requirement for non-empty image alt.
 
 Acceptance Criteria
 
-1. UX improvements function correctly.
-2. No schema changes occur.
-3. Admin has a top-level generic render-failure fallback.
-4. Public/preview web has a top-level generic render-failure fallback.
-5. Internal exception details are not rendered.
-6. Boundaries make no claim to catch unrelated async or event-handler failures.
-7. No client telemetry endpoint is introduced without separate governance.
-8. Existing local feedback remains valid.
-9. Shared transient notification UI is added only for a concrete workflow that cannot retain useful local feedback.
+1. Sections can be reordered through native drag-and-drop.
+2. Blocks can be reordered through native drag-and-drop within their existing section.
+3. Blocks cannot move between sections.
+4. Move Up/Down controls provide an equivalent non-drag ordering mechanism.
+5. Reorder operations are pure and immutable in @bher/editor.
+6. Reorder no-ops preserve original document identity.
+7. Reordering does not change the PageDocument contract.
+8. Reordering never autosaves.
+9. Explicit save persists reordered array order through the existing API.
+10. Page-creation title/slug validation is inline and contract-derived.
+11. Existing slug conflict maps to the slug field.
+12. Page-editor heading/paragraph text validation is inline and contract-derived.
+13. Empty image alt remains valid.
+14. Decorative-alt guidance is non-blocking.
+15. Client-invalid page content sends no save request.
+16. Generic server HTTP 400 remains form-level and exposes no field-error payload.
+17. No draft-save stale HTTP 409 behavior is introduced.
+18. No API, content, or persistence contract changes occur.
+19. Admin has a top-level generic React render-failure fallback.
+20. Public/preview web has one top-level generic React render-failure fallback.
+21. Internal exception details and preview credentials are not rendered.
+22. Error boundaries claim only React render/lifecycle coverage.
+23. No browser exception telemetry endpoint or global handler exists.
+24. No toast system is added.
+25. Existing inline feedback elsewhere remains valid and is not retrofitted.
+26. Phase P adds no additional theme writer.
+27. No external dependency or lockfile change occurs.
+28. Phase Q remains unstarted.
+
+Output Format
+
+Files modified
+Commands executed
+Reorder, validation, accessibility, error-boundary, regression, dependency, scope, and manual-browser evidence
 
 ────────
 
