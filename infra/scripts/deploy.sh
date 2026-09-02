@@ -41,7 +41,7 @@ prepare_deployment() {
   validate_production_environment
   load_database_environment
   validate_production_paths
-  reject_reserved_admin_host
+  check_reserved_admin_host_pre_migration
 }
 
 build_release() {
@@ -67,6 +67,8 @@ activate_release() {
   DEPLOY_STAGE="migration"
   stop_service_if_active
   run_in_repository bun run db:migrate
+  DEPLOY_STAGE="post-migration-reserved-host"
+  reject_reserved_admin_host
   DEPLOY_STAGE="api-start"
   systemctl restart "$SERVICE_NAME"
   wait_for_internal_health
@@ -121,6 +123,21 @@ validate_production_paths() {
   openssl x509 -in "$TLS_CERT" -noout -checkhost "$ADMIN_HOST" >/dev/null
   sudo -u bhr-cms test -x "$ASSET_ROOT"
   sudo -u bhr-cms test -w "$ASSET_ROOT"
+}
+
+check_reserved_admin_host_pre_migration() {
+  local relation_exists
+  relation_exists="$(read_domains_relation_presence)"
+  if [[ "$relation_exists" == "f" ]]; then
+    return
+  fi
+  [[ "$relation_exists" == "t" ]] || fail "domains relation probe returned an unexpected result"
+  reject_reserved_admin_host
+}
+
+read_domains_relation_presence() {
+  psql -X --no-psqlrc -v ON_ERROR_STOP=1 -Atc \
+    "SELECT to_regclass('public.domains') IS NOT NULL;"
 }
 
 reject_reserved_admin_host() {
