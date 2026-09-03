@@ -74,7 +74,8 @@ activate_release() {
   wait_for_internal_health
   DEPLOY_STAGE="nginx-reload"
   systemctl reload nginx
-  verify_external_health
+  DEPLOY_STAGE="external-health"
+  wait_for_external_health
   DEPLOY_STAGE="complete"
 }
 
@@ -179,12 +180,21 @@ wait_for_internal_health() {
   fail "API did not become healthy within 30 seconds"
 }
 
-verify_external_health() {
-  local body
-  body="$(curl --silent --show-error --fail \
-    --resolve "${ADMIN_HOST}:443:127.0.0.1" \
-    "https://${ADMIN_HOST}/health")"
-  [[ "$body" == "$EXPECTED_HEALTH_BODY" ]] || fail "external health response is invalid"
+wait_for_external_health() {
+  local attempt body status
+  for attempt in {1..30}; do
+    if body="$(curl --silent --show-error --fail \
+      --resolve "${ADMIN_HOST}:443:127.0.0.1" \
+      "https://${ADMIN_HOST}/health")"; then
+      [[ "$body" == "$EXPECTED_HEALTH_BODY" ]] || fail "external health response is invalid"
+      return
+    else
+      status=$?
+    fi
+    ((status == 7)) || return "$status"
+    ((attempt < 30)) && sleep 1
+  done
+  fail "external HTTPS endpoint did not become reachable within 30 attempts"
 }
 
 read_admin_origin() {
