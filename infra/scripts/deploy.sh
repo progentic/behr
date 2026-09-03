@@ -261,7 +261,7 @@ require_root_private_file() {
   [[ -f "$path" ]] || fail "required file is missing: $path"
   [[ "$(stat -c %U "$path")" == "root" ]] || fail "file must be root-owned: $path"
   mode="$(stat -c %a "$path")"
-  ((8#$mode & 077 == 0)) || fail "file must not be group/world accessible: $path"
+  (((8#$mode & 077) == 0)) || fail "file must not be group/world accessible: $path"
 }
 
 require_directory_owner_mode() {
