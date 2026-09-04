@@ -1,5 +1,18 @@
 # scripts
 
+`install-preflight.sh` implements the Phase R0 non-mutating admission boundary
+for the initial root-run, interactive-only first-run path. It derives the source
+root from its own physical location and validates Ubuntu 24.04, systemd host
+eligibility, Bash and CPU architecture bounds, Git top-level identity, the
+current source SHA, and clean tracked state. It can run from a caller working
+directory outside the checkout and reports only bounded non-secret evidence.
+
+This preflight is not a complete or unattended installer. It does not download
+or update BeHR, provision packages, install or verify Bun releases, create a
+service user or production filesystem, provision PostgreSQL, create environment
+or secret material, install TLS, bootstrap an identity, invoke deployment, or
+implement installer re-entry state.
+
 The Phase Q operational scripts require root, Bash 5+, the host-native tools
 listed in the Phase Plan, and the root-owned mode-0600 environment file at
 `/etc/bhr-cms/bhr-api.env`. They serialize through the nonblocking

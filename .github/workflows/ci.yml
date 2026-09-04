@@ -35,6 +35,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Validate operational shell syntax
         run: |
+          bash -n infra/scripts/install-preflight.sh
           bash -n infra/scripts/backup.sh
           bash -n infra/scripts/restore.sh
           bash -n infra/scripts/deploy.sh
