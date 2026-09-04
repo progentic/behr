@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.16
+Version: 1.17
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -24,8 +24,10 @@ These rules apply to every phase.
 11. Unimplemented behavior must be documented. Do not represent it with future-work markers, fake readiness exports, stub functions, or speculative code.
 12. Composition-root hygiene: Remove functions that only forward arguments, rename another call, or package already-available values unless they own distinct policy, validation, lifecycle, translation, reuse, or a necessary test seam.
 13. Async UI identity: Any asynchronous UI state whose result belongs to a selectable resource must carry that resource’s authoritative ID. Late load or save completions must not update state belonging to a different current resource. Prefer functional/latest-state updates over mirrored refs or global state unless stronger coordination is actually required.
+   Notification/resource-identity corollary: Any global or transient notification or feedback surface that reports an asynchronous operation is governed by the same authoritative resource-identity discipline as the state it reports. Context-bound feedback must be discarded when its completion is stale or no longer belongs to the user's current resource context. A completion for tenant, site, page, asset, or another resource A must not appear to belong to the user's current resource B. This corollary does not authorize a notification system. A later explicitly governed workflow may permit cross-context notification only when the notification retains and visibly identifies its originating resource identity, does not imply that the current resource was affected, and does not weaken stale-state discard.
 14. Cross-layer naming clarity: When similarly named operations exist at different boundaries, names must communicate the boundary when search, stack traces, or review would otherwise be ambiguous. Database mutations, HTTP requests, UI actions, and response translations must not use indistinguishable names when they perform materially different work.
 15. Error-boundary classification: When a boundary catches an exception from a platform, framework, database, filesystem, parser, authentication provider, network API, or other external/runtime dependency and translates it into an application error or HTTP result, translate only failures that the boundary explicitly owns. Prefer stable structured discriminators such as error codes, statuses, or specific error types over broad type checks or message fragments. When a materially adjacent non-owned failure exists and can be exercised without speculative production hooks, verification must prove both sides of the boundary: at least one owned failure is translated as intended and at least one adjacent unowned failure propagates to its upstream boundary. Exact message matching is acceptable only when the pinned runtime exposes no stable structured discriminator; such matching must be exact and covered by a version-specific regression test.
+16. Human product acceptance: For a phase or bounded task that materially changes a user-facing interface or interaction, machine-verifiable correctness and human product acceptance are independent gates; neither substitutes for the other. The machine gate owns functional correctness, type safety, automated regressions, mechanically verifiable accessibility and responsive floors, async/resource identity, validation, and error/loading/state correctness. The human gate owns visual hierarchy, typography, text sizing, spacing, density, control sizing, comprehensibility, interaction and motion quality, feedback presentation, visual coherence, aesthetic quality, and whether the affected screen or workflow is acceptable to ship. A technically correct interface may pass the machine gate and fail the human gate because it is ugly, confusing, excessively dense, awkward, or unpleasant to use. Human product acceptance may be issued only by the project owner or another explicitly designated human reviewer. An agent may prepare screenshots, execute browser interactions, collect accessibility evidence, identify or critique design problems, and compare the result against the rubric, but it may not unilaterally satisfy the human gate. Applicable static visual review records the exact commit SHA, browser, viewport, screen/state, screenshot, named rubric, and explicit human PASS/FAIL. When interaction quality is material, also record the starting state, user actions, observed transitions/feedback, and human verdict; video is optional. A change directly proven to have no visual or interaction effect may report human product acceptance as NOT APPLICABLE with supporting evidence; diff size alone is not proof. Human-product failure may create a bounded corrective task, but it does not authorize database, contract, persistence, backend, authentication, Phase Q operational, or unrelated UI changes without separate governance at the owning boundary. Rule 15 remains specifically the error-boundary-classification rule.
 
 ────────
 
@@ -51,6 +53,10 @@ Error Reporting Baseline
 O — Theme and Settings UI
 P — UX Refinement
 Q — Production Operations Lock
+R — Installation & First-Run Productization
+S — Product Experience Completion / Beta Exit
+T — Release Candidate, Compatibility & Recovery Validation
+U — v1.0.0 Release Lock
 
 ────────
 
@@ -5001,6 +5007,493 @@ API binding, shell, nginx, systemd, routing, TLS, rate-limit, logging, deploy, b
 
 ────────
 
+Post-Q Release Governance
+
+Purpose
+
+Phases A–Q established a substantial, architecturally coherent, functionally broad, and operationally certifiable CMS. They did not by themselves establish turnkey first installation, product-wide visual quality, independent human usability acceptance, release-candidate compatibility and recovery obligations, or a final exact-SHA v1.0.0 lock.
+
+This is a plan-scope gap, not evidence that A–Q failed. Those phases correctly optimized for bounded functional correctness within their governed ownership.
+
+The post-Q release questions are distinct:
+
+Q asks: Can BeHR be deployed and operated safely on the prepared-host production model?
+
+R asks: Can a new operator establish BeHR through the supported first-run path?
+
+S asks: Is the complete BeHR-owned product experience acceptable to ship?
+
+T asks: Does one frozen release candidate satisfy every declared release obligation?
+
+U asks: Is this exact certified SHA ready to be tagged and released as v1.0.0?
+
+Authoritative and Revisable Governance
+
+Global Rules 1–16, the Rule 13 notification/resource-identity corollary, the R → S → T → U order, each phase's ownership question, and each explicit exclusion are authoritative until deliberately revised. Phase boundaries must not be crossed silently. A named later capability is never permission to implement it early, and backend, persistence, contract, security, and operational changes remain governed by their owning boundaries. Phase U remains a zero-repository-content release lock.
+
+Future implementation detail is evidence-driven and versionable. Initial targets, expected decompositions, supported-model language, and acceptance details are subject to pre-phase reconciliation when the then-current repository or prior-phase evidence demonstrates that an assumption is false or inadequate. Such evidence requires a separately reviewed, versioned plan revision before implementation. Implementation difficulty alone is not permission to rewrite governance.
+
+Future-Phase Reconciliation
+
+Before the first implementation or acceptance task of each of Phases R, S, T, and U is generated, re-read the then-current repository, previous-phase evidence, applicable architecture, applicable contracts and invariants, and that phase's current plan text.
+
+If completed work makes an assumption false or inadequate:
+
+stop
+    ↓
+revise governance deliberately
+    ↓
+version the plan
+    ↓
+implement
+
+Do not force outdated roadmap detail merely because Version 1.17 predicted it. Do not weaken current invariants by treating all future detail as aspirational.
+
+Execution and Certification Order
+
+Implementation order is:
+
+Q → R → S → T → U
+
+R proves first-run installation against the product state that exists during R. S then reconstructs and completes the product experience. T re-verifies the final frozen candidate across the distinct applicable installation, operational, product, compatibility, recovery, browser, and release paths. T prevents stale exact-SHA evidence from R or S from being carried silently to the final candidate. U releases only the exact T-certified SHA.
+
+T's joint certification responsibility does not make R and S unordered.
+
+────────
+
+Phase R — Installation & First-Run Productization
+
+Task
+
+Productize the first-run host installation boundary.
+
+Objective
+
+A new operator starts from the supported host baseline, runs one BeHR first-run entrypoint from an exact clean source checkout, supplies required external inputs securely, and reaches a functioning trusted HTTPS administration URL without manually reconstructing the Phase Q host, service, database, filesystem, and bootstrap model.
+
+R's acceptance bar is functional installation correctness. Final product-wide aesthetic quality belongs to Phase S.
+
+Why Phase Q Does Not Already Own R
+
+Phase Q deploy.sh, backup.sh, and restore.sh intentionally operate against an already prepared host. They require the service user/group, fixed filesystem roots, protected environment file, host packages, TLS material, and PostgreSQL authority to exist before deployment.
+
+That is a valid prepared-host operations model. A first-run installer is a separate privilege, secret, package, filesystem, database, identity, and lifecycle boundary. Do not rewrite deploy.sh into an installer.
+
+Adopted Initial v1 Installer Model
+
+Supported Host
+
+The initial supported installer platform is Ubuntu Server 24.04 LTS with systemd on one VPS.
+
+Installer implementation must avoid unnecessary CPU-architecture assumptions. Version 1.17 does not convert the Phase Q Ubuntu/aarch64 acceptance into a general architecture promise. Only architectures actually accepted during R and the final T candidate may be represented as release-supported. Do not create a multi-distribution provisioning abstraction.
+
+PostgreSQL Topology
+
+The initial first-run installer provisions one local PostgreSQL 16 server, database, and login role on the supported VPS. It generates the database credential and writes the resulting local authority into the protected BeHR environment.
+
+Phase Q may continue to support operator-provisioned external PostgreSQL for advanced manual deployments. The initial R installer does not support both topologies; do not double its configuration and error surface prospectively.
+
+DNS Ownership
+
+DNS remains external operator authority. The installer collects the intended admin hostname, validates its syntax, and verifies the bounded DNS prerequisite required by the selected first-run flow. It does not call DNS-provider APIs, create DNS records, or introduce generic DNS automation.
+
+TLS Ownership
+
+The initial installer uses operator-supplied trusted certificate and private-key files. Certificate acquisition and renewal remain external prerequisites.
+
+The installer owns secure placement into:
+
+/etc/bhr-cms/tls/fullchain.pem
+/etc/bhr-cms/tls/privkey.pem
+
+It validates certificate parsing, the configured admin hostname, required file identity and permission boundaries, and normal trusted HTTPS through the existing Phase Q deployment health gate. It must not print key material or overwrite unknown/conflicting installed TLS state.
+
+R adds no ACME client, Certbot, renewal timer, external account state, certificate daemon, DNS challenge automation, or silent certificate-lifecycle promise. Tenant hostnames remain usable over HTTPS only when the operator-supplied certificate covers them.
+
+Configuration and Secret Collection
+
+The initial v1 first-run entrypoint is root-run and interactive. It collects non-secret configuration such as the admin hostname and operator-supplied TLS source paths through a bounded prompt flow. Initial administrator password input is read without echo from an attached terminal. An unattended installer interface is not part of the initial model unless later evidence requires a separately governed revision.
+
+Secret values are never accepted through command-line arguments, echoed, or logged. The installer generates BETTER_AUTH_SECRET and the local PostgreSQL role password with cryptographically secure randomness. It creates `/etc/bhr-cms/bhr-api.env` itself as root:root mode 0600 with the existing Phase Q production variables. It does not require the operator to construct that file and does not create a secret-manager abstraction.
+
+Initial Identity
+
+A successful first run establishes the first usable BeHR administrator through the existing one-time `auth:bootstrap` authority. The installer collects administrator name, email, and password transiently, invokes the existing bootstrap command only after PostgreSQL and the BeHR schema are ready, and never stores bootstrap credentials in `bhr-api.env`.
+
+Do not add a second identity-creation path for installation. Existing-identity or bootstrap-refusal behavior must remain authoritative and participate in interrupted/re-entry classification.
+
+Source and Artifact Acquisition
+
+The installer executes from an operator-obtained exact, clean BeHR checkout or release source. It verifies the expected repository/release identity and clean tracked state before privileged mutation.
+
+It does not perform Git fetch, pull, checkout, reset, or generic updating and does not use `curl | bash` or unverified arbitrary code execution. T and U later own final release identity; downloading or updating BeHR releases is outside the initial installer.
+
+Host Package Ownership
+
+On Ubuntu 24.04 LTS, R may use native apt package management directly to install the host tools required by the accepted Phase Q model, including nginx, PostgreSQL 16 server/client capability, and required shell utilities.
+
+Do not add Ansible, Puppet, Chef, Salt, a host package-manager abstraction, or multi-distribution branches.
+
+Bun acquisition is pinned to 1.4.0 and must be verified before installation or use. The first bounded R task may finalize the exact official artifact and checksum mechanism after inspecting current upstream artifact availability and supported target architecture. It must not accept an arbitrary latest runtime.
+
+Interrupted Installation and Re-entry
+
+Apply this classification at every installer-owned boundary:
+
+installer-owned state absent
+    → establish it
+
+installer-owned state already correct
+    → preserve and reuse it
+
+unsupported or conflicting state
+    → fail clearly
+
+unexpected establishment failure
+    → propagate and fail
+
+ambiguous partial prior installation
+    → refuse unless the correct reconciliation is deterministic and explicitly owned
+
+The installer must not delete ambiguous state, overwrite unknown configuration, treat arbitrary failure as a missing prerequisite, or introduce a generic rollback manager.
+
+Concrete already-correct state includes only state whose identity, values, permissions, and relationships can be validated authoritatively. An existing unknown environment file, TLS destination, database/role relationship, service identity, or partial bootstrap is not implicitly reusable. A failed first run leaves bounded stage diagnostics and sufficient preserved state for safe retry or deliberate operator reconciliation.
+
+R Scope Boundary
+
+R may establish only the host prerequisites Phase Q intentionally assumed: supported packages, service identity, fixed directories and permissions, local PostgreSQL authority, protected production configuration, operator-supplied TLS placement, initial identity, and orchestration into the existing deploy.sh.
+
+R reuses the accepted Phase Q artifacts as the target installed model. It must not silently change backup, restore, nginx routing, systemd runtime, API contracts, database schema, or application features.
+
+If R evidence demonstrates that a certified Phase Q surface is insufficient:
+
+stop
+    ↓
+govern that owning change separately
+    ↓
+determine applicable recertification
+
+Do not hide the change inside installer work.
+
+Expected Decomposition
+
+R is too large for one implementation task. Its expected bounded concerns are:
+
+R0 — Installer contract, source identity, and preflight
+R1 — Ubuntu package, service identity, and filesystem provisioning
+R2 — Local PostgreSQL and secure configuration/secrets
+R3 — Operator-supplied TLS placement and validation
+R4 — Existing bootstrap integration and first-run orchestration
+R5 — Interrupted-run and deterministic re-entry controls
+R6 — Fresh-host installation acceptance
+
+This decomposition is an initial target subject to pre-phase reconciliation. Generate the exact subtask split from the adopted decisions and actual repository state; do not invent all future file surfaces in this governance task.
+
+Acceptance Direction
+
+R requires real fresh-host Ubuntu 24.04 LTS acceptance. CI or source inspection cannot substitute for privilege behavior, package installation, filesystem permissions, service identity, PostgreSQL setup, TLS trust, bootstrap, interruption/re-entry, or integration with the accepted Phase Q deployment.
+
+R acceptance must distinguish installer correctness from the applicable Phase Q operational behavior it invokes and must bind evidence to one exact candidate SHA.
+
+Explicit Exclusions
+
+Phase R adds no final visual redesign, product-wide component system, global notification system, multi-distribution framework, dual local/external database installer, DNS automation, ACME/renewal lifecycle, generic updater, release channel, backup/restore redesign, application feature, contract/schema change, or post-R behavior without separate governance.
+
+Output Format
+
+Files created
+Files modified
+Commands executed
+Installer contract, privilege, package, filesystem, PostgreSQL, secret, TLS, bootstrap, re-entry, Phase Q integration, and fresh-host evidence
+
+────────
+
+Phase S — Product Experience Completion / Beta Exit
+
+Task
+
+Reconstruct BeHR's user-facing experience against an intentional visual and interaction system and apply Global Rule 16.
+
+Objective
+
+The BeHR-owned admin and default public experience must be functionally correct, accessible, understandable, responsive, visually coherent, aesthetically pleasurable, and acceptable for v1.0.0. Technically works is insufficient.
+
+Design Direction
+
+Use Apple Human Interface Guidelines-inspired clarity, legibility, consistency, restraint, comfortable interaction targets, clear hierarchy, and generous spacing, adapted to a web CMS. Do not imitate macOS chrome merely to appear Apple-like.
+
+Why Earlier UX Phases Do Not Already Own S
+
+Phases K, M, N, O, and P correctly implemented bounded authoring, asset, theme, settings, validation, ordering, accessibility, and render-failure behavior against their stated criteria. They did not establish a product-wide visual system or independent human aesthetic acceptance gate.
+
+This is a planning-scope gap, not retroactive evidence that those phases were implemented incorrectly.
+
+Expected Decomposition
+
+S0 — Product UX inventory and usability baseline
+S1 — Visual foundations
+S2 — Shared UI primitives
+S3 — Application shell
+S4 — Forms and feedback model
+S5 — Core workflow reconstruction
+S6 — Editor and publishing experience
+S7 — Responsive and accessibility completion
+S8 — Integrated usability and beta-exit acceptance
+
+This is an expected decomposition. S0 may propose a better bounded split only through an explicit documented governance decision before affected implementation.
+
+Independent Acceptance Gates
+
+Every materially user-facing S subtask requires both the applicable machine-verifiable gate and explicit human product acceptance under Global Rule 16. A machine PASS cannot close a required human gate, and an attractive screen cannot substitute for functional or accessibility correctness.
+
+Human acceptance must come from the project owner or another explicitly designated human reviewer. Agents prepare evidence and critique; they do not approve their own human gate.
+
+Continuous Human Review
+
+Human aesthetic review begins during S1. Do not defer screenshots and judgment until S8. S8 is the integrated cross-screen and cross-workflow review of the final S candidate.
+
+Visual and Product Rubric
+
+S0 must finalize and name a rubric covering at minimum:
+
+• Clarity
+• Hierarchy
+• Typography
+• Comfortable text sizes
+• Restrained type scale
+• Spacing rhythm
+• Information density
+• Button and control sizing
+• Focus, hover, pressed, disabled, and loading states
+• Validation and error presentation
+• Progress and success feedback
+• Motion and transition quality
+• Visual consistency
+• Responsive behavior
+• Accessibility
+• Overall aesthetic quality
+
+The initial accessibility target is WCAG 2.2 AA for BeHR-owned UI surfaces.
+
+The initial interaction-target goal is approximately 44 CSS pixels for primary touch/click targets where practical, with explicit justified exceptions.
+
+S0 may refine these initial targets only through an explicit documented decision. They must not be weakened silently.
+
+Reproducible Review Evidence
+
+Applicable static reviews record exact SHA, browser, viewport, screen/state, screenshot, named rubric, and explicit human PASS/FAIL. Material interaction reviews additionally record starting state, actions, observed transitions or feedback, and the human verdict. Video may supplement but is not required as permanent infrastructure.
+
+Shared UI Ownership
+
+Phase S may activate `packages/ui` because repeated BeHR-owned surfaces now exist. S2 may create shared primitives only when S0 demonstrates actual reuse and the primitive owns concrete visual, accessibility, interaction, or feedback policy.
+
+Do not create a hypothetical component catalog, generic design framework, or abstraction for a future screen.
+
+Notification Decision
+
+S4 must evaluate concrete workflows including:
+
+• Save or publish completion after navigation
+• Asset completion after resource switching
+• Session expiry during editing
+• Destructive actions whose initiating control disappears
+• Membership or invitation actions that change the visible resource list
+
+Do not assume toasts everywhere or toasts never.
+
+If a transient or global notification primitive is justified, it must obey the Rule 13 notification/resource-identity corollary. Field-level validation remains field-proximate where appropriate. Existing inline alert/status feedback must not be retrofitted merely to enforce one visual mechanism.
+
+Public Experience Boundary
+
+S owns the BeHR admin UI and BeHR-owned default public/theme rendering. It does not own or guarantee the aesthetic quality of arbitrary user-authored text, images, layout choices, or content.
+
+Backend Boundary
+
+S must not silently redesign backend, persistence, authentication, or contracts because a UI review exposes a limitation. A demonstrated need outside the S-owned interface becomes a separately governed correction at its owning boundary.
+
+Stopping Rule
+
+For each material human-product finding:
+
+same material finding fails
+    ↓
+bounded remediation 1
+    ↓
+human re-review
+    ↓
+same material finding still fails
+    ↓
+bounded remediation 2
+    ↓
+human re-review
+    ↓
+same material finding remains unacceptable
+    ↓
+stop automatic iteration
+    ↓
+explicitly redesign, descope from v1.0.0, or knowingly accept with rationale
+
+The remediation budget applies per material finding, not per complete journey.
+
+Explicit Exclusions
+
+Phase S does not authorize silent API, schema, persistence, authentication, Phase Q operational, installer, release, arbitrary user-content, speculative component-catalog, or client-telemetry changes.
+
+Output Format
+
+Files created
+Files modified
+Machine-verifiable evidence
+Screenshots and interaction evidence
+Explicit human product verdicts
+
+────────
+
+Phase T — Release Candidate, Compatibility & Recovery Validation
+
+Task
+
+Freeze and validate one release candidate against every release obligation BeHR explicitly claims to support.
+
+Objective
+
+Produce one exact repository SHA whose release claims are evidenced rather than inferred from earlier phase completion.
+
+Distinct Prior Evidence
+
+Phase Q proved the prepared-host production-operations model. Phase R proves the supported first-run installation path. Phase S proves the product-experience bar. T must not conflate these gates or carry their evidence automatically to a changed final candidate.
+
+Initial Supported-Predecessor Policy
+
+The initial v1.0.0 target has no supported in-place predecessor. Do not manufacture an upgrade promise from arbitrary historical main commits, internal phase commits, or unversioned acceptance fixtures.
+
+If an RC, beta, or prior release is later declared upgrade-supported, identify its exact version and SHA through a separately reviewed governance revision before T certification. That revision must define and test data/content integrity, session survival or intentional invalidation, failed/interrupted upgrade recovery, and the selected recovery authority. Forward migrations are not presumed reversible; a verified pre-upgrade backup may be the recovery authority.
+
+Absent an explicitly supported predecessor, upgrade-session and interrupted-upgrade gates are NOT APPLICABLE rather than silently passed.
+
+Certification Paths
+
+T uses one evidence-efficient structure equivalent to:
+
+Fresh supported host
+    → Phase R installer
+    → frozen candidate installed
+    → one applicable Phase Q operational matrix
+
+Declared supported prior state, if one exists
+    → upgrade to candidate
+    → integrity and selected session-policy checks
+    → interrupted-upgrade recovery
+    → final reconciliation
+
+Supported browsers and viewports
+    → Phase S product-experience matrix
+
+Candidate repository
+    → exact CI
+    → dependency and security review
+    → release metadata and documentation verification
+    → release rehearsal
+
+Do not rerun the same destructive Phase Q matrix twice when both historical R and Q references ask the same question. Installation evidence and operational/recovery evidence remain distinct within the one frozen-candidate flow.
+
+Preview Credential Sequencing
+
+When T's integrated workflow uses short-lived credentials such as the 15-minute preview token, sequence or refresh acceptance fixtures so final reconciliation can exercise the intended capability without weakening its TTL. Do not extend product credential lifetime to make a long matrix convenient.
+
+Browser and Product Matrix
+
+T executes the browser/viewport set declared by the final Phase S governance and release metadata. Machine and human product gates remain independent. A prior human verdict does not certify a changed release candidate with user-visible differences.
+
+Security Review
+
+The frozen candidate must have no unresolved release-blocking security finding. Non-blocking findings require explicit disposition and rationale. Do not impose the unrealistic rule that every dependency or security tool must report zero findings of every severity forever.
+
+Candidate Freeze
+
+Before T certification begins, the repository content intended to ship must already contain final version metadata, final repository release notes, and reconciled documentation.
+
+Once T freezes the candidate SHA:
+
+any repository-content change
+    → new candidate SHA
+    → applicable T evidence resets
+
+Acceptance Direction
+
+T must identify every claimed supported host architecture, browser, viewport, predecessor, installation path, operational/recovery path, and security/release obligation before execution. Unsupported or unclaimed variants are not silently implied.
+
+Output Format
+
+Frozen candidate SHA
+Declared support matrix
+Installation, operational, compatibility, recovery, browser, human-product, security, metadata, and rehearsal evidence
+Release recommendation
+
+────────
+
+Phase U — v1.0.0 Release Lock
+
+Task
+
+Make the final explicit go/no-go decision and release the exact T-certified SHA.
+
+Objective
+
+The SHA tagged as v1.0.0 must be exactly the SHA certified by Phase T.
+
+Zero Repository-Content Changes
+
+Phase U permits zero repository-content changes.
+
+Phase U may:
+
+• Verify T evidence
+• Verify repository and release metadata already match
+• Record GO or NO-GO externally as appropriate
+• Tag the exact T-certified SHA
+• Publish a release that references that exact SHA
+
+Phase U may not:
+
+• Fix code
+• Modify documentation
+• Change version metadata
+• Modify repository release notes
+• Clean formatting
+• Add a tiny final fix
+
+If Phase U finds a repository problem:
+
+NO-GO
+    ↓
+bounded correction or preparation
+    ↓
+new candidate SHA
+    ↓
+applicable Phase T recertification
+    ↓
+Phase U again
+
+No behavior, documentation, release-note, or metadata commit occurs inside Phase U.
+
+Acceptance Criteria
+
+1. T evidence is complete and belongs to one exact SHA.
+2. Repository version metadata and release notes already identify v1.0.0.
+3. The release tag targets exactly the T-certified SHA.
+4. No repository-content change occurs during U.
+5. Any discovered repository problem produces NO-GO rather than a release-time fix.
+
+Output Format
+
+GO or NO-GO
+Certified SHA
+Tag and release identity
+Zero-content-change verification
+
+────────
+
 Final Agent Execution Directive
 
 The agent must stop after completing the assigned phase.
@@ -5015,5 +5508,7 @@ The agent must not:
 Each phase must be verified before the next begins.
 
 Any explicit decision gate must be resolved before the dependent phase identified by that gate begins.
+
+For Phases R–U, before a phase's first task begins, reconcile its current plan assumptions against the then-current repository and prior-phase evidence. If evidence requires a governance change, revise and version the plan before implementation. Future-phase detail is not permission to implement it early.
 
 This preserves the monolithic architecture, deterministic content contracts, and single-VPS operational model defined for the system.
