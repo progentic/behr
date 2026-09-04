@@ -36,6 +36,7 @@ jobs:
       - name: Validate operational shell syntax
         run: |
           bash -n infra/scripts/install-preflight.sh
+          bash -n infra/scripts/provision-host.sh
           bash -n infra/scripts/backup.sh
           bash -n infra/scripts/restore.sh
           bash -n infra/scripts/deploy.sh

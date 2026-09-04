@@ -13,6 +13,25 @@ service user or production filesystem, provision PostgreSQL, create environment
 or secret material, install TLS, bootstrap an identity, invoke deployment, or
 implement installer re-entry state.
 
+`provision-host.sh` implements the Phase R1 host-prerequisite boundary. It runs
+the committed R0 preflight before mutation, installs the explicit Ubuntu 24.04
+package set, disables only the exact nginx package-default enabled-site symlink,
+and validates a neutral nginx configuration. It downloads the architecture-
+specific Bun 1.4.0 archive from the exact official release, verifies its pinned
+SHA-256 before extraction, and installs or preserves the byte-identical
+root-owned runtime at `/usr/local/bin/bun`.
+
+R1 also creates or validates the `bhr-cms` system group/user and the fixed
+Phase Q application, protected configuration, TLS, upload, and backup
+directories with exact ownership and modes. Already-correct state is preserved;
+conflicting state and unresolved restore residue are refused. R1 uses
+deterministic forward reconciliation on rerun and makes no rollback claim.
+
+R1 does not create a BeHR PostgreSQL database or role, configuration or secret
+values, TLS material, an initial identity, application source under
+`/opt/bhr-cms`, BeHR nginx/systemd configuration, deployment state, or a
+complete first-run installer.
+
 The Phase Q operational scripts require root, Bash 5+, the host-native tools
 listed in the Phase Plan, and the root-owned mode-0600 environment file at
 `/etc/bhr-cms/bhr-api.env`. They serialize through the nonblocking
