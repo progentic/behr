@@ -324,7 +324,7 @@ require_directory_if_present() {
 scan_nginx_conflicts() {
   local enabled_root="/etc/nginx/sites-enabled" path target
   [[ ! -L "$enabled_root" ]] || fail "nginx enabled-site root is a conflicting symlink"
-  [[ -e "$enabled_root" ]] || return
+  [[ -e "$enabled_root" ]] || return 0
   [[ -d "$enabled_root" ]] || fail "nginx enabled-site root has a conflicting type"
   if [[ -e "$enabled_root/default" || -L "$enabled_root/default" ]]; then
     [[ -L "$enabled_root/default" ]] || fail "nginx default enabled site is not the package symlink"
