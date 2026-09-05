@@ -32,6 +32,22 @@ values, TLS material, an initial identity, application source under
 `/opt/bhr-cms`, BeHR nginx/systemd configuration, deployment state, or a
 complete first-run installer.
 
+`configure-instance.sh` implements the Phase R2 local database and protected
+configuration boundary after accepted R0 and R1 prerequisites. It validates
+the local PostgreSQL 16 loopback authority, creates or preserves the bounded
+`behr_app` login role and `behr` database, generates independent database and
+authentication secrets, collects the admin hostname, and publishes the exact
+root-owned mode-0600 production environment file.
+
+R2 treats an existing environment file as inert data before trust. Exact
+correct environment, role, and database state is preserved on re-entry;
+conflicting or ambiguous partial state is refused without credential rotation
+or destructive reconciliation.
+
+R2 does not place TLS material, bootstrap an identity, populate application
+source, run migrations, install BeHR nginx/systemd configuration, deploy the
+application, or provide final first-run orchestration.
+
 The Phase Q operational scripts require root, Bash 5+, the host-native tools
 listed in the Phase Plan, and the root-owned mode-0600 environment file at
 `/etc/bhr-cms/bhr-api.env`. They serialize through the nonblocking
