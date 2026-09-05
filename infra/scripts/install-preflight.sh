@@ -3,6 +3,12 @@ set -Eeuo pipefail
 
 readonly REQUIRED_UBUNTU_VERSION="24.04"
 readonly MINIMUM_BASH_MAJOR=5
+readonly BEHR_ROOT_PACKAGE_PATH="package.json"
+readonly BEHR_ROOT_PACKAGE_NAME="bher-cms"
+readonly BEHR_API_PACKAGE_PATH="apps/api/package.json"
+readonly BEHR_API_PACKAGE_NAME="@bher/api"
+readonly BEHR_PHASE_PLAN_PATH="docs/PHASE_PLAN.md"
+readonly BEHR_PHASE_PLAN_TITLE="BeHR CMS — Agentic Implementation Execution Brief"
 
 HOST_OS_ID=""
 HOST_OS_VERSION=""
@@ -20,6 +26,7 @@ main() {
   require_systemd_host
   read_supported_architecture
   read_source_identity
+  require_behr_source_identity
   report_preflight_success
 }
 
@@ -93,6 +100,50 @@ read_source_identity() {
     fail "source HEAD must resolve to a full commit SHA"
   tracked_state="$(git -C "$SOURCE_ROOT" status --porcelain --untracked-files=no)"
   [[ -z "$tracked_state" ]] || fail "first-run source has tracked changes"
+}
+
+require_behr_source_identity() {
+  require_committed_package_identity "$BEHR_ROOT_PACKAGE_PATH" "$BEHR_ROOT_PACKAGE_NAME"
+  require_committed_package_identity "$BEHR_API_PACKAGE_PATH" "$BEHR_API_PACKAGE_NAME"
+  require_committed_title_identity "$BEHR_PHASE_PLAN_PATH" "$BEHR_PHASE_PLAN_TITLE"
+}
+
+require_committed_package_identity() {
+  local name
+  name="$(read_committed_package_name "$1")" ||
+    fail "BeHR source identity marker is invalid: $1 name"
+  [[ "$name" == "$2" ]] || fail "BeHR source identity marker is invalid: $1 name"
+}
+
+require_committed_title_identity() {
+  local title
+  title="$(read_committed_first_line "$1")" ||
+    fail "BeHR source identity marker is invalid: $1 title"
+  [[ "$title" == "$2" ]] || fail "BeHR source identity marker is invalid: $1 title"
+}
+
+read_committed_package_name() {
+  local marker line name="" count=0
+  marker="$(read_committed_marker "$1")" || return
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^[[:space:]]*\"name\"[[:space:]]*:[[:space:]]*\"([^\"]+)\"[[:space:]]*,?[[:space:]]*$ ]]; then
+      name="${BASH_REMATCH[1]}"
+      ((count += 1))
+    fi
+  done <<<"$marker"
+  ((count == 1)) || return 1
+  printf '%s\n' "$name"
+}
+
+read_committed_first_line() {
+  local marker first_line
+  marker="$(read_committed_marker "$1")" || return
+  IFS= read -r first_line <<<"$marker"
+  printf '%s\n' "$first_line"
+}
+
+read_committed_marker() {
+  git -C "$SOURCE_ROOT" show "HEAD:$1" 2>/dev/null
 }
 
 report_preflight_success() {
