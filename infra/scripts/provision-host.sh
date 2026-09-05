@@ -11,6 +11,8 @@ readonly BUN_AARCH64_SHA256="4b1a332ee861983eb93bcfe6f770fff94e3e31b2c388bdaea3c
 readonly BUN_DESTINATION="/usr/local/bin/bun"
 readonly SERVICE_ACCOUNT="bhr-cms"
 readonly NOLOGIN_SHELL="/usr/sbin/nologin"
+readonly DEFAULT_REGULAR_ID_MIN=1000
+readonly DEFAULT_SYSTEM_ID_MIN=101
 readonly OPS_STAGING="/var/lib/bhr-cms/uploads.staging"
 readonly OPS_PRE_RESTORE="/var/lib/bhr-cms/uploads.pre-restore"
 
@@ -44,6 +46,8 @@ SYSTEM_UID_MIN=""
 SYSTEM_UID_MAX=""
 SYSTEM_GID_MIN=""
 SYSTEM_GID_MAX=""
+REGULAR_UID_MIN=""
+REGULAR_GID_MIN=""
 SERVICE_GROUP_PRESENT=0
 SERVICE_GROUP_GID=""
 SERVICE_USER_PRESENT=0
@@ -158,15 +162,83 @@ require_commands() {
 
 read_system_account_ranges() {
   local key value
+  local uid_min_value="" gid_min_value=""
+  local sys_uid_min_value="" sys_uid_max_value=""
+  local sys_gid_min_value="" sys_gid_max_value=""
+  local uid_min_count=0 gid_min_count=0
+  local sys_uid_min_count=0 sys_uid_max_count=0
+  local sys_gid_min_count=0 sys_gid_max_count=0
   [[ -r /etc/login.defs ]] || fail "system account policy is unreadable"
   while read -r key value _; do
     case "$key" in
-      SYS_UID_MIN) SYSTEM_UID_MIN=$value ;;
-      SYS_UID_MAX) SYSTEM_UID_MAX=$value ;;
-      SYS_GID_MIN) SYSTEM_GID_MIN=$value ;;
-      SYS_GID_MAX) SYSTEM_GID_MAX=$value ;;
+      UID_MIN)
+        ((uid_min_count += 1))
+        uid_min_value=$value
+        ;;
+      GID_MIN)
+        ((gid_min_count += 1))
+        gid_min_value=$value
+        ;;
+      SYS_UID_MIN)
+        ((sys_uid_min_count += 1))
+        sys_uid_min_value=$value
+        ;;
+      SYS_UID_MAX)
+        ((sys_uid_max_count += 1))
+        sys_uid_max_value=$value
+        ;;
+      SYS_GID_MIN)
+        ((sys_gid_min_count += 1))
+        sys_gid_min_value=$value
+        ;;
+      SYS_GID_MAX)
+        ((sys_gid_max_count += 1))
+        sys_gid_max_value=$value
+        ;;
     esac
   done </etc/login.defs
+  ((uid_min_count <= 1 && gid_min_count <= 1 &&
+    sys_uid_min_count <= 1 && sys_uid_max_count <= 1 &&
+    sys_gid_min_count <= 1 && sys_gid_max_count <= 1)) ||
+    fail "system account policy contains duplicate entries"
+
+  if ((uid_min_count == 0)); then
+    REGULAR_UID_MIN=$DEFAULT_REGULAR_ID_MIN
+  else
+    [[ "$uid_min_value" =~ ^[0-9]+$ ]] || fail "system account policy is invalid"
+    REGULAR_UID_MIN=$((10#$uid_min_value))
+  fi
+  if ((gid_min_count == 0)); then
+    REGULAR_GID_MIN=$DEFAULT_REGULAR_ID_MIN
+  else
+    [[ "$gid_min_value" =~ ^[0-9]+$ ]] || fail "system account policy is invalid"
+    REGULAR_GID_MIN=$((10#$gid_min_value))
+  fi
+  if ((sys_uid_min_count == 0)); then
+    SYSTEM_UID_MIN=$DEFAULT_SYSTEM_ID_MIN
+  else
+    [[ "$sys_uid_min_value" =~ ^[0-9]+$ ]] || fail "system account policy is invalid"
+    SYSTEM_UID_MIN=$((10#$sys_uid_min_value))
+  fi
+  if ((sys_uid_max_count == 0)); then
+    SYSTEM_UID_MAX=$((REGULAR_UID_MIN - 1))
+  else
+    [[ "$sys_uid_max_value" =~ ^[0-9]+$ ]] || fail "system account policy is invalid"
+    SYSTEM_UID_MAX=$((10#$sys_uid_max_value))
+  fi
+  if ((sys_gid_min_count == 0)); then
+    SYSTEM_GID_MIN=$DEFAULT_SYSTEM_ID_MIN
+  else
+    [[ "$sys_gid_min_value" =~ ^[0-9]+$ ]] || fail "system account policy is invalid"
+    SYSTEM_GID_MIN=$((10#$sys_gid_min_value))
+  fi
+  if ((sys_gid_max_count == 0)); then
+    SYSTEM_GID_MAX=$((REGULAR_GID_MIN - 1))
+  else
+    [[ "$sys_gid_max_value" =~ ^[0-9]+$ ]] || fail "system account policy is invalid"
+    SYSTEM_GID_MAX=$((10#$sys_gid_max_value))
+  fi
+
   [[ "$SYSTEM_UID_MIN" =~ ^[0-9]+$ && "$SYSTEM_UID_MAX" =~ ^[0-9]+$ &&
     "$SYSTEM_GID_MIN" =~ ^[0-9]+$ && "$SYSTEM_GID_MAX" =~ ^[0-9]+$ ]] ||
     fail "system account policy is invalid"
