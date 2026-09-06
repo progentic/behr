@@ -66,6 +66,23 @@ R3 does not issue or renew certificates, use ACME, change system trust, manage
 DNS, bootstrap identity, install BeHR nginx/systemd configuration, deploy BeHR,
 or start services.
 
+`install.sh` implements the Phase R4 integrated first-run entrypoint. It
+performs explicit R0 admission, composes the accepted R1 host, R2 instance, and
+R3 TLS boundaries, installs only the admitted committed Git revision into
+`/opt/bhr-cms`, and delegates migration, service configuration, activation, and
+health validation to the accepted Phase Q `deploy.sh`.
+
+Only after deployment succeeds, R4 reads the exact R2 environment as inert
+data, transiently collects the initial administrator name, email, and hidden
+password, and invokes the existing one-time `bun run auth:bootstrap` authority
+from the installed production checkout. Bootstrap credentials are not written
+to the protected environment or another file.
+
+R4 proves positive first-run composition and basic exact-source preservation.
+It does not yet claim complete interrupted-run recovery, deterministic
+whole-flow re-entry, or final fresh-host certification; those remain Phase R5
+and R6 responsibilities.
+
 The Phase Q operational scripts require root, Bash 5+, the host-native tools
 listed in the Phase Plan, and the root-owned mode-0600 environment file at
 `/etc/bhr-cms/bhr-api.env`. They serialize through the nonblocking
