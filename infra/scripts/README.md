@@ -48,6 +48,24 @@ R2 does not place TLS material, bootstrap an identity, populate application
 source, run migrations, install BeHR nginx/systemd configuration, deploy the
 application, or provide final first-run orchestration.
 
+`install-tls.sh` implements the Phase R3 operator-supplied TLS boundary after
+accepted R0, R1, and R2 state. It reads the R2 admin hostname as validated data,
+resolves interactive certificate/key source paths, snapshots each source once,
+and validates the complete certificate bundle, system trust, hostname, current
+validity, TLS-server purpose, private key, and certificate/key pairing.
+
+R3 publishes only the validated snapshots at the fixed Phase Q TLS paths with
+root ownership, restrictive modes, single-link identity, and exclusive
+same-filesystem operations. Exact correct installed state is preserved without
+prompting; partial, conflicting, invalid, or ambiguous state is refused. A
+crash between the two publications may leave partial state that requires
+operator reconciliation; ordinary second-publication conflict compensation
+removes only an inode-proven file created by that invocation.
+
+R3 does not issue or renew certificates, use ACME, change system trust, manage
+DNS, bootstrap identity, install BeHR nginx/systemd configuration, deploy BeHR,
+or start services.
+
 The Phase Q operational scripts require root, Bash 5+, the host-native tools
 listed in the Phase Plan, and the root-owned mode-0600 environment file at
 `/etc/bhr-cms/bhr-api.env`. They serialize through the nonblocking
