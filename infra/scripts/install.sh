@@ -40,7 +40,6 @@ main() {
 prepare_first_run() {
   trap report_first_run_failure ERR
   trap cleanup_completion_marker EXIT
-  umask 077
   enter_stage "preflight"
   require_no_arguments "$@"
   read_source_authority
