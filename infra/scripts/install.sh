@@ -4,7 +4,7 @@ set -Eeuo pipefail
 readonly INSTALL_ROOT="/opt/bhr-cms"
 readonly ENV_FILE="/etc/bhr-cms/bhr-api.env"
 readonly API_PORT_VALUE="3000"
-readonly ASSET_STORAGE_ROOT="/var/lib/bhr-cms/uploads"
+readonly EXPECTED_ASSET_STORAGE_ROOT="/var/lib/bhr-cms/uploads"
 readonly SECRET_PATTERN='^[0-9a-f]{64}$'
 readonly DATABASE_URL_PATTERN='^postgresql://behr_app:([0-9a-f]{64})@127\.0\.0\.1:5432/behr$'
 readonly HOSTNAME_PATTERN='^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$'
@@ -189,7 +189,7 @@ validate_environment_values() {
 require_fixed_environment_values() {
   [[ "${ENVIRONMENT_VALUES[NODE_ENV]-}" == "production" &&
     "${ENVIRONMENT_VALUES[API_PORT]-}" == "$API_PORT_VALUE" &&
-    "${ENVIRONMENT_VALUES[ASSET_STORAGE_ROOT]-}" == "$ASSET_STORAGE_ROOT" ]] ||
+    "${ENVIRONMENT_VALUES[ASSET_STORAGE_ROOT]-}" == "$EXPECTED_ASSET_STORAGE_ROOT" ]] ||
     fail "protected production environment content is invalid"
 }
 
