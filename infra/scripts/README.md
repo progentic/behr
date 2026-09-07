@@ -79,9 +79,21 @@ from the installed production checkout. Bootstrap credentials are not written
 to the protected environment or another file.
 
 R4 proves positive first-run composition and basic exact-source preservation.
-It does not yet claim complete interrupted-run recovery, deterministic
-whole-flow re-entry, or final fresh-host certification; those remain Phase R5
-and R6 responsibilities.
+Phase R5 adds deterministic whole-flow bootstrap completion recognition while
+leaving R1–R3, exact source validation, and accepted `deploy.sh` responsible
+for their existing re-entry boundaries. After successful bootstrap and exact
+identity-count verification, `install.sh` exclusively publishes
+`/etc/bhr-cms/first-run.complete` as a protected one-line source-SHA
+attestation. A completed rerun preserves that marker, skips administrator
+credential prompts and `auth:bootstrap`, and reruns deployment reconciliation.
+
+An identity without the marker is ambiguous and refused. A marker without an
+identity, a marker for another source SHA, or conflicting marker type/metadata
+is also preserved and refused. A crash or publication conflict after bootstrap
+but before marker creation therefore requires deliberate operator
+reconciliation; R5 does not automatically adopt the identity, roll it back, or
+maintain a generic stage journal. R6 remains responsible for final fresh-host
+certification of the completed installer.
 
 The Phase Q operational scripts require root, Bash 5+, the host-native tools
 listed in the Phase Plan, and the root-owned mode-0600 environment file at
