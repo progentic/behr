@@ -1599,3 +1599,164 @@ and positive/negative backup/restore/deploy controls require a disposable Linux
 VPS/VM. Until that distinct gate executes, repository implementation may pass
 while production operational acceptance and Phase Q closure remain
 inconclusive.
+
+---
+
+## Phase S0 — Product UX Inventory and Usability Baseline
+
+### Baseline authority and review environment
+
+Phase S0 observed the unchanged Phase R-certified runtime at:
+
+```text
+3e65e64d4e1759523b57e2b02a100a62ec8776a1
+```
+
+The evidence-only stage made no repository-content change. Admin workflows ran
+in the Codex in-app Chromium 152.0.7977.64 browser on macOS 26.6.2. Published
+and preview rendering ran in Chromium 152.0.7977.64 on Ubuntu 24.04.4 LTS
+arm64. The review used 1440 × 900, 390 × 844, and approximately 320-pixel-wide
+CSS viewports. Screenshots remained outside the repository with exact SHA,
+browser, OS, viewport, surface, state, role, data-assumption, fixture, and
+rubric metadata.
+
+The audited BeHR-owned surfaces were authentication and invitation
+registration; authenticated owner and member workspaces; tenant and site
+selection; site creation and settings; membership administration; page lists,
+creation, editing, ordering, asset selection, and save feedback; admin failure
+fallbacks; published light/sans and dark/serif rendering; preview rendering;
+and public not-found behavior. The browser review used actual owner and member
+sessions, including a disposable invitation. State that could not be created
+through the human UI was marked as an acceptance fixture and was not treated as
+proof of UI reachability.
+
+### Workflow and product condition
+
+Authentication, logout, invitation registration, owner site creation and
+settings, membership administration, page creation, and portions of page
+authoring were exercised successfully. Members could enter the workspace,
+select a site, reach page authoring, and did not receive owner-only settings or
+membership controls.
+
+The current UI is not usable as a complete, reliable end-to-end CMS workflow.
+A newly bootstrapped administrator reaches a zero-tenant state without a human
+tenant-creation path. Asset upload, preview issuance, and publishing have
+backend authority but lack corresponding admin controls. Asset selection is
+therefore reachable only after fixture or API upload, and preview rendering is
+reachable only after obtaining a token outside the admin interface.
+
+The browser baseline also demonstrated two functional defects. Tenant
+switching accumulates duplicate site-creation forms and duplicate form IDs.
+Normal heading-text editing can dereference a cleared React event target,
+trigger a runtime exception, and replace the workspace with the generic
+admin-unavailable fallback. These failures are not visual-polish findings and
+must retain explicit reproduction steps and regression checks in their future
+frontend correction tasks.
+
+The owner finds the current interface aesthetically unacceptable for the
+intended release. The admin predominantly presents browser-default HTML
+without an intentional CSS-based visual system governing typography, spacing,
+hierarchy, control presentation, or responsive composition. The result is
+visually unfinished, densely grouped, and insufficiently clear for sustained
+CMS use. Inputs and buttons measured about 21.5 CSS pixels high, selects about
+19 pixels, and form-control text about 13.33 pixels. Narrow admin layouts avoid
+document overflow in the exercised states but wrap labels, controls, and values
+into ambiguous runs.
+
+The public renderer does have limited bounded theme styling: light/dark colors
+and sans/serif font selection. That must not be described as no styling
+anywhere. It remains an incomplete product presentation because it lacks a
+coherent content-width, spacing, full-viewport theme-background, and responsive
+image policy. A representative 1200-pixel image produced horizontal overflow
+at both 390- and 320-pixel widths. Published and token-bound preview captures
+of the same document and theme were visually identical, confirming renderer
+reuse.
+
+### Accepted findings
+
+The accepted baseline uses the BeHR v1 Product Experience Rubric, with
+PASS/FAIL/NOT APPLICABLE dimensions and BLOCKER/MATERIAL/POLISH severities.
+Objective source and browser evidence remains attached to its corresponding
+finding. The owner verdict promotes the subjective assessment in S0-F002 and
+the aesthetic portion of S0-F015 to HUMAN-CONFIRMED.
+
+| ID | Severity | Evidence maturity | Accepted finding | Future owner |
+| --- | --- | --- | --- | --- |
+| S0-F001 | BLOCKER | BROWSER-CONFIRMED | A freshly bootstrapped owner reaches a zero-tenant dead end although tenant-creation backend authority exists. | S5 |
+| S0-F002 | MATERIAL | HUMAN-CONFIRMED | The admin lacks an intentional visual system and is aesthetically unacceptable for release. | S1 |
+| S0-F003 | MATERIAL | BROWSER-CONFIRMED | The admin lacks clear persistent navigation and tenant/site/page context. | S3 |
+| S0-F004 | MATERIAL | BROWSER-CONFIRMED | Admin controls and control text are substantially below the adopted comfort and target-size goals. | S1, S2, S7 |
+| S0-F005 | MATERIAL | BROWSER-CONFIRMED | Mobile and narrow admin layouts wrap into dense, ambiguous compositions. | S7 |
+| S0-F006 | MATERIAL | BROWSER-CONFIRMED | Tenant switching accumulates duplicate site-creation forms and duplicate IDs. This is a demonstrated functional defect. | S5 |
+| S0-F007 | BLOCKER | SOURCE-CONFIRMED | Asset upload has backend authority but no human admin path. | S6 |
+| S0-F008 | MATERIAL | SOURCE-CONFIRMED | Preview-token issuance and opening have no human admin path. | S6 |
+| S0-F009 | BLOCKER | SOURCE-CONFIRMED | Publishing has owner-only backend authority but no human admin path or publication feedback. | S6 |
+| S0-F010 | BLOCKER | BROWSER-CONFIRMED | Normal editor text input can trigger a runtime exception and destroy the active workspace. This is a demonstrated functional defect. | S6 |
+| S0-F011 | MATERIAL | BROWSER-CONFIRMED | The editor presents many equally weighted controls without a clear authoring hierarchy. | S2, S6 |
+| S0-F012 | MATERIAL | SOURCE-CONFIRMED | Page, site, or tenant changes can discard unsaved local edits without warning. | S6 |
+| S0-F013 | MATERIAL | BROWSER-CONFIRMED | Form and outcome semantics exist, but feedback is visually indistinct and some success is communicated only by resource-list mutation. | S4 |
+| S0-F014 | MATERIAL | BROWSER-CONFIRMED | Transient invitation-token output lacks a copy affordance and strong secure-sharing hierarchy. Token persistence remains intentionally excluded. | S4, S5 |
+| S0-F015 | MATERIAL | HUMAN-CONFIRMED | The public renderer's limited theme styling does not amount to an acceptable content presentation system. | S1, S7 |
+| S0-F016 | MATERIAL | BROWSER-CONFIRMED | Public images have no responsive width constraint and can cause horizontal overflow. | S7 |
+| S0-F017 | MATERIAL | BROWSER-CONFIRMED | Sign-in and invitation registration lack clear visual priority and reflow awkwardly at narrow widths. | S3, S4 |
+
+These findings distinguish missing product paths, demonstrated functional
+defects, and visual deficiencies. The baseline does not imply that every
+interface operation is nonfunctional, and aesthetic reconstruction may not
+substitute for functional correction.
+
+### Accessibility, reuse, and feedback evidence
+
+The baseline target is WCAG 2.2 AA with an approximately 44 CSS pixel primary
+interaction target where practical. Browser-default keyboard focus was visible,
+login tab order was coherent, tested fields had associated labels, page-title
+validation used `aria-invalid` and `aria-describedby` and focused the invalid
+field, site/page selection used `aria-pressed`, alert/status semantics were
+widely present, and editor Move Up/Down actions supplied a non-pointer ordering
+path. Those positives do not offset the target-size, reflow, duplicate-ID, and
+workflow failures. The environment did not expose an assistive-technology or
+accessibility-tree bridge, so S0 does not claim screen-reader certification.
+
+`packages/ui` remains empty without itself being a defect. S0 found repeated
+policy evidence for action variants, field/label pairs, selects, alert/status
+presentation, selectable resource rows, empty states, and panels/surfaces.
+S2 may extract a primitive only when it owns those shared semantics and their
+visual, accessibility, or interaction policy; repeated HTML alone is
+insufficient.
+
+Existing feedback is predominantly local: alerts for failures, statuses for
+loading/saving/success, and resource-list updates after some creation actions.
+S4 must evaluate save, settings, membership/invitation, session-expiry,
+resource-switching, future upload, and future publish completion before choosing
+any transient/global notification behavior. No toast policy was preselected,
+and any later cross-context notification remains subject to Global Rule 13
+resource identity.
+
+### Accepted ownership and owner verdict
+
+The evidence confirmed the existing decomposition without refinement:
+
+```text
+S1 — Visual foundations
+S2 — Shared UI primitives
+S3 — Application shell
+S4 — Forms and feedback model
+S5 — Core workflow reconstruction
+S6 — Editor and publishing experience
+S7 — Responsive and accessibility completion
+S8 — Integrated usability and beta-exit acceptance
+```
+
+No S0 finding demonstrated a required backend expansion. The missing tenant,
+asset-upload, preview, and publish paths can use existing backend authority.
+Any later evidence requiring API, schema, persistence, authentication,
+operations, or installer changes must be governed outside S.
+
+Owner baseline verdict: **BASELINE ACCEPTED**.
+
+The owner accepts this inventory and its supporting evidence as the Phase S0
+baseline. This acceptance does not approve the current product interface for
+release. Human Product Acceptance of S0 implementation is not applicable
+because S0 changes no interface. The owner verdict authorizes only this
+documentation record; it does not authorize runtime changes, opportunistic
+fixes, backend expansion, or implementation of S1–S8.

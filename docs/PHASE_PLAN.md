@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.17
+Version: 1.18
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -5222,6 +5222,28 @@ Design Direction
 
 Use Apple Human Interface Guidelines-inspired clarity, legibility, consistency, restraint, comfortable interaction targets, clear hierarchy, and generous spacing, adapted to a web CMS. Do not imitate macOS chrome merely to appear Apple-like.
 
+Phase S0 Adopted Governance
+
+The normative review instrument is the BeHR v1 Product Experience Rubric. Each applicable dimension receives exactly PASS, FAIL, or NOT APPLICABLE; material failures are not averaged into an aggregate score. The rubric covers clarity, hierarchy, typography, comfortable text sizes, restrained type scale, spacing rhythm, information density, button and control sizing, focus/hover/pressed/disabled/loading states, validation and error presentation, progress and success feedback, motion and transition quality, visual consistency, responsive behavior, accessibility, and overall aesthetic quality.
+
+WCAG 2.2 AA remains the BeHR-owned UI accessibility target. Primary touch and click targets retain an approximately 44 CSS pixel goal where practical. A specific exception requires observed evidence, documented rationale, and explicit owner approval.
+
+Baseline browser review uses at least these CSS viewports:
+
+• Desktop — 1440 × 900
+• Mobile — 390 × 844
+• Narrow reflow — approximately 320 pixels wide
+
+Browser evidence used for Phase S acceptance must originate from the actual `progentic/behr` runtime at the declared exact SHA. Every retained screenshot records exact SHA, browser and version, operating system, viewport, surface, state, role, data assumptions, fixture status, and rubric name. Evidence from another repository or SHA, a prototype, mockup, manually reconstructed page, copied implementation, or generated reproduction is NON-EVIDENTIARY and cannot close an S gate.
+
+Material findings use stable IDs `S0-F###` and retain their assigned identity when later findings are added. Severity is exactly BLOCKER, MATERIAL, or POLISH. Evidence maturity is exactly PROVISIONAL, SOURCE-CONFIRMED, BROWSER-CONFIRMED, or HUMAN-CONFIRMED. A source or browser observation must not be promoted to human judgment without an explicit human verdict.
+
+Shared primitives may be introduced only when S0 evidence demonstrates repeated semantics plus shared visual, accessibility, interaction, or feedback policy. Repeated HTML elements alone do not justify extraction. An action policy may distinguish primary, secondary, destructive, and quiet actions rather than forcing every action into one semantic component.
+
+S0 requires explicit Human Baseline Governance Acceptance from the project owner or a designated reviewer. That verdict accepts the accuracy, evidence, severity, and future ownership of the baseline; it does not approve the current interface for release and is not Human Product Acceptance of an implemented UI change.
+
+S0 findings are planning evidence, not implementation authority. Each later phase must receive a bounded task at the owning frontend boundary. A finding that requires API, schema, persistence, authentication, Phase Q, or installer behavior requires separate out-of-S governance. Aesthetic reconstruction must not conceal or substitute for correction of a demonstrated functional defect.
+
 Why Earlier UX Phases Do Not Already Own S
 
 Phases K, M, N, O, and P correctly implemented bounded authoring, asset, theme, settings, validation, ordering, accessibility, and render-failure behavior against their stated criteria. They did not establish a product-wide visual system or independent human aesthetic acceptance gate.
@@ -5240,7 +5262,7 @@ S6 — Editor and publishing experience
 S7 — Responsive and accessibility completion
 S8 — Integrated usability and beta-exit acceptance
 
-This is an expected decomposition. S0 may propose a better bounded split only through an explicit documented governance decision before affected implementation.
+This decomposition was confirmed by the accepted S0 baseline. A later change requires an explicit documented governance decision before affected implementation.
 
 Independent Acceptance Gates
 
