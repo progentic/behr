@@ -76,7 +76,7 @@ export function PageList({ tenantId, siteId }: PageListProperties) {
   }
 
   return (
-    <section aria-labelledby="pages-title">
+    <section className="pages-surface" aria-labelledby="pages-title">
       <h2 id="pages-title">Pages</h2>
       {state.pages.length === 0 ? (
         <p>No pages yet.</p>

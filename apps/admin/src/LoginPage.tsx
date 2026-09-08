@@ -25,7 +25,7 @@ export function LoginPage({ error, onLogin }: LoginPageProps) {
   }
 
   return (
-    <main>
+    <main className="auth-page">
       <h1>Sign in to BeHR</h1>
       <p>Use your BeHR account to continue to the admin workspace.</p>
       <form onSubmit={(event) => void submitLogin(event)}>

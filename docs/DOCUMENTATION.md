@@ -1760,3 +1760,117 @@ release. Human Product Acceptance of S0 implementation is not applicable
 because S0 changes no interface. The owner verdict authorizes only this
 documentation record; it does not authorize runtime changes, opportunistic
 fixes, backend expansion, or implementation of S1–S8.
+
+---
+
+## Phase S1 — Visual Foundations
+
+### Application-local stylesheet ownership
+
+S1 adds one stylesheet to each existing HTML application entrypoint:
+
+```text
+apps/admin/src/styles.css
+apps/web/src/styles.css
+```
+
+Bun's existing HTML build discovers and fingerprints both local stylesheets.
+The admin CSP remains byte-for-byte unchanged and continues to permit only
+self-hosted styles. The public document adds the standard responsive viewport
+declaration without restricting browser zoom. No package, shared UI export,
+CSS framework, remote font, asset, workspace dependency, or build
+configuration was introduced.
+
+Static class names were added only where an existing element needed a stable
+presentation identity: the admin header and main, authentication page and
+invitation region, workspace and page/editor surfaces, editor section and
+block containers, explicit success messages, the existing draft-save action,
+existing destructive editor actions, and the public loaded/status main
+elements. Element order and type, headings, labels, IDs, keys, refs, ARIA,
+conditionals, state, effects, handlers, validation, request paths, and preview
+credential transport remain unchanged.
+
+### Admin palette, typography, and surfaces
+
+The admin uses a neutral gray canvas with white surfaces, near-black primary
+text, and a readable neutral secondary gray. Blue is limited to primary
+actions, selection, and focus; red to existing alert/destructive semantics;
+and green to explicit saved-success states. Loading and indeterminate status
+messages retain a neutral treatment. No admin dark mode, gradient, tinted page
+background, or ornamental palette was added.
+
+The compact admin scale is:
+
+```text
+body                 0.9375rem / 1.5 line-height (15px at browser default)
+form controls        1rem / 1.3 line-height (16px at browser default)
+secondary text       inherited 0.9375rem where applicable
+h1                   clamp(1.75rem, 3vw, 2rem)
+h2                   1.25rem
+h3                   1.0625rem
+```
+
+Fluid outer gutters, a restrained 0.5–2rem spacing rhythm, bounded form and
+content measures, modest neutral borders/radii, and limited card elevation
+separate the existing stacked workflows without creating the S3 navigation or
+workspace structure. Sign-in receives the stronger blue action and accent
+edge; invitation registration remains visible as a quieter secondary surface.
+
+All existing admin inputs, selects, textareas, and buttons receive a flexible
+minimum block size of 2.75rem (44 CSS pixels at browser defaults). S1 therefore
+requests no compact-control exception. The populated editor remains dense and
+continues to require S2/S6 reconstruction; S1 only groups its existing section
+and block controls and distinguishes current destructive actions. Focus uses a
+three-pixel blue outline with offset. Hover, active, selected, disabled,
+invalid, alert, neutral status, and confirmed-success states remain visually
+distinct without changing state semantics or adding motion.
+
+Measured palette ratios include 16.44:1 for primary text on the neutral canvas,
+7.81:1 for secondary text on white, 3.45:1 for essential control borders on
+white, 6.44:1 for white text on blue, 5.98:1 for red alert text on its surface,
+and 6.44:1 for green success text on its surface.
+
+### Public presentation and theme authority
+
+The public stylesheet leaves the existing inline `readThemeStyle()` mapping as
+the only light/dark and sans/serif authority. The current themed renderer root
+now covers at least the viewport and grows with long content, so a short dark
+page no longer reveals an unintended light canvas. Existing sections receive
+fluid gutters and default, narrow, standard, and wide measures consistent with
+their authored class hooks. Existing spacing and text-alignment hooks receive
+direct CSS mappings.
+
+Public headings and paragraphs use a separate reading scale and rhythm rather
+than inheriting the compact admin scale. Images are block-level, shrink to the
+current content container, retain automatic aspect ratio, and are neither
+cropped nor replaced. Published and preview rendering still use the same
+`PageRenderer`; text escaping, heading levels, order, alt text, public asset
+routes, header-only preview credentials, object-URL cleanup, and bounded
+loading/not-found/unavailable behavior are unchanged.
+
+### Evidence and finding disposition
+
+Pre-commit working-tree browser checks used the actual core runtime in Chromium
+152.0.7977.64 on macOS. They exercised sign-in/logout, invitation registration,
+owner and member visibility, site creation, invalid page creation, saved site
+settings, keyboard focus, selected and disabled states, a populated static
+editor fixture, and 1440 × 900, 390 × 844, and approximately 320-pixel layouts.
+Representative admin buttons and inputs measured 44 CSS pixels high with
+16-pixel control text; body text measured 15 pixels. Final public, preview,
+built-runtime, text-enlargement, exact-candidate, CI, and human evidence remain
+external acceptance gates and are not marked PASS by this implementation
+record.
+
+S0-F002, S0-F004, and S0-F015 receive direct S1 foundation work but require the
+candidate-bound machine and human verdict before closure. S0-F005, S0-F016,
+and S0-F017 receive only foundation-level responsive, image, and authentication
+hierarchy improvements; their later owning phases remain open.
+
+S0-F006 remains an open functional defect: tenant switching can duplicate
+site-creation forms and IDs. S0-F010 remains an open functional defect: normal
+editor text input can crash the workspace. S1 changes neither failure's state,
+effects, handlers, IDs, keys, or conditions and does not hide either with CSS.
+Tenant creation, upload, preview issuance, publishing, unsaved-edit protection,
+shared components, shell reconstruction, forms/feedback reconstruction, editor
+workflow reconstruction, final responsive/accessibility completion, and
+integrated beta-exit acceptance remain assigned to S2–S8.

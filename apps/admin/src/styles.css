@@ -1,0 +1,452 @@
+:root {
+  color: #171717;
+  background: #f5f5f5;
+  font-family:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 100%;
+  --admin-canvas: #f5f5f5;
+  --admin-surface: #ffffff;
+  --admin-surface-muted: #fafafa;
+  --admin-text: #171717;
+  --admin-text-muted: #525252;
+  --admin-border: #d4d4d4;
+  --admin-border-strong: #8a8a8a;
+  --admin-blue: #0759c7;
+  --admin-blue-hover: #064ba6;
+  --admin-blue-soft: #eaf2ff;
+  --admin-red: #b42318;
+  --admin-red-soft: #fff1f0;
+  --admin-green: #17663a;
+  --admin-green-soft: #edf8f1;
+  --admin-focus: #0759c7;
+  --admin-radius-small: 0.5rem;
+  --admin-radius: 0.75rem;
+  --admin-space-2: 0.5rem;
+  --admin-space-3: 0.75rem;
+  --admin-space-4: 1rem;
+  --admin-space-5: 1.5rem;
+  --admin-space-6: 2rem;
+  --admin-content: 76rem;
+  --admin-form: 34rem;
+  --admin-control-size: 2.75rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--admin-canvas);
+}
+
+.behr-admin {
+  min-block-size: 100vh;
+  margin: 0;
+  color: var(--admin-text);
+  background: var(--admin-canvas);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.behr-admin button,
+.behr-admin input,
+.behr-admin select,
+.behr-admin textarea {
+  max-inline-size: 100%;
+  min-block-size: var(--admin-control-size);
+  border: 1px solid var(--admin-border-strong);
+  border-radius: var(--admin-radius-small);
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.behr-admin input,
+.behr-admin select,
+.behr-admin textarea {
+  inline-size: 100%;
+  padding: 0.625rem 0.75rem;
+}
+
+.behr-admin textarea {
+  min-block-size: 6rem;
+  resize: vertical;
+}
+
+.behr-admin button {
+  inline-size: fit-content;
+  padding: 0.625rem 1rem;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.behr-admin button:hover:not(:disabled) {
+  border-color: var(--admin-text-muted);
+  background: var(--admin-surface-muted);
+}
+
+.behr-admin button:active:not(:disabled) {
+  background: #e5e5e5;
+}
+
+.behr-admin button[type="submit"],
+.behr-admin .button-primary {
+  border-color: var(--admin-blue);
+  color: #ffffff;
+  background: var(--admin-blue);
+}
+
+.behr-admin button[type="submit"]:hover:not(:disabled),
+.behr-admin .button-primary:hover:not(:disabled) {
+  border-color: var(--admin-blue-hover);
+  background: var(--admin-blue-hover);
+}
+
+.behr-admin button[type="submit"]:active:not(:disabled),
+.behr-admin .button-primary:active:not(:disabled) {
+  border-color: #043d88;
+  background: #043d88;
+}
+
+.behr-admin .button-danger {
+  border-color: var(--admin-red);
+  color: var(--admin-red);
+  background: var(--admin-surface);
+}
+
+.behr-admin .button-danger:hover:not(:disabled) {
+  background: var(--admin-red-soft);
+}
+
+.behr-admin .button-danger:active:not(:disabled) {
+  background: #ffe2df;
+}
+
+.behr-admin button:disabled,
+.behr-admin input:disabled,
+.behr-admin select:disabled,
+.behr-admin textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.behr-admin :focus-visible {
+  outline: 3px solid var(--admin-focus);
+  outline-offset: 3px;
+}
+
+.behr-admin h1,
+.behr-admin h2,
+.behr-admin h3 {
+  margin-block: 0;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.behr-admin h1 {
+  font-size: clamp(1.75rem, 3vw, 2rem);
+  font-weight: 750;
+}
+
+.behr-admin h2 {
+  font-size: 1.25rem;
+  font-weight: 720;
+}
+
+.behr-admin h3 {
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+.behr-admin p,
+.behr-admin dl,
+.behr-admin ul {
+  margin-block: 0;
+}
+
+.behr-admin label,
+.behr-admin dt,
+.behr-admin legend {
+  font-weight: 650;
+}
+
+.behr-admin code,
+.behr-admin output {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+.behr-admin output {
+  display: block;
+  padding: var(--admin-space-3);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-small);
+  background: var(--admin-surface-muted);
+}
+
+.behr-admin form {
+  display: grid;
+  inline-size: min(100%, var(--admin-form));
+  gap: var(--admin-space-2);
+}
+
+.behr-admin form > button {
+  margin-block-start: var(--admin-space-2);
+}
+
+.behr-admin ul {
+  display: grid;
+  gap: var(--admin-space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.behr-admin li {
+  min-inline-size: 0;
+  padding: var(--admin-space-3);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-small);
+  background: var(--admin-surface-muted);
+  overflow-wrap: anywhere;
+}
+
+.behr-admin li > button {
+  inline-size: 100%;
+  text-align: start;
+}
+
+.behr-admin button[aria-pressed="true"] {
+  border-color: var(--admin-blue);
+  color: #064698;
+  background: var(--admin-blue-soft);
+}
+
+.behr-admin button[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: var(--admin-blue-hover);
+  color: #043d88;
+  background: #dceaff;
+}
+
+.behr-admin [role="alert"],
+.behr-admin [aria-invalid="true"] + p {
+  color: var(--admin-red);
+}
+
+.behr-admin [role="alert"] {
+  padding: var(--admin-space-3) var(--admin-space-4);
+  border-inline-start: 4px solid var(--admin-red);
+  border-radius: var(--admin-radius-small);
+  background: var(--admin-red-soft);
+}
+
+.behr-admin [role="status"] {
+  padding: var(--admin-space-3) var(--admin-space-4);
+  border-inline-start: 4px solid var(--admin-border-strong);
+  border-radius: var(--admin-radius-small);
+  color: var(--admin-text-muted);
+  background: var(--admin-surface-muted);
+}
+
+.behr-admin .status-success {
+  border-inline-start-color: var(--admin-green);
+  color: var(--admin-green);
+  background: var(--admin-green-soft);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: var(--admin-space-3);
+  padding: var(--admin-space-3) clamp(1rem, 4vw, 2rem);
+  border-block-end: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+}
+
+.app-header strong {
+  margin-inline-end: auto;
+  font-size: 1.125rem;
+  letter-spacing: -0.02em;
+}
+
+.app-header span {
+  min-inline-size: 0;
+  color: var(--admin-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.admin-main {
+  inline-size: min(100%, var(--admin-content));
+  margin-inline: auto;
+  padding: clamp(1rem, 4vw, 2rem);
+}
+
+.auth-page {
+  display: grid;
+  inline-size: min(100% - 2rem, 48rem);
+  min-block-size: 100vh;
+  align-content: center;
+  gap: var(--admin-space-4);
+  margin-inline: auto;
+  padding-block: var(--admin-space-6);
+}
+
+.auth-page > p {
+  max-inline-size: 42rem;
+  color: var(--admin-text-muted);
+  font-size: 1rem;
+}
+
+.auth-page > form,
+.auth-invitation {
+  padding: clamp(1rem, 4vw, 1.5rem);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 0.06);
+}
+
+.auth-page > form {
+  border-block-start: 4px solid var(--admin-blue);
+}
+
+.auth-invitation {
+  display: grid;
+  gap: var(--admin-space-4);
+}
+
+.auth-invitation > h2 {
+  color: var(--admin-text-muted);
+}
+
+.auth-invitation button[type="submit"] {
+  border-color: var(--admin-border-strong);
+  color: var(--admin-text);
+  background: var(--admin-surface);
+}
+
+.auth-invitation button[type="submit"]:hover:not(:disabled) {
+  border-color: var(--admin-text-muted);
+  background: var(--admin-surface-muted);
+}
+
+.workspace {
+  display: grid;
+  gap: var(--admin-space-5);
+}
+
+.workspace > section[aria-labelledby] {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--admin-space-4);
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+}
+
+.workspace > label,
+.workspace > select {
+  inline-size: min(100%, 24rem);
+}
+
+.workspace > ul {
+  inline-size: min(100%, 34rem);
+}
+
+.workspace dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--admin-space-2) var(--admin-space-4);
+}
+
+.workspace dd {
+  margin: 0;
+  color: var(--admin-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.pages-surface > section,
+.editor-surface {
+  display: grid;
+  gap: var(--admin-space-4);
+  margin-block-start: var(--admin-space-4);
+  padding-block-start: var(--admin-space-5);
+  border-block-start: 1px solid var(--admin-border);
+}
+
+.editor-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: var(--admin-space-3);
+  min-inline-size: 0;
+  padding: var(--admin-space-4);
+  border: 1px solid var(--admin-border-strong);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface-muted);
+}
+
+.editor-section legend {
+  padding-inline: var(--admin-space-2);
+}
+
+.editor-section > label,
+.editor-section > select,
+.editor-block {
+  grid-column: 1 / -1;
+}
+
+.editor-block {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: var(--admin-space-3);
+  min-inline-size: 0;
+  padding: var(--admin-space-4);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-small);
+  background: var(--admin-surface);
+}
+
+.editor-block > label,
+.editor-block > input,
+.editor-block > textarea,
+.editor-block > p,
+.editor-block > select {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 40rem) {
+  .app-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .app-header strong {
+    inline-size: 100%;
+  }
+
+  .admin-main {
+    padding: var(--admin-space-4);
+  }
+
+  .auth-page {
+    align-content: start;
+  }
+
+  .workspace > section[aria-labelledby] {
+    padding: var(--admin-space-4);
+  }
+
+  .behr-admin button,
+  .behr-admin form,
+  .workspace > label,
+  .workspace > select,
+  .workspace > ul {
+    inline-size: 100%;
+  }
+
+  .workspace dl {
+    grid-template-columns: 1fr;
+  }
+}

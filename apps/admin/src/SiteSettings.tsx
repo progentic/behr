@@ -208,7 +208,9 @@ export function SiteSettings({
           <p role="status">Saving site settings…</p>
         ) : null}
         {state.saveStatus === "saved" ? (
-          <p role="status">Site settings saved.</p>
+          <p className="status-success" role="status">
+            Site settings saved.
+          </p>
         ) : null}
         <button type="submit" disabled={saving}>
           Save settings

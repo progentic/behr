@@ -64,7 +64,7 @@ function AuthenticatedShell({
   const { user } = session;
   return (
     <>
-      <header>
+      <header className="app-header">
         <strong>BeHR</strong>
         <span>{user.email}</span>
         <button type="button" onClick={() => void onLogout()}>
@@ -72,7 +72,7 @@ function AuthenticatedShell({
         </button>
       </header>
       {error ? <p role="alert">{error}</p> : null}
-      <main>
+      <main className="admin-main">
         <SitesPage />
       </main>
     </>

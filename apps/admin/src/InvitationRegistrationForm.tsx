@@ -51,7 +51,10 @@ export function InvitationRegistrationForm() {
   }
 
   return (
-    <section aria-labelledby="invitation-registration-title">
+    <section
+      className="auth-invitation"
+      aria-labelledby="invitation-registration-title"
+    >
       <h2 id="invitation-registration-title">Register with an invitation</h2>
       <form onSubmit={(event) => void registerInvitation(event)}>
         <label htmlFor="invitation-token">Invitation token</label>

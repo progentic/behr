@@ -229,7 +229,7 @@ export function PageEditor({
   }
 
   return (
-    <section aria-labelledby="page-editor-title">
+    <section className="editor-surface" aria-labelledby="page-editor-title">
       <h3 id="page-editor-title">Edit {loadedState.page.title}</h3>
       <p>
         Path: <code>/{loadedState.page.slug}</code>
@@ -270,9 +270,12 @@ export function PageEditor({
         <p role="alert">{loadedState.formError}</p>
       ) : null}
       {loadedState.save.status === "saved" ? (
-        <p role="status">Draft saved.</p>
+        <p className="status-success" role="status">
+          Draft saved.
+        </p>
       ) : null}
       <button
+        className="button-primary"
         type="button"
         disabled={loadedState.save.status === "saving"}
         onClick={() => void saveDraft()}
@@ -307,6 +310,7 @@ function SectionEditor({
 }>) {
   return (
     <fieldset
+      className="editor-section"
       onDragOver={(event) => {
         if (draggedItem?.kind === "section") {
           event.preventDefault();
@@ -359,6 +363,7 @@ function SectionEditor({
         Move section down
       </button>
       <button
+        className="button-danger"
         type="button"
         onClick={() =>
           transformDocument((document) => removeSection(document, section.id))
@@ -460,6 +465,7 @@ function BlockEditor({
   const inputId = `block-${block.id}`;
   return (
     <div
+      className="editor-block"
       onDragOver={(event) => {
         if (draggedItem?.kind === "block") {
           event.stopPropagation();
@@ -613,6 +619,7 @@ function BlockEditor({
         </>
       )}
       <button
+        className="button-danger"
         type="button"
         onClick={() =>
           transformDocument(

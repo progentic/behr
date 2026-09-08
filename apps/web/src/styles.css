@@ -1,0 +1,166 @@
+:root {
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 100%;
+  --public-gutter: clamp(1rem, 5vw, 4rem);
+  --public-measure-narrow: 42rem;
+  --public-measure-standard: 58rem;
+  --public-measure-wide: 76rem;
+  --public-radius: 0.75rem;
+  --public-space-small: 1.5rem;
+  --public-space-medium: 3rem;
+  --public-space-large: 5rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+.behr-public,
+#root,
+.public-shell {
+  min-block-size: 100%;
+  margin: 0;
+}
+
+.public-shell > div {
+  min-block-size: 100vh;
+  padding: var(--public-gutter);
+}
+
+.public-shell section {
+  inline-size: min(100%, var(--public-measure-standard));
+  margin-inline: auto;
+  padding-block: var(--public-space-medium);
+}
+
+.public-shell section:first-child {
+  padding-block-start: 0;
+}
+
+.public-shell .section-width-narrow {
+  max-inline-size: var(--public-measure-narrow);
+}
+
+.public-shell .section-width-standard {
+  max-inline-size: var(--public-measure-standard);
+}
+
+.public-shell .section-width-wide {
+  max-inline-size: var(--public-measure-wide);
+}
+
+.public-shell .section-spacing-none {
+  padding-block: 0;
+}
+
+.public-shell .section-spacing-sm {
+  padding-block: var(--public-space-small);
+}
+
+.public-shell .section-spacing-md {
+  padding-block: var(--public-space-medium);
+}
+
+.public-shell .section-spacing-lg {
+  padding-block: var(--public-space-large);
+}
+
+.public-shell h1,
+.public-shell h2,
+.public-shell h3,
+.public-shell h4,
+.public-shell h5,
+.public-shell h6 {
+  margin-block: 0 0.75em;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.public-shell h1 {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+}
+
+.public-shell h2 {
+  font-size: clamp(1.625rem, 4vw, 2.5rem);
+}
+
+.public-shell h3 {
+  font-size: clamp(1.375rem, 3vw, 2rem);
+}
+
+.public-shell h4 {
+  font-size: 1.25rem;
+}
+
+.public-shell h5 {
+  font-size: 1.125rem;
+}
+
+.public-shell h6 {
+  font-size: 1rem;
+}
+
+.public-shell p {
+  max-inline-size: 68ch;
+  margin-block: 0 1.25em;
+  font-size: 1.0625rem;
+  line-height: 1.72;
+}
+
+.public-shell img {
+  display: block;
+  max-inline-size: 100%;
+  block-size: auto;
+  margin-block: var(--public-space-small);
+  border-radius: var(--public-radius);
+}
+
+.public-shell .text-align-left {
+  text-align: left;
+}
+
+.public-shell .text-align-center {
+  text-align: center;
+}
+
+.public-shell .text-align-right {
+  text-align: right;
+}
+
+.public-status {
+  display: grid;
+  min-block-size: 100vh;
+  place-content: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: var(--public-gutter);
+  color: #171717;
+  background: #f5f5f5;
+  text-align: center;
+}
+
+.public-status h1,
+.public-status p {
+  margin: 0;
+}
+
+.public-status h1 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+}
+
+.public-status p {
+  color: #525252;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 30rem) {
+  .public-shell h1 {
+    font-size: 2rem;
+  }
+
+  .public-shell p {
+    font-size: 1rem;
+  }
+}

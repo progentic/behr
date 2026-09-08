@@ -165,14 +165,14 @@ function renderPublicPageState(
 ) {
   switch (state.status) {
     case "loading":
-      return <main>Loading page…</main>;
+      return <main className="public-status">Loading page…</main>;
     case "not-found":
-      return <main>Page not found.</main>;
+      return <main className="public-status">Page not found.</main>;
     case "unavailable":
-      return <main>Page unavailable.</main>;
+      return <main className="public-status">Page unavailable.</main>;
     case "loaded":
       return (
-        <main>
+        <main className="public-shell">
           <PageRenderer
             document={state.page.document}
             previewToken={previewToken}

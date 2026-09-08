@@ -93,7 +93,7 @@ export function SitesPage() {
   }
   if (tenantState.tenants.length === 0) {
     return (
-      <section>
+      <section className="workspace">
         <h1>Sites</h1>
         <p>You do not belong to any tenants yet.</p>
       </section>
@@ -115,7 +115,7 @@ export function SitesPage() {
       : null;
 
   return (
-    <section>
+    <section className="workspace">
       <h1>Sites</h1>
       {tenantState.tenants.length > 1 ? (
         <>
