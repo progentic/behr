@@ -75,6 +75,16 @@ html {
   resize: vertical;
 }
 
+.behr-admin input[type="file"]::file-selector-button {
+  display: block;
+  max-inline-size: 100%;
+  min-block-size: var(--admin-control-size);
+  margin: 0 0 var(--admin-space-2);
+  padding: 0.625rem 0.75rem;
+  font: inherit;
+  white-space: normal;
+}
+
 .behr-admin button {
   inline-size: fit-content;
   padding: 0.625rem 1rem;
@@ -126,7 +136,10 @@ html {
 .behr-admin select:disabled,
 .behr-admin textarea:disabled {
   cursor: not-allowed;
-  opacity: 0.56;
+  opacity: 1;
+  color: var(--admin-text-muted);
+  background: var(--admin-canvas);
+  border-style: dashed;
 }
 
 .behr-admin :focus-visible {
@@ -475,9 +488,19 @@ html {
 
 .editor-surface {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--admin-space-4);
   min-inline-size: 0;
   align-content: start;
+  overflow-wrap: anywhere;
+}
+
+@media (forced-colors: active) {
+  .behr-admin .selectable-resource-item > button[aria-pressed="true"],
+  .behr-admin .workspace-views > button[aria-pressed="true"] {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
 }
 
 .editor-section {

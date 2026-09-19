@@ -2441,3 +2441,82 @@ editor-action inline padding, and permits word wrapping. Text size, semantic
 colors, and minimum 44px interaction height are unchanged. The corrected exact
 candidate must repeat browser acceptance; the earlier candidate is not treated
 as passing this accessibility floor.
+
+---
+
+## Phase S7 — Responsive and Accessibility Completion
+
+S7 starts from accepted S6 `98eb8393785eefb4c4361cf16ea79c3b4fe43467`,
+BeHR CI 35463360138, and the owner's S6 PASS verdict. S1–S6 remain accepted;
+this task does not reconstruct their shell, workflows, or shared primitives.
+
+### Evidence-led corrections
+
+The baseline browser matrix used the clean core checkout on the disposable
+prepared host, Edge 153.0.4234.32 on macOS 27.0, and 1440, 1024, 390 and 320 CSS
+pixel widths. Root-font enlargement to 200% was used separately from viewport
+resizing. Standard login, settings, membership and populated-editor states
+retained their control targets, names, descriptions and unique IDs. Stress
+cases demonstrated the following bounded failures:
+
+- A valid unbroken page title expanded the 320px editor to 1720px, or 3366px
+  with enlarged text. The editor now uses a zero-minimum grid track and safe
+  overflow wrapping; document/state authority is unchanged.
+- The native file control placed its button and filename on one line, with
+  431px of content inside 254px at enlarged text. Its native selector button
+  now stacks and wraps, retaining the target-size goal. Browsers may still
+  ellipsize the filename within the native input; a selected file's full name
+  is therefore shown in adjacent wrapping text and included in its accessible
+  description. No custom picker, upload behavior, or persistence is added.
+- Forced-colors emulation collapsed selected and unselected navigation colors.
+  A forced-colors-only underline supplements the existing pressed semantics.
+- Disabled-label opacity produced approximately 4.12:1 text contrast on white.
+  Disabled controls now use the accepted readable gray on neutral canvas with
+  a dashed border rather than faded text. Inactive controls are exempt from
+  WCAG's text-contrast requirement, but the BeHR readability goal still applies.
+- Valid unbroken public text expanded a 320px page to 1385–1422px. Section text
+  now wraps only when necessary, without changing canonical content.
+- Wide sections were capped at the standard 928px width. The default measure
+  now uses max-inline-size so the existing narrow/standard/wide token rules
+  actually govern the section. Paragraph measure remains 68ch. Explicit first
+  section spacing no longer loses its authored top padding.
+
+The baseline large image itself already fit both narrow and wide containers
+at 320px, including preview object URLs; F016 is not claimed as a newly fixed
+image algorithm. Exact-candidate geometry is still required for its closure.
+Theme colors/fonts, intrinsic image proportions, alt text including empty alt,
+asset URLs, preview headers and cleanup remain owned by the existing renderer.
+
+Public loading now exposes a local status, unavailable output a local alert,
+and not-found output a heading within its existing main landmark. The generic
+render-boundary fallback receives the same status-page styling. No error detail,
+retry action, live workspace, or notification system is introduced.
+
+### Verification scope and remaining acceptance
+
+Baseline public fixtures exercise all four theme combinations, supported width
+and spacing tokens, ordinary and unbroken prose, large canonical images, and
+short root/non-root pages. They are saved through existing authenticated APIs;
+their image was previously uploaded through the supported S6 UI. This fixture
+setup is not represented as a UI authoring test. Zero-tenant presentation also
+uses a labelled empty-list response fixture; it is not fresh-bootstrap evidence.
+Public not-found and bounded injected unavailable/loading responses were
+inspected in the real application. No production fault-injection hook exists.
+
+Local verification passed frozen install, focused admin/web checks, 33 admin
+tests, all 137 repository tests including nine web tests, typecheck, build,
+audit, and diff checks. No package/version/lockfile change is made. Browser
+geometry, keyboard/DOM review and human judgment remain independent of tests.
+The complexity pass retains application-local CSS and native markup only; no
+new primitive, focus framework, device detection, mobile DOM, dependency,
+motion, router or notification mechanism is needed. Architecture and Phase Plan
+remain unchanged because ownership and runtime authority are unchanged.
+
+Final exact-SHA cross-surface checks, CI and the owner's
+`S7 RESPONSIVE AND ACCESSIBILITY: PASS` verdict remain closure gates when this
+implementation record is authored. S0-F015 remains OPEN pending human public
+review; S0-F016 remains OPEN pending final image/reflow evidence. Earlier
+accepted findings retain their dispositions, including F006 NOT REPRODUCED —
+NO FIX CLAIMED and F014 ACCEPTABLE, unless final checks show a regression.
+The target is WCAG 2.2 AA for tested BeHR-owned surfaces, not certification or
+an assertion about arbitrary authored content. S8 has not started.

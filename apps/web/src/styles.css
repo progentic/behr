@@ -29,12 +29,14 @@ html,
 }
 
 .public-shell section {
-  inline-size: min(100%, var(--public-measure-standard));
+  inline-size: 100%;
+  max-inline-size: var(--public-measure-standard);
   margin-inline: auto;
   padding-block: var(--public-space-medium);
+  overflow-wrap: anywhere;
 }
 
-.public-shell section:first-child {
+.public-shell section:first-child:not([class*="section-spacing-"]) {
   padding-block-start: 0;
 }
 
@@ -138,6 +140,7 @@ html,
   color: #171717;
   background: #f5f5f5;
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .public-status h1,

@@ -52,7 +52,7 @@ export function AssetUploadForm({ tenantId, siteId, onUploaded }: Readonly<{
         type="file"
         accept={RENDERABLE_ASSET_CONTENT_TYPES.join(",")}
         disabled={pending}
-        aria-describedby="editor-image-help"
+        aria-describedby={file ? "editor-image-help editor-image-name" : "editor-image-help"}
         onChange={(event) => {
           const selected = event.currentTarget.files?.[0] ?? null;
           setFile(selected);
@@ -60,6 +60,7 @@ export function AssetUploadForm({ tenantId, siteId, onUploaded }: Readonly<{
           setUploaded(false);
         }}
       />
+      {file ? <p className="field-help" id="editor-image-name">{file.name}</p> : null}
       <p className="field-help" id="editor-image-help">JPEG, PNG, GIF, WebP or AVIF. Up to 10 MiB.</p>
       {error ? <AlertMessage>{error}</AlertMessage> : null}
       {uploaded ? <StatusMessage tone="success">Image uploaded.</StatusMessage> : null}

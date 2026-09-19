@@ -31,7 +31,7 @@ class WebRenderBoundary extends Component<
 
   render() {
     return this.state.failed ? (
-      <main>
+      <main className="public-status">
         <h1>Page unavailable.</h1>
         <p>Reload the page to try again.</p>
       </main>
@@ -165,11 +165,11 @@ function renderPublicPageState(
 ) {
   switch (state.status) {
     case "loading":
-      return <main className="public-status">Loading page…</main>;
+      return <main className="public-status"><p role="status">Loading page…</p></main>;
     case "not-found":
-      return <main className="public-status">Page not found.</main>;
+      return <main className="public-status"><h1>Page not found.</h1></main>;
     case "unavailable":
-      return <main className="public-status">Page unavailable.</main>;
+      return <main className="public-status"><p role="alert">Page unavailable.</p></main>;
     case "loaded":
       return (
         <main className="public-shell">
