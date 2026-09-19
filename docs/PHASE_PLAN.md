@@ -1,6 +1,6 @@
 BeHR CMS — Agentic Implementation Execution Brief
 
-Version: 1.18
+Version: 1.19
 Execution Model: Phase-gated, deterministic, monolith-first
 Deployment Target: Single VPS
 Architecture Constraint: No distributed systems assumptions
@@ -5274,6 +5274,66 @@ Continuous Human Review
 
 Human aesthetic review begins during S1. Do not defer screenshots and judgment until S8. S8 is the integrated cross-screen and cross-workflow review of the final S candidate.
 
+Continuous Product Design Discipline
+
+Phase S treats product design as a continuous implementation constraint, not a cleanup activity deferred to S8.
+
+S8 is the integrated final product review. It is not the first product-wide design pass, a late visual cleanup sprint, or permission for S2–S7 to accumulate known visual debt.
+
+Every S2–S7 task that materially changes a BeHR-owned screen or interaction must:
+
+• apply the accepted S1 visual foundations;
+• preserve the BeHR v1 Product Experience Rubric;
+• review the affected real core-repository screen during that task;
+• obtain the applicable Human Product Acceptance before the task closes;
+• leave the affected surface visually coherent enough for the next phase to build on without first undoing avoidable presentation debt.
+
+A material hierarchy, density, comprehensibility, or aesthetic problem discovered in the phase that owns the affected surface must not be deferred to S8 merely because the screen is still evolving. If the correction is inside the current phase, address it within the governed remediation budget. If correction would cross a phase, backend, persistence, authentication, contract, or operational boundary, stop and route the finding to the actual owner. An owner-approved deferral must be explicit, identify the reason and future owner, and must not be represented as a PASS for the affected material finding.
+
+Before adding a visible control, label, helper, message, surface, navigation element, or persistent status, identify:
+
+1. The user decision or task it supports.
+2. The authoritative resource or context it belongs to.
+3. Its visual priority: primary, secondary, destructive, quiet, or informational as applicable.
+4. Whether the same user goal remains understandable with less visible UI.
+
+Prefer the simpler presentation when it preserves functionality, accessibility, and comprehensibility.
+
+Do not expose backend capability as a wall of equally weighted controls merely because the capability exists. New actions must fit an intentional hierarchy. Primary, secondary, destructive, and quiet are product-design roles; they do not require a component abstraction when local markup is clearer.
+
+Text is not a substitute for interface design. Prefer labels, grouping, affordances, state, visual hierarchy, and progressive disclosure where the owning phase permits it. Add explanatory prose only when the user still needs information that structure and labels cannot communicate safely.
+
+Information density is an explicit quality constraint. Do not turn admin screens into long vertical piles of every available operation. Group related work, preserve scanability, and make the current workspace understandable without requiring the user to read the entire page. Progressive disclosure is permitted only where the current phase owns the needed interaction; it is not authority to introduce speculative tabs, dialogs, navigation, hidden state, or routing.
+
+Each materially reconstructed workspace should make three things readily apparent:
+
+• the current resource/context;
+• the primary work area;
+• the likely next or primary action.
+
+Phase-specific design sequencing remains:
+
+• S2 establishes reusable visual and interaction policy before repeated controls diverge.
+• S3 establishes durable navigation and resource context before S5 and S6 add major workflow surface.
+• S4 keeps forms, helper text, validation, status, and any justified transient notification visually lightweight and semantically clear.
+• S5 fits core product journeys into the established shell rather than exposing raw backend operations as disconnected forms.
+• S6 must address editor and publishing density while those workflows are reconstructed; editor visual overload may not be deferred to S8.
+• S7 owns final responsive and accessibility completion, but S2–S6 must not knowingly introduce structural mobile or accessibility debt that requires later demolition.
+• S8 validates the integrated result across screens and journeys; it does not redesign the product for the first time.
+
+The accepted S1 admin foundation is the current visual baseline unless a later bounded task and human review deliberately revise it:
+
+• light admin appearance;
+• white and neutral-gray canvas/surfaces;
+• black and readable neutral-gray ordinary text;
+• blue for appropriate primary action, selection, informational, or focus emphasis;
+• red for existing error or destructive semantics;
+• green for confirmed-success semantics;
+• compact but readable typography;
+• approximately 44 CSS pixel primary interaction-target goal where practical.
+
+This does not freeze the final S3/S5/S6 layout. Information architecture and workflow structure remain evidence-driven at their owning phases. It does freeze the requirement that later implementation remain visually disciplined, compatible with the accepted foundation, and continuously human-reviewed.
+
 Visual and Product Rubric
 
 S0 must finalize and name a rubric covering at minimum:
@@ -5315,15 +5375,46 @@ Notification Decision
 
 S4 must evaluate concrete workflows including:
 
-• Save or publish completion after navigation
-• Asset completion after resource switching
-• Session expiry during editing
-• Destructive actions whose initiating control disappears
-• Membership or invitation actions that change the visible resource list
+• Save or publish completion after navigation.
+• Asset completion after resource switching.
+• Session expiry during editing.
+• Destructive actions whose initiating control disappears.
+• Membership or invitation actions that change the visible resource list.
+• Field and form helper text that carries contextual or semantic guidance.
 
 Do not assume toasts everywhere or toasts never.
 
-If a transient or global notification primitive is justified, it must obey the Rule 13 notification/resource-identity corollary. Field-level validation remains field-proximate where appropriate. Existing inline alert/status feedback must not be retrofitted merely to enforce one visual mechanism.
+Field-level validation and ordinary contextual guidance remain field-proximate where appropriate. Existing inline alert/status feedback must not be retrofitted merely to enforce one visual mechanism.
+
+S4 must explicitly review the visual treatment of helper text and any justified transient notification against the accepted S1 foundation.
+
+Helper text should remain local, restrained, readable, and subordinate to the control it explains. Neutral dark-gray text is the default. When existing semantics justify an accent, use only the accepted palette:
+
+• blue for informational emphasis;
+• red for error or destructive meaning;
+• green for confirmed success.
+
+Loading and indeterminate progress remain neutral unless the actual state provides stronger semantics.
+
+Orange or amber is not part of the accepted S1 semantic palette and must not be introduced silently. A new semantic accent requires an explicit owner-approved palette revision.
+
+If a concrete workflow demonstrates that useful completion or failure feedback cannot reasonably remain attached to its initiating control, S4 may introduce the smallest transient-notification behavior that satisfies that workflow.
+
+The initial notification design direction is:
+
+• neutral white or light-gray surface;
+• crisp existing border/radius geometry;
+• restrained semantic edge, border, icon, or soft wash where meaning requires it;
+• no gradient;
+• no floating pill aesthetic;
+• no heavy diffuse shadow;
+• no decorative animation.
+
+Do not prospectively add notification stacking, a queue, timers, portal infrastructure, global reducer/store, event bus, or third-party notification package. Begin with at most one context-valid transient notification unless actual S4 workflow evidence demonstrates that concurrent visible notifications are required.
+
+Any transient or global notification must obey the Global Rule 13 notification/resource-identity corollary. Context-bound feedback that is stale for the current resource must be discarded. A cross-context completion is permitted only when explicitly governed and when the notification visibly identifies its originating tenant, site, page, asset, or other authoritative resource so it cannot appear to describe the user’s current unrelated context.
+
+S4 must decide from evidence whether a notification primitive is justified at all. This section authorizes evaluation and the smallest demonstrated implementation only; it does not pre-authorize a general toast framework.
 
 Public Experience Boundary
 

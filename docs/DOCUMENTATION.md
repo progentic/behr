@@ -1874,3 +1874,79 @@ Tenant creation, upload, preview issuance, publishing, unsaved-edit protection,
 shared components, shell reconstruction, forms/feedback reconstruction, editor
 workflow reconstruction, final responsive/accessibility completion, and
 integrated beta-exit acceptance remain assigned to S2–S8.
+
+---
+
+## Phase S1 Final Acceptance and Continuous Product Design Direction
+
+### Final S1 acceptance
+
+The Phase S1 visual-foundation candidate is:
+
+```text
+7cdeaa7e4d664f70d2f8fd705b191c4faeae571c
+```
+
+Commit:
+
+```text
+feat(ui): Establish visual foundations
+```
+
+Exact-commit BeHR CI run 34214722796 passed on that SHA. Machine acceptance completed against the real core runtime, including development and built stylesheet delivery, unchanged admin CSP, owner/member role visibility, representative working form states, static editor presentation, public light/dark and sans/serif rendering, genuine short-lived preview rendering, responsive image behavior, continuous dark-page background, keyboard focus, contrast, 1440 × 900 / 390 × 844 / approximately 320-pixel layouts, and 200% text enlargement.
+
+The project owner returned:
+
+```text
+S1 VISUAL FOUNDATIONS: PASS
+```
+
+The accepted foundation uses a light admin appearance, neutral gray canvas, white surfaces, near-black and readable gray text, blue action/selection/focus accents, red error/destructive accents, and green confirmed-success accents. Admin body text is 15 CSS pixels at the normal browser default, form controls are 16 pixels, existing admin controls have a 44-pixel minimum block size, and the accepted candidate requires no interaction-target exception.
+
+S1 acceptance approves the visual foundations, not the complete CMS experience. S0-F006 tenant-switch duplication and S0-F010 editor-input failure remain open functional defects. Tenant creation, asset upload, preview issuance, publishing, unsaved-edit protection, shell reconstruction, shared primitives, forms/feedback reconstruction, editor workflow reconstruction, final responsive/accessibility completion, and integrated beta exit remain later Phase S work.
+
+### Owner design direction
+
+The owner identified an enduring Phase S risk: postponing meaningful product design while code and UI surface accumulate can produce a dense, noisy, text-heavy interface whose late cleanup requires structural rework. Phase S therefore treats visual UX and UI quality as a continuous implementation constraint.
+
+S8 remains the final integrated review, but it is not the first design pass. S2 through S7 must leave each materially changed real screen coherent enough for subsequent work to build on directly. A phase may not knowingly accumulate a material hierarchy, density, or aesthetic problem and defer it to S8 merely because the interface is still evolving.
+
+The adopted working principles are:
+
+• No visual-debt accumulation on materially changed surfaces.
+• No control dumping: backend capability does not justify another equally weighted visible action.
+• Every visible action has an intentional priority such as primary, secondary, destructive, or quiet.
+• Text does not substitute for interface design; prefer grouping, labels, state, affordance, and hierarchy before explanatory prose.
+• Information density is a design constraint; avoid long vertical capability piles and preserve scanability.
+• The current resource, principal workspace, and likely next action should be readily understandable.
+• S2 should establish repeated visual policy before local variants proliferate.
+• S3 should establish durable navigation and resource context before S5/S6 substantially expand workflows.
+• S4 should keep helper text, validation, status, and any justified transient notification lightweight and semantically clear.
+• S6 must address editor density during editor/publishing reconstruction rather than waiting for S8.
+• Responsive review remains continuous even though S7 owns final completion.
+• S8 validates and reconciles the finished experience; it is not a late product-wide redesign sprint.
+
+These principles do not freeze the final information architecture now. S3, S5, and S6 remain responsible for evidence-driven layout and workflow structure. The accepted S1 palette, typography, spacing, surface language, control treatment, and human-review discipline are the current foundation those later phases build on unless a later bounded task explicitly revises them with human approval.
+
+### S4 helper and notification carry-forward
+
+The owner also asked that S4 explicitly revisit semantic helper text and transient-notification presentation.
+
+The current palette remains authoritative for that review: neutral white/gray surfaces and black/gray text, with blue, red, and green accents. Orange/amber is not currently approved and must not appear implicitly as a warning color.
+
+The S4 review direction is:
+
+• Keep ordinary helper text local to its field or owning action, restrained, readable, and visually subordinate.
+• Prefer neutral dark-gray helper text by default.
+• Use blue only for actual informational emphasis, red for error/destructive meaning, and green for confirmed success.
+• Do not represent loading or indeterminate progress as green success.
+• If a transient notification is genuinely required, prefer a neutral surface with the existing crisp border/radius language and a narrow semantic edge, border, icon, or restrained wash.
+• Avoid floating pill styling, gradients, heavy diffuse shadows, and ornamental animation.
+• Do not pre-build toast stacking, notification queues, timers, portals, a global notification store, or event infrastructure.
+• Start from at most one context-valid transient notification unless concrete S4 evidence proves simultaneous notifications are necessary.
+• Preserve Global Rule 13 resource identity. Stale context-bound feedback must be discarded, and any governed cross-context notification must visibly identify its originating resource.
+• Do not retrofit existing useful local alerts/status messages into transient notifications merely for visual uniformity.
+
+Current accepted semantic palette: blue / red / green. Orange/amber: NOT APPROVED. The default remains local inline feedback. A toast framework is NOT AUTHORIZED; toast stacking and a notification queue are NOT PLANNED. Any later transient notification must satisfy Global Rule 13 resource identity.
+
+This is a required S4 implementation/review question, not current authorization for a toast system.
