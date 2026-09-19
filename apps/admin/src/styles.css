@@ -357,6 +357,21 @@ html {
   min-block-size: calc(100vh - 4.25rem);
 }
 
+.first-tenant {
+  max-inline-size: 42rem;
+}
+
+.tenant-create-disclosure > summary {
+  padding: var(--admin-space-3) 0;
+  min-block-size: var(--admin-control-size);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.tenant-create-disclosure > form {
+  margin-block-start: var(--admin-space-3);
+}
+
 .workspace-navigation {
   display: grid;
   align-content: start;

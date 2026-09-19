@@ -2224,3 +2224,99 @@ Final exact-candidate browser evidence, CI, and the owner's
 `S4 FORMS AND FEEDBACK` verdict are separate closure gates. Human Product
 Acceptance is NOT RUN when this implementation record is authored; it does
 not close S4 or begin S5.
+
+---
+
+## Phase S5 — Core Workflow Reconstruction
+
+The starting candidate is accepted S4
+`adc9dbd66c775d31c1ac94b9c6bbdb02be6336a3`, with BeHR CI 35450517724 and the
+owner's `S4 FORMS AND FEEDBACK: PASS` verdict. S5 adds the missing human tenant
+creation path without changing backend authority or the accepted shell.
+
+### Tenant creation and selection authority
+
+`TenantCreateForm` owns one name field, shared-contract validation, field-linked
+invalid-name feedback, a generic request alert, and existing pending/success
+presentation. Its HTTP boundary is `requestTenantCreation`: the existing
+credentialed `requestApi` sends only the normalized name to `POST /tenants`
+and parses the result through `tenantAccessSchema`. The backend continues to
+derive the user from the session and create ownership through
+`createTenantWithOwner`; the UI invents no tenant ID or owner role.
+
+The zero-tenant screen now presents first-tenant creation directly. Successful
+creation enters the existing shell without reload and lets the existing
+site-list effect load the new tenant's sites. It does not provision a site,
+page, or sample content. The empty owner workspace says `Create a site.`
+instead of asking the user to choose a nonexistent site.
+
+Existing users reach the same form through a native `details` / `summary`
+New tenant disclosure in tenant context. It is available to members as well
+as owners because creation is session-scoped, not selected-membership-scoped.
+The disclosure remains local, adds no modal/router/store, and keeps another
+form from permanently occupying navigation space.
+
+The functional `applyCreatedTenant` update appends validated access to the
+latest loaded list without duplicating an existing ID or replacing current
+memberships. A functional selection update selects the returned tenant only
+when no tenant has yet been selected. Additional and delayed completion
+therefore leave established selection and site/page/workspace context alone.
+A local success message names the new tenant; explicit selection remains the
+existing selector's responsibility. Role rendering continues to use each
+tenant's authoritative membership value.
+
+### Existing journeys retained
+
+Site creation/selection, Pages, page creation, membership, and invitation
+registration remain in their existing components. The site form stays visible
+because it remains the immediate useful action for an empty owner tenant;
+no second disclosure or workflow redesign was justified by the browser run.
+The accepted S4 local feedback/no-toast model remains intact.
+
+Invitation transfer was exercised by selecting the transient output text and
+entering it in the recipient's visible registration form, followed by normal
+sign-in. No email delivery, token URL, automatic login, clipboard dependency,
+copy button, history, or persistence was added. Browser text selection was
+usable; the final S0-F014 presentation disposition still requires human review,
+not an inference from S4 styling. Shared primitives remain unchanged.
+
+### Verification and limits
+
+Working-tree browser evidence used the actual core application in Edge
+153.0.4234.32 on macOS with a fresh disposable database and only the supported
+initial bootstrap identity. After login, the first tenant, site, and page
+were created through visible UI controls only, without API/SQL resource
+fixtures or reload. This demonstrates the implementation path for S0-F001;
+closure still requires repetition on the exact committed candidate.
+
+The same run exercised additional tenants, invalid-name refusal without a
+request, injected generic HTTP failure without list mutation, delayed tenant
+creation while switching to a third tenant, and invited-member onboarding.
+An invited member created an independent tenant, gained owner controls only
+there, and returned to member-only controls in the original tenant. Tenant
+A→B→A switching produced no duplicate site forms or IDs. Views at 1440×900,
+390×844, and 320×844 had no document overflow, including fresh/additional
+creation with 200% root-font enlargement. No browser selection storage or
+global notification was introduced.
+
+Four focused tenant tests cover shared validation, request/response authority,
+generic failures, and latest-list/duplicate/role preservation. The admin test
+command includes that file using the existing runner. Local verification
+passed 23 admin tests and 127 total tests, full typecheck/build, frozen install,
+and audit. The initial test import was changed to the existing admin
+declaration convention rather than adding Bun typings or dependencies.
+Manifests change only for admin test wiring; the lockfile is unchanged.
+
+The complexity review retains only the focused form, its request/preparation
+boundaries, one tenant-list insertion policy, and native disclosure CSS. No
+generic creator, collection manager, onboarding framework, mirrored ref,
+global owner flag, new shell component, or speculative capability is needed.
+
+S0-F006: NOT REPRODUCED — NO FIX CLAIMED. S0-F010 remains OPEN; PageEditor is
+byte-identical. Invitation UX is unchanged pending the owner's S0-F014 review.
+Asset upload, preview, publishing, editor input reliability and unsaved-change
+protection remain S6 work. S6–S8 have not started.
+
+Final exact-SHA journeys, CI, and `S5 CORE WORKFLOWS` Human Product Acceptance
+are independent closure gates. Human acceptance is NOT RUN when this record
+is authored; this implementation history does not declare S5 closed.

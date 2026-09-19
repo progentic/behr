@@ -11,9 +11,10 @@ import { PageList } from "./PageList";
 import { SiteCreateForm } from "./SiteCreateForm";
 import { SiteSettings } from "./SiteSettings";
 import { TenantMembers } from "./TenantMembers";
+import { TenantCreateForm } from "./TenantCreateForm";
 import { requestApi } from "./lib/api";
 
-type TenantState =
+export type TenantState =
   | Readonly<{ status: "loading" }>
   | Readonly<{ status: "error" }>
   | Readonly<{ status: "loaded"; tenants: TenantAccess[] }>;
@@ -89,6 +90,11 @@ export function SitesPage() {
     };
   }, [selectedTenantId]);
 
+  function receiveCreatedTenant(tenant: TenantAccess): void {
+    setTenantState((current) => applyCreatedTenant(current, tenant));
+    setSelectedTenantId((current) => current ?? tenant.id);
+  }
+
   if (tenantState.status === "loading") {
     return (
       <main className="admin-main">
@@ -105,9 +111,9 @@ export function SitesPage() {
   }
   if (tenantState.tenants.length === 0) {
     return (
-      <main className="admin-main workspace">
-        <h1>Sites</h1>
-        <p>You do not belong to any tenants yet.</p>
+      <main className="admin-main workspace first-tenant">
+        <h1>Create your first tenant</h1>
+        <TenantCreateForm onCreated={receiveCreatedTenant} />
       </main>
     );
   }
@@ -123,6 +129,8 @@ export function SitesPage() {
     );
   }
   const formTenantId = selectedTenant.id;
+  const noSites = siteState.status === "loaded" &&
+    siteState.tenantId === selectedTenant.id && siteState.sites.length === 0;
   const selectedSite =
     siteState.status === "loaded" &&
     siteState.tenantId === selectedTenant.id &&
@@ -161,6 +169,10 @@ export function SitesPage() {
               <strong>{selectedTenant.name}</strong>
             </>
           )}
+          <details className="tenant-create-disclosure">
+            <summary>New tenant</summary>
+            <TenantCreateForm onCreated={receiveCreatedTenant} />
+          </details>
         </div>
         <h2>Sites</h2>
         <SiteList
@@ -257,10 +269,19 @@ export function SitesPage() {
             siteId={selectedSite.id}
           />
         ) : null}
-        {!selectedSite && workspaceView === "pages" ? <p>Choose a site.</p> : null}
+        {!selectedSite && workspaceView === "pages" ? (
+          <p>{noSites ? (selectedTenant.role === "owner" ? "Create a site." : "No sites yet.") : "Choose a site."}</p>
+        ) : null}
       </main>
     </div>
   );
+}
+
+export function applyCreatedTenant(state: TenantState, tenant: TenantAccess): TenantState {
+  if (state.status !== "loaded" || state.tenants.some(({ id }) => id === tenant.id)) {
+    return state;
+  }
+  return { ...state, tenants: [...state.tenants, tenant] };
 }
 
 export function applyUpdatedSite(
