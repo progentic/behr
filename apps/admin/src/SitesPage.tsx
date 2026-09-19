@@ -13,6 +13,7 @@ import { SiteSettings } from "./SiteSettings";
 import { TenantMembers } from "./TenantMembers";
 import { TenantCreateForm } from "./TenantCreateForm";
 import { requestApi } from "./lib/api";
+import { confirmEditorNavigation } from "./lib/unsaved-navigation";
 
 export type TenantState =
   | Readonly<{ status: "loading" }>
@@ -27,7 +28,9 @@ export type SiteState =
 
 type WorkspaceView = "pages" | "settings" | "members";
 
-export function SitesPage() {
+export function SitesPage({ editorDirty, onDirtyChange }: Readonly<{
+  editorDirty: boolean; onDirtyChange: (dirty: boolean) => void;
+}>) {
   const [tenantState, setTenantState] = useState<TenantState>({
     status: "loading",
   });
@@ -150,6 +153,7 @@ export function SitesPage() {
                 value={selectedTenant.id}
                 onChange={(event) => {
                   const nextTenantId = event.currentTarget.value;
+                  if (nextTenantId === selectedTenant.id || !confirmEditorNavigation(editorDirty)) return;
                   setSelectedTenantId(nextTenantId);
                   setSelectedSiteId(null);
                   setSiteState({ status: "loading", tenantId: nextTenantId });
@@ -180,6 +184,7 @@ export function SitesPage() {
           selectedTenantId={selectedTenant.id}
           state={siteState}
           onSelect={(siteId) => {
+            if (siteId !== selectedSiteId && !confirmEditorNavigation(editorDirty)) return;
             setSelectedSiteId(siteId);
             setWorkspaceView("pages");
           }}
@@ -232,7 +237,7 @@ export function SitesPage() {
             <button
               type="button"
               aria-pressed={workspaceView === "settings"}
-              onClick={() => setWorkspaceView("settings")}
+              onClick={() => { if (confirmEditorNavigation(editorDirty)) setWorkspaceView("settings"); }}
             >
               Site settings
             </button>
@@ -241,7 +246,7 @@ export function SitesPage() {
             <button
               type="button"
               aria-pressed={workspaceView === "members"}
-              onClick={() => setWorkspaceView("members")}
+              onClick={() => { if (confirmEditorNavigation(editorDirty)) setWorkspaceView("members"); }}
             >
               Tenant members
             </button>
@@ -267,6 +272,9 @@ export function SitesPage() {
             key={`${selectedTenant.id}:${selectedSite.id}`}
             tenantId={selectedTenant.id}
             siteId={selectedSite.id}
+            hostname={selectedSite.hostname}
+            role={selectedTenant.role}
+            onDirtyChange={onDirtyChange}
           />
         ) : null}
         {!selectedSite && workspaceView === "pages" ? (

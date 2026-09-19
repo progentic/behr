@@ -2320,3 +2320,114 @@ protection remain S6 work. S6–S8 have not started.
 Final exact-SHA journeys, CI, and `S5 CORE WORKFLOWS` Human Product Acceptance
 are independent closure gates. Human acceptance is NOT RUN when this record
 is authored; this implementation history does not declare S5 closed.
+
+---
+
+## Phase S6 — Editor and Publishing Experience
+
+S6 starts from accepted S5 `40b8d6318d2acdad6f43da7a6807dcb3801862ea`, BeHR CI
+35453811584, and the owner's `S5 CORE WORKFLOWS: PASS`. S0-F001 is resolved and
+S0-F014's manual token transfer is accepted for v1; neither is reopened here.
+
+### Authoring and event lifetime
+
+Page management now occupies a bounded region beside the editing area on wide
+screens and stacks naturally on narrow screens. The existing creation form is
+inside a native New page disclosure. The editor groups page actions, image
+management, section actions, block actions, content, and optional properties.
+Move controls remain alongside native drag; full accessible reorder names are
+retained. Block grouping uses a restrained edge rather than another nested
+card. Save draft is the primary page action; preview, publication and upload
+remain secondary. Existing tenant/site shell geometry is not reconstructed.
+
+The F010 cause was deferred state transformations dereferencing a React event's
+`currentTarget`. Heading, paragraph and image-alt handlers now capture the
+string during the callback. The level, alignment and asset selectors already
+captured their values; the new file handler similarly captures the File, not
+the event. Normal typing was exercised on the working tree without lost text
+or the unavailable fallback. Canonical transforms/contracts remain unchanged.
+
+### Unsaved work and save identity
+
+Dirty state derives from the existing revision/save state, without a second
+document snapshot. Initial load and a matching completed save are clean;
+edits, in-flight saves, and failed saves are unsaved. A successful old save
+with newer local edits remains dirty. Existing snapshot/operation identity
+guards remain intact.
+
+A single local confirmation policy is reused at real page, site, tenant,
+workspace and logout boundaries. Dirty state is passed through callbacks,
+not a store/context or mirrored current-page ref. Native beforeunload exists
+only while dirty. Cancel does not mutate selection. Creating a new page while
+the current editor is dirty appends the result without replacing that editor;
+the user may explicitly select it through the normal discard confirmation.
+No successful creation is rolled back. Clean navigation requires no prompt.
+
+### Image upload and HTTP boundary
+
+`AssetUploadForm` owns one native file input, shared filename/MIME/size
+validation, exactly one FormData `file` entry, local pending/error/success,
+and the existing site-scoped upload request. It accepts only the existing five
+renderable image metadata types and 1 byte through 10 MiB. It does not decode,
+sniff, crop, resize, preview thumbnails, or add a media library.
+
+The production requestApi caller audit found JSON-string bodies for login,
+tenant/site/membership creation, invitation registration, settings, page
+creation and draft save; other calls have no body. The boundary now assigns
+the JSON default only to string bodies without an explicit Content-Type.
+FormData is passed without a synthesized header so fetch owns the boundary;
+credential inclusion remains unchanged. Strict upload/list-item parsing
+keeps storage paths and keys out of UI data.
+
+Successful assets append through a matching loaded tenant/site state check,
+with duplicate protection. Upload does not change PageDocument. The user
+chooses where to insert the image through the existing per-section control.
+An obsolete editor's completion cannot populate the new site's asset state.
+
+### Preview and owner publication
+
+`PagePublicationControls` owns the existing bodyless POST requests and strict
+response parsing. Both operations are unavailable while dirty or saving.
+The component is scoped by the parent editor's resource instance plus load
+epoch, document revision and save state. Changing those retires its credential,
+links, results and pending instance, preventing late completion from appearing
+in another page/current revision. A subsequent save does not rotate a token
+or publish automatically.
+
+Preview is available to owners and members. Its raw credential stays only in
+the current component and governed URL fragment, never visible text or Web
+Storage. Links use the authoritative site hostname with the current origin's
+scheme/port, correct root/slug path, and no unrelated query/hash. External
+links have noopener/noreferrer. The public renderer and token-header transport
+are unchanged.
+
+Only the current tenant owner receives Publish. The UI reports only observed
+published/unchanged responses, not an invented initial publication badge or
+history. HTTP 409 has explicit local stale feedback and no retry; other
+failures remain generic. Publication success may expose the public URL without
+a token. Local edits retire previous preview/publication presentation.
+
+### Verification and remaining gates
+
+Working-tree checks passed the editor event-lifetime audit, JSON/FormData and
+request-contract tests, dirty/save state tests, creation-without-discard tests,
+and upload metadata/site-confinement tests. Real local browser checks exercised
+heading/paragraph/alt typing, upload without automatic insertion, draft save,
+preview preparation, dirty disabling, cancellation/confirmation at navigation
+boundaries, native beforeunload, clean navigation, edit-during-save, stale
+preview/publication completions, a mocked 409 without retry, and cross-site
+upload completion. Existing native reorder behavior was retained and exercised.
+These development observations are not exact-candidate certification.
+
+Final built owner/member preview/publication journeys, draft/public isolation,
+exact-commit CI and the human density/workflow verdict remain separate closure
+gates at this implementation-record stage. No S6 finding is declared resolved
+by source changes alone. F006 retains NOT REPRODUCED — NO FIX CLAIMED unless
+final evidence changes that disposition. S7 public responsive/accessibility
+completion and S8 integrated acceptance remain unstarted.
+
+The complexity review uses native controls, FormData, URL, details, confirm,
+and beforeunload. The only new behavioral component boundaries are upload and
+preview/publication; no generic operation manager, autosave, dialog framework,
+global notification, router, media library, or external dependency was added.
+S4's no-transient-notification decision remains intact.

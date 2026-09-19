@@ -1,13 +1,15 @@
 import { AlertMessage, SelectableResourceItem, StatusMessage } from "@bher/ui";
 import {
   type PageSummary,
+  type TenantRole,
   pageListResponseSchema,
 } from "@bher/contracts";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { PageCreateForm } from "./PageCreateForm";
 import { PageEditor } from "./PageEditor";
 import { requestApi } from "./lib/api";
+import { confirmEditorNavigation } from "./lib/unsaved-navigation";
 
 export type PageListState =
   | Readonly<{ status: "loading"; tenantId: string; siteId: string }>
@@ -17,20 +19,30 @@ export type PageListState =
       siteId: string;
       pages: PageSummary[];
       selectedPageId: string | null;
+      editorDirty: boolean;
     }>
   | Readonly<{ status: "error"; tenantId: string; siteId: string }>;
 
 type PageListProperties = Readonly<{
   tenantId: string;
   siteId: string;
+  hostname: string;
+  role: TenantRole;
+  onDirtyChange: (dirty: boolean) => void;
 }>;
 
-export function PageList({ tenantId, siteId }: PageListProperties) {
+export function PageList({ tenantId, siteId, hostname, role, onDirtyChange }: PageListProperties) {
   const [state, setState] = useState<PageListState>({
     status: "loading",
     tenantId,
     siteId,
   });
+  const reportDirty = useCallback((dirty: boolean) => {
+    setState((current) => current.status === "loaded" &&
+      matchesPageListIdentity(current, tenantId, siteId) && current.editorDirty !== dirty
+      ? { ...current, editorDirty: dirty } : current);
+    onDirtyChange(dirty);
+  }, [tenantId, siteId, onDirtyChange]);
 
   useEffect(() => {
     const requestedTenantId = tenantId;
@@ -78,6 +90,7 @@ export function PageList({ tenantId, siteId }: PageListProperties) {
 
   return (
     <section className="pages-surface" aria-labelledby="pages-title">
+      <div className="page-management">
       <h2 id="pages-title">Pages</h2>
       {state.pages.length === 0 ? (
         <p>No pages yet.</p>
@@ -87,13 +100,19 @@ export function PageList({ tenantId, siteId }: PageListProperties) {
             <SelectableResourceItem
               key={page.id}
               selected={state.selectedPageId === page.id}
-              onSelect={() => setState((current) => selectPage(current, page.id))}
+              onSelect={() => {
+                if (state.selectedPageId === page.id || !confirmEditorNavigation(state.editorDirty)) return;
+                setState((current) => selectPage(current, page.id));
+              }}
             >
-              {page.title} — /{page.slug}
+              <strong>{page.title}</strong>
+              <span>/{page.slug}</span>
             </SelectableResourceItem>
           ))}
         </ul>
       )}
+      <details className="page-create-disclosure">
+      <summary>New page</summary>
       <PageCreateForm
         tenantId={tenantId}
         siteId={siteId}
@@ -103,12 +122,17 @@ export function PageList({ tenantId, siteId }: PageListProperties) {
           )
         }
       />
+      </details>
+      </div>
       {state.selectedPageId ? (
         <PageEditor
           key={`${tenantId}:${siteId}:${state.selectedPageId}`}
           tenantId={tenantId}
           siteId={siteId}
           pageId={state.selectedPageId}
+          hostname={hostname}
+          role={role}
+          onDirtyChange={reportDirty}
         />
       ) : null}
     </section>
@@ -130,6 +154,7 @@ export function applyPageListResult(
     siteId,
     pages,
     selectedPageId: null,
+    editorDirty: false,
   };
 }
 
@@ -148,7 +173,7 @@ export function applyCreatedPage(
   return {
     ...state,
     pages: [...state.pages, page],
-    selectedPageId: page.id,
+    selectedPageId: state.editorDirty ? state.selectedPageId : page.id,
   };
 }
 
@@ -159,7 +184,7 @@ export function selectPage(
   if (state.status !== "loaded" || !state.pages.some(({ id }) => id === pageId)) {
     return state;
   }
-  return { ...state, selectedPageId: pageId };
+  return { ...state, selectedPageId: pageId, editorDirty: false };
 }
 
 function applyPageListError(

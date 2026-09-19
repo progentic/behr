@@ -110,7 +110,9 @@ Admin Panel
 The admin provides login, session restoration, logout, tenant-local site
 management, and owner-only membership provisioning and invitation handling.
 Phase K adds tenant/site-scoped page listing, page creation, draft loading,
-structured local editing, and explicit manual draft saving.
+structured local editing, and explicit manual draft saving. Phase S6 exposes
+the existing image-upload, preview-issuance, and owner-publication authorities
+through the admin and guards navigation away from unsaved editor content.
 
 Public Website
 
@@ -259,8 +261,8 @@ site workflow: component-local tenant selection, site loading, and owner-only
 site creation. The pre-Phase G membership work adds owner-only membership
 administration and invite registration. Phase G adds no admin behavior. Phase K
 adds the first page-authoring interface. Phase M adds a tenant/site-keyed
-renderable-asset list and inline image selection with alt-text editing. Upload,
-deletion, search, and broader media management remain absent from the admin.
+renderable-asset list and inline image selection with alt-text editing.
+Deletion, search, and broader media management remain absent from the admin.
 Phase O adds an owner-only `SiteSettings` workflow for the existing site name
 and light/dark plus sans/serif theme tokens. It keeps hostname visible but
 read-only, uses resource-keyed local state and inline alert/status feedback,
@@ -271,8 +273,19 @@ creation and draft validation use shared contracts for local inline feedback;
 the server remains authoritative and explicit Save draft remains the only
 editor persistence trigger. Empty image alternative text remains valid and is
 accompanied by non-blocking decorative-image guidance.
-Domain administration, custom CSS, theme catalogs/frameworks, preview controls,
-and publishing interfaces remain unimplemented.
+Phase S6 adds a site-scoped renderable-image upload form using browser FormData,
+saved-draft preview issuance/opening, and owner-only publication. These use the
+existing routes and contracts; members can edit, upload, save, and preview but
+do not receive publication controls. Preview credentials and observed publish
+results are local to an editor resource/epoch/revision/save-state instance and
+are retired when that instance changes. No historical publication claim is
+fabricated on load. Draft save remains manual and older save completions cannot
+replace newer edits. Native confirmation protects internal editor-leaving
+actions, with dirty state lifted through direct callbacks for shell/logout
+navigation; beforeunload is registered only while unsaved. New-page creation
+appends without replacing a dirty editor; explicit later selection is guarded.
+Domain administration, custom CSS, theme catalogs/frameworks, version history,
+and publication history interfaces remain unimplemented.
 
 ---
 
@@ -574,8 +587,9 @@ sequenceDiagram
 # 6. Content Publication Flow
 
 This request-driven flow is implemented through Phase J. Phase K adds draft
-authoring but no publish button, historical-version selection, approval
-workflow, or rollback UI.
+authoring; Phase S6 adds admin preview and owner publication controls without
+changing backend transaction authority. Historical-version selection, approval
+workflow, and rollback UI remain absent.
 
 ```mermaid
 sequenceDiagram
@@ -624,8 +638,11 @@ sequenceDiagram
     end
 ```
 
-Preview-token issuance and publish arrows represent implemented API surfaces,
-not admin controls. Phase K provides draft authoring and manual save only.
+Phase S6 admin controls invoke the existing preview-token and publish arrows
+only for a clean saved editor. Preview links use the authoritative site hostname,
+the browser origin's scheme/port, the page slug, and the governed token fragment.
+The unchanged public app sends the token through its existing header-only API
+transport. Saving does not publish or automatically rotate preview credentials.
 
 ---
 

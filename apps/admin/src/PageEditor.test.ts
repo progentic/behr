@@ -16,6 +16,8 @@ import {
   requestDraftSave,
   requestPageDraft,
   requestSiteAssets,
+  isEditorDirty,
+  applyUploadedAsset,
 } from "./PageEditor";
 
 declare function test(name: string, body: () => void | Promise<void>): void;
@@ -33,6 +35,29 @@ const PARAGRAPH = "66666666-6666-4666-8666-666666666666";
 const HEADING = "77777777-7777-4777-8777-777777777777";
 const ASSET = "88888888-8888-4888-8888-888888888888";
 const IMAGE = "99999999-9999-4999-8999-999999999999";
+
+test("dirty state tracks matching saves, failures, and newer in-flight edits", () => {
+  const clean = loadedState(PAGE_A, 1, document("Initial"));
+  expect(isEditorDirty(clean)).toBe(false);
+  const edited = applyDocumentEdit(clean, (value) => updateBlockText(value, SECTION, PARAGRAPH, "Edit"));
+  expect(isEditorDirty(edited)).toBe(true);
+  const operation = createEditorSaveOperation(edited, 1);
+  if (!operation) throw new Error("Expected save.");
+  expect(isEditorDirty(operation.state)).toBe(true);
+  expect(isEditorDirty(applySaveSuccess(operation.state, operation.operation))).toBe(false);
+  expect(isEditorDirty(applySaveError(operation.state, operation.operation))).toBe(true);
+  const newer = applyDocumentEdit(operation.state, (value) => updateBlockText(value, SECTION, PARAGRAPH, "Newer"));
+  expect(isEditorDirty(applySaveSuccess(newer, operation.operation))).toBe(true);
+});
+
+test("uploaded assets append only to the matching loaded site without duplicates", () => {
+  const state: SiteAssetState = { status: "loaded", tenantId: TENANT, siteId: SITE, assets: [] };
+  const asset = assetRecord();
+  expect(applyUploadedAsset(state, TENANT, "other-site", asset)).toBe(state);
+  const updated = applyUploadedAsset(state, TENANT, SITE, asset);
+  expect(updated).toEqual({ ...state, assets: [asset] });
+  expect(applyUploadedAsset(updated, TENANT, SITE, asset)).toBe(updated);
+});
 
 test("rejects late and same-page re-entry draft loads", () => {
   const a1 = identity(PAGE_A, 1);

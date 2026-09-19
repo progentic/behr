@@ -473,18 +473,16 @@ html {
   overflow-wrap: anywhere;
 }
 
-.pages-surface > section,
 .editor-surface {
   display: grid;
   gap: var(--admin-space-4);
-  margin-block-start: var(--admin-space-4);
-  padding-block-start: var(--admin-space-5);
-  border-block-start: 1px solid var(--admin-border);
+  min-inline-size: 0;
+  align-content: start;
 }
 
 .editor-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--admin-space-3);
   min-inline-size: 0;
   padding: var(--admin-space-4);
@@ -505,13 +503,95 @@ html {
 
 .editor-block {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--admin-space-3);
   min-inline-size: 0;
   padding: var(--admin-space-4);
-  border: 1px solid var(--admin-border);
-  border-radius: var(--admin-radius-small);
+  border: 0;
+  border-inline-start: 3px solid var(--admin-border);
   background: var(--admin-surface);
+}
+
+.workspace-content > .pages-surface {
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+  align-items: start;
+}
+
+.page-management {
+  display: grid;
+  gap: var(--admin-space-4);
+  min-inline-size: 0;
+}
+
+.page-management .selectable-resource-item {
+  border: 0;
+  padding: 0;
+}
+
+.page-management .selectable-resource-item > button {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.page-management .selectable-resource-item span {
+  font-weight: 400;
+  color: var(--admin-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.page-create-disclosure > summary,
+.editor-images > summary,
+.block-properties > summary {
+  min-block-size: var(--admin-control-size);
+  padding-block: var(--admin-space-3);
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.page-create-disclosure > section,
+.editor-images > form,
+.block-properties[open] {
+  display: grid;
+  gap: var(--admin-space-3);
+}
+
+.editor-page-actions,
+.page-publication,
+.prepared-preview,
+.publication-result {
+  display: grid;
+  gap: var(--admin-space-3);
+}
+
+.editor-page-actions {
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: start;
+}
+
+.editor-actions,
+.editor-add-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--admin-space-2);
+  align-items: center;
+}
+
+.behr-admin .editor-actions > button,
+.behr-admin .editor-add-block > button {
+  inline-size: auto;
+}
+
+.editor-add-block > select,
+.editor-add-block > label {
+  flex-basis: 100%;
+}
+
+.behr-admin .page-publication a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--admin-control-size);
+  color: var(--admin-blue);
+  overflow-wrap: anywhere;
 }
 
 .editor-block > label,
@@ -547,6 +627,12 @@ html {
 }
 
 @media (max-width: 60rem) {
+  .editor-page-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace-content > .pages-surface {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .workspace-shell {
     grid-template-columns: minmax(0, 1fr);
   }

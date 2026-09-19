@@ -56,6 +56,7 @@ test("applies creation and selection only to the initiating site", () => {
     siteId: SITE_X,
     pages: [],
     selectedPageId: null,
+    editorDirty: false,
   };
   const created = applyCreatedPage(matching, TENANT_A, SITE_X, PAGE_A);
   expect(created).toEqual({
@@ -69,6 +70,7 @@ test("applies creation and selection only to the initiating site", () => {
     siteId: SITE_Y,
     pages: [],
     selectedPageId: null,
+    editorDirty: false,
   };
   expect(applyCreatedPage(otherSite, TENANT_A, SITE_X, PAGE_A)).toBe(
     otherSite,
@@ -106,6 +108,13 @@ test("prepares normalized page creation input and isolated field errors", () => 
     slug: "",
     document: { schemaVersion: 1, sections: [] },
   });
+});
+
+test("new page creation cannot replace an unsaved current page", () => {
+  const state: PageListState = { status: "loaded", tenantId: TENANT_A, siteId: SITE_X,
+    pages: [PAGE_A], selectedPageId: PAGE_A.id, editorDirty: true };
+  const pageB = { ...PAGE_A, id: "66666666-6666-4666-8666-666666666666", title: "Second" };
+  expect(applyCreatedPage(state, TENANT_A, SITE_X, pageB)).toEqual({ ...state, pages: [PAGE_A, pageB] });
 });
 
 test("uses existing page list and creation request boundaries", async () => {

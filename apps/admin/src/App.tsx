@@ -1,5 +1,7 @@
 import { ActionButton, AlertMessage, StatusMessage } from "@bher/ui";
 import type { AuthenticatedSession, SessionResponse } from "@bher/contracts";
+import { useState } from "react";
+import { confirmEditorNavigation } from "./lib/unsaved-navigation";
 
 import { AuthGuard } from "./AuthGuard";
 import { LoginPage } from "./LoginPage";
@@ -63,17 +65,20 @@ function AuthenticatedShell({
   session: AuthenticatedSession;
 }>) {
   const { user } = session;
+  const [editorDirty, setEditorDirty] = useState(false);
   return (
     <>
       <header className="app-header">
         <strong>BeHR</strong>
         <span>{user.email}</span>
-        <ActionButton variant="secondary" type="button" onClick={() => void onLogout()}>
+        <ActionButton variant="secondary" type="button" onClick={() => {
+          if (confirmEditorNavigation(editorDirty)) void onLogout();
+        }}>
           Log out
         </ActionButton>
       </header>
       {error ? <AlertMessage>{error}</AlertMessage> : null}
-      <SitesPage />
+      <SitesPage editorDirty={editorDirty} onDirtyChange={setEditorDirty} />
     </>
   );
 }

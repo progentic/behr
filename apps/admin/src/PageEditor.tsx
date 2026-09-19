@@ -7,6 +7,7 @@ import {
   type SavePageDraftRequest,
   type Section,
   type TextAlignToken,
+  type TenantRole,
   assetListResponseSchema,
   pageDocumentSchema,
   pageDraftSchema,
@@ -28,8 +29,11 @@ import {
 } from "@bher/editor";
 import type { DragEvent } from "react";
 import { useEffect, useRef, useState } from "react";
+import { ActionButton, AlertMessage, StatusMessage } from "@bher/ui";
 
 import { requestApi } from "./lib/api";
+import { AssetUploadForm } from "./AssetUploadForm";
+import { PagePublicationControls } from "./PagePublicationControls";
 
 const INVALID_DOCUMENT_MESSAGE =
   "The page contains invalid content and cannot be saved.";
@@ -100,6 +104,9 @@ type PageEditorProperties = Readonly<{
   tenantId: string;
   siteId: string;
   pageId: string;
+  hostname: string;
+  role: TenantRole;
+  onDirtyChange: (dirty: boolean) => void;
 }>;
 
 type DocumentTransform = (document: PageDocument) => PageDocument;
@@ -108,6 +115,9 @@ export function PageEditor({
   tenantId,
   siteId,
   pageId,
+  hostname,
+  role,
+  onDirtyChange,
 }: PageEditorProperties) {
   const loadEpoch = useRef(0);
   const saveOperation = useRef(0);
@@ -121,6 +131,22 @@ export function PageEditor({
     siteId,
   });
   const [draggedItem, setDraggedItem] = useState<DraggedEditorItem | null>(null);
+  const dirty = isEditorDirty(state);
+
+  useEffect(() => {
+    onDirtyChange(dirty);
+    return () => onDirtyChange(false);
+  }, [dirty, onDirtyChange]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const preventUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", preventUnload);
+    return () => window.removeEventListener("beforeunload", preventUnload);
+  }, [dirty]);
 
   useEffect(() => {
     const identity: EditorIdentity = {
@@ -171,13 +197,13 @@ export function PageEditor({
   }, [tenantId, siteId]);
 
   if (!matchesResourceIdentity(state.identity, { tenantId, siteId, pageId })) {
-    return <p role="status">Loading page…</p>;
+    return <StatusMessage>Loading page…</StatusMessage>;
   }
   if (state.status === "loading") {
-    return <p role="status">Loading page…</p>;
+    return <StatusMessage>Loading page…</StatusMessage>;
   }
   if (state.status === "error") {
-    return <p role="alert">The page draft could not be loaded.</p>;
+    return <AlertMessage>The page draft could not be loaded.</AlertMessage>;
   }
 
   const loadedState = state;
@@ -234,6 +260,29 @@ export function PageEditor({
       <p>
         Path: <code>/{loadedState.page.slug}</code>
       </p>
+      <div className="editor-page-actions">
+        <ActionButton type="button" variant="primary" disabled={loadedState.save.status === "saving"} onClick={() => void saveDraft()}>
+          {loadedState.save.status === "saving" ? "Saving…" : "Save draft"}
+        </ActionButton>
+        <PagePublicationControls
+          key={`${loadedState.identity.requestEpoch}:${loadedState.revision}:${loadedState.save.status}`}
+          tenantId={tenantId} siteId={siteId} pageId={pageId}
+          hostname={hostname} slug={loadedState.page.slug} role={role} dirty={dirty}
+        />
+      </div>
+      {loadedState.save.status === "error" ? <AlertMessage>{loadedState.save.message}</AlertMessage> : null}
+      {loadedState.formError ? <AlertMessage>{loadedState.formError}</AlertMessage> : null}
+      {loadedState.save.status === "saved" ? <StatusMessage tone="success">Draft saved.</StatusMessage> : null}
+      <details className="editor-images">
+        <summary>Site images</summary>
+        {visibleAssets.status === "loading" ? <StatusMessage>Loading site assets…</StatusMessage> : null}
+        {visibleAssets.status === "error" ? <AlertMessage>Site assets could not be loaded.</AlertMessage> : null}
+        {visibleAssets.status === "loaded" ? (
+          <AssetUploadForm tenantId={tenantId} siteId={siteId} onUploaded={(asset) =>
+            setAssetState((current) => applyUploadedAsset(current, tenantId, siteId, asset))
+          } />
+        ) : null}
+      </details>
       {loadedState.document.sections.map((section, sectionIndex) => (
         <SectionEditor
           key={section.id}
@@ -247,12 +296,6 @@ export function PageEditor({
           transformDocument={transformDocument}
         />
       ))}
-      {visibleAssets.status === "loading" ? (
-        <p role="status">Loading site assets…</p>
-      ) : null}
-      {visibleAssets.status === "error" ? (
-        <p role="alert">Site assets could not be loaded.</p>
-      ) : null}
       <button
         type="button"
         onClick={() =>
@@ -262,25 +305,6 @@ export function PageEditor({
         }
       >
         Add section
-      </button>
-      {loadedState.save.status === "error" ? (
-        <p role="alert">{loadedState.save.message}</p>
-      ) : null}
-      {loadedState.formError ? (
-        <p role="alert">{loadedState.formError}</p>
-      ) : null}
-      {loadedState.save.status === "saved" ? (
-        <p className="status-success" role="status">
-          Draft saved.
-        </p>
-      ) : null}
-      <button
-        className="button-primary"
-        type="button"
-        disabled={loadedState.save.status === "saving"}
-        onClick={() => void saveDraft()}
-      >
-        {loadedState.save.status === "saving" ? "Saving…" : "Save draft"}
       </button>
     </section>
   );
@@ -328,8 +352,9 @@ function SectionEditor({
         setDraggedItem(null);
       }}
     >
-      <legend>Section</legend>
-      <button
+      <legend>Section {sectionIndex + 1}</legend>
+      <div className="editor-actions">
+      <button aria-label="Drag section"
         type="button"
         draggable
         onDragStart={(event) => {
@@ -338,9 +363,9 @@ function SectionEditor({
         }}
         onDragEnd={() => setDraggedItem(null)}
       >
-        Drag section
+        Drag
       </button>
-      <button
+      <button aria-label="Move section up"
         type="button"
         disabled={sectionIndex === 0}
         onClick={() =>
@@ -349,9 +374,9 @@ function SectionEditor({
           )
         }
       >
-        Move section up
+        Move up
       </button>
-      <button
+      <button aria-label="Move section down"
         type="button"
         disabled={sectionIndex === sectionCount - 1}
         onClick={() =>
@@ -360,7 +385,7 @@ function SectionEditor({
           )
         }
       >
-        Move section down
+        Move down
       </button>
       <button
         className="button-danger"
@@ -371,6 +396,7 @@ function SectionEditor({
       >
         Remove section
       </button>
+      </div>
       {section.blocks.map((block, blockIndex) => (
         <BlockEditor
           key={block.id}
@@ -385,6 +411,7 @@ function SectionEditor({
           transformDocument={transformDocument}
         />
       ))}
+      <div className="editor-add-block">
       <button
         type="button"
         onClick={() =>
@@ -434,6 +461,7 @@ function SectionEditor({
           </select>
         </>
       ) : null}
+      </div>
     </fieldset>
   );
 }
@@ -466,6 +494,8 @@ function BlockEditor({
   return (
     <div
       className="editor-block"
+      role="group"
+      aria-label={`${block.type} block ${blockIndex + 1}`}
       onDragOver={(event) => {
         if (draggedItem?.kind === "block") {
           event.stopPropagation();
@@ -490,7 +520,8 @@ function BlockEditor({
         setDraggedItem(null);
       }}
     >
-      <button
+      <div className="editor-actions">
+      <button aria-label="Drag block"
         type="button"
         draggable
         onDragStart={(event) => {
@@ -503,9 +534,9 @@ function BlockEditor({
           setDraggedItem(null);
         }}
       >
-        Drag block
+        Drag
       </button>
-      <button
+      <button aria-label="Move block up"
         type="button"
         disabled={blockIndex === 0}
         onClick={() =>
@@ -514,9 +545,9 @@ function BlockEditor({
           )
         }
       >
-        Move block up
+        Move up
       </button>
-      <button
+      <button aria-label="Move block down"
         type="button"
         disabled={blockIndex === blockCount - 1}
         onClick={() =>
@@ -525,8 +556,21 @@ function BlockEditor({
           )
         }
       >
-        Move block down
+        Move down
       </button>
+      <button
+        className="button-danger"
+        type="button"
+        onClick={() =>
+          transformDocument(
+            (document) => removeBlock(document, sectionId, block.id),
+            block.id,
+          )
+        }
+      >
+        Remove block
+      </button>
+      </div>
       {block.type === "image" ? (
         <ImageBlockFields
           block={block}
@@ -545,18 +589,19 @@ function BlockEditor({
               value={block.text}
               aria-invalid={fieldError ? true : undefined}
               aria-describedby={fieldError ? `${inputId}-error` : undefined}
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 transformDocument(
                   (document) =>
                     updateBlockText(
                       document,
                       sectionId,
                       block.id,
-                      event.currentTarget.value,
+                      value,
                     ),
                   block.id,
-                )
-              }
+                );
+              }}
             />
           ) : (
             <textarea
@@ -564,21 +609,24 @@ function BlockEditor({
               value={block.text}
               aria-invalid={fieldError ? true : undefined}
               aria-describedby={fieldError ? `${inputId}-error` : undefined}
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 transformDocument(
                   (document) =>
                     updateBlockText(
                       document,
                       sectionId,
                       block.id,
-                      event.currentTarget.value,
+                      value,
                     ),
                   block.id,
-                )
-              }
+                );
+              }}
             />
           )}
           {fieldError ? <p id={`${inputId}-error`}>{fieldError}</p> : null}
+          <details className="block-properties">
+          <summary>Properties</summary>
           {block.type === "heading" ? (
             <>
               <label htmlFor={`${inputId}-level`}>Level</label>
@@ -616,20 +664,10 @@ function BlockEditor({
             <option value="center">Center</option>
             <option value="right">Right</option>
           </select>
+          </details>
         </>
       )}
-      <button
-        className="button-danger"
-        type="button"
-        onClick={() =>
-          transformDocument(
-            (document) => removeBlock(document, sectionId, block.id),
-            block.id,
-          )
-        }
-      >
-        Remove block
-      </button>
+
     </div>
   );
 }
@@ -652,29 +690,41 @@ function ImageBlockFields({
   const hintId = `${inputId}-hint`;
   return (
     <>
-      <p>Image: {asset?.originalFilename ?? block.assetId}</p>
+      <p>Image: {asset?.originalFilename ?? "Unavailable image"}</p>
       <label htmlFor={inputId}>Alternative text</label>
       <input
         id={inputId}
         value={block.alt}
         aria-describedby={hintId}
-        onChange={(event) =>
+        onChange={(event) => {
+          const value = event.currentTarget.value;
           transformDocument((document) =>
             updateImageAlt(
               document,
               sectionId,
               block.id,
-              event.currentTarget.value,
+              value,
             ),
-          )
-        }
+          );
+        }}
       />
-      <p id={hintId}>
-        Empty alternative text marks this image as decorative. Leave it empty
-        only when the image is purely decorative.
+      <p className="field-help" id={hintId}>
+        Leave empty only for a decorative image.
       </p>
     </>
   );
+}
+
+export function isEditorDirty(state: PageEditorState): boolean {
+  return state.status === "loaded" && (
+    state.save.status === "saving" || state.save.status === "error" ||
+    (state.revision > 0 && state.save.status !== "saved")
+  );
+}
+
+export function applyUploadedAsset(state: SiteAssetState, tenantId: string, siteId: string, asset: AssetListItem): SiteAssetState {
+  if (state.status !== "loaded" || !matchesSiteAssetState(state, tenantId, siteId) || state.assets.some(({ id }) => id === asset.id)) return state;
+  return { ...state, assets: [...state.assets, asset] };
 }
 
 export function applyDraftLoad(
