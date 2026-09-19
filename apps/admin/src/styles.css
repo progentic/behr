@@ -333,23 +333,99 @@ html {
   gap: var(--admin-space-5);
 }
 
-.workspace > section[aria-labelledby] {
+.workspace-shell {
+  display: grid;
+  grid-template-columns: 18rem minmax(0, 1fr);
+  min-block-size: calc(100vh - 4.25rem);
+}
+
+.workspace-navigation {
+  display: grid;
+  align-content: start;
+  gap: var(--admin-space-4);
+  min-inline-size: 0;
+  padding: var(--admin-space-5);
+  border-inline-end: 1px solid var(--admin-border);
+  background: var(--admin-surface-muted);
+  overflow-wrap: anywhere;
+}
+
+.tenant-context {
+  display: grid;
+  gap: var(--admin-space-2);
+  padding-block-end: var(--admin-space-4);
+  border-block-end: 1px solid var(--admin-border);
+}
+
+.tenant-context > span,
+.workspace-context > span,
+.workspace-context > p {
+  color: var(--admin-text-muted);
+}
+
+.workspace-navigation > section {
+  display: grid;
+  gap: var(--admin-space-4);
+  margin-block-start: var(--admin-space-4);
+  padding-block-start: var(--admin-space-5);
+  border-block-start: 1px solid var(--admin-border);
+}
+
+.workspace-navigation .selectable-resource-item {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.workspace-navigation .selectable-resource-item > button {
+  display: grid;
+  gap: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+.workspace-navigation .selectable-resource-item span {
+  color: var(--admin-text-muted);
+  font-size: 0.9375rem;
+  font-weight: 400;
+}
+
+.workspace-content {
+  align-content: start;
+  min-inline-size: 0;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+.workspace-context {
+  display: grid;
+  gap: var(--admin-space-2);
+  overflow-wrap: anywhere;
+}
+
+.workspace-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--admin-space-2);
+  border-block-end: 1px solid var(--admin-border);
+}
+
+.behr-admin .workspace-views > button {
+  inline-size: auto;
+  border: 0;
+  border-block-end: 3px solid transparent;
+  border-radius: 0;
+  color: var(--admin-text-muted);
+  background: transparent;
+}
+
+.behr-admin .workspace-views > button[aria-pressed="true"] {
+  border-block-end-color: var(--admin-blue);
+  color: var(--admin-blue);
+}
+
+.workspace-content > section[aria-labelledby] {
   display: grid;
   min-inline-size: 0;
   gap: var(--admin-space-4);
-  padding: clamp(1rem, 3vw, 1.5rem);
-  border: 1px solid var(--admin-border);
-  border-radius: var(--admin-radius);
-  background: var(--admin-surface);
-}
-
-.workspace > label,
-.workspace > select {
-  inline-size: min(100%, 24rem);
-}
-
-.workspace > ul {
-  inline-size: min(100%, 34rem);
 }
 
 .workspace dl {
@@ -419,10 +495,6 @@ html {
     flex-wrap: wrap;
   }
 
-  .app-header strong {
-    inline-size: 100%;
-  }
-
   .admin-main {
     padding: var(--admin-space-4);
   }
@@ -431,19 +503,24 @@ html {
     align-content: start;
   }
 
-  .workspace > section[aria-labelledby] {
-    padding: var(--admin-space-4);
-  }
-
   .behr-admin button,
-  .behr-admin form,
-  .workspace > label,
-  .workspace > select,
-  .workspace > ul {
+  .behr-admin form {
     inline-size: 100%;
   }
 
   .workspace dl {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 60rem) {
+  .workspace-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-navigation {
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--admin-border);
+    padding: var(--admin-space-4);
   }
 }

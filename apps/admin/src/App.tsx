@@ -73,9 +73,7 @@ function AuthenticatedShell({
         </ActionButton>
       </header>
       {error ? <AlertMessage>{error}</AlertMessage> : null}
-      <main className="admin-main">
-        <SitesPage />
-      </main>
+      <SitesPage />
     </>
   );
 }

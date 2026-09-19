@@ -24,6 +24,8 @@ export type SiteState =
   | Readonly<{ status: "error"; tenantId: string }>
   | Readonly<{ status: "loaded"; tenantId: string; sites: SiteSummary[] }>;
 
+type WorkspaceView = "pages" | "settings" | "members";
+
 export function SitesPage() {
   const [tenantState, setTenantState] = useState<TenantState>({
     status: "loading",
@@ -31,6 +33,7 @@ export function SitesPage() {
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
   const [siteState, setSiteState] = useState<SiteState>({ status: "idle" });
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("pages");
 
   useEffect(() => {
     let active = true;
@@ -87,17 +90,25 @@ export function SitesPage() {
   }, [selectedTenantId]);
 
   if (tenantState.status === "loading") {
-    return <StatusMessage>Loading tenants…</StatusMessage>;
+    return (
+      <main className="admin-main">
+        <StatusMessage>Loading tenants…</StatusMessage>
+      </main>
+    );
   }
   if (tenantState.status === "error") {
-    return <AlertMessage>Tenants could not be loaded.</AlertMessage>;
+    return (
+      <main className="admin-main">
+        <AlertMessage>Tenants could not be loaded.</AlertMessage>
+      </main>
+    );
   }
   if (tenantState.tenants.length === 0) {
     return (
-      <section className="workspace">
+      <main className="admin-main workspace">
         <h1>Sites</h1>
         <p>You do not belong to any tenants yet.</p>
-      </section>
+      </main>
     );
   }
 
@@ -105,7 +116,11 @@ export function SitesPage() {
     tenantState.tenants.find((tenant) => tenant.id === selectedTenantId) ??
     tenantState.tenants[0];
   if (!selectedTenant) {
-    return <AlertMessage>The selected tenant is unavailable.</AlertMessage>;
+    return (
+      <main className="admin-main">
+        <AlertMessage>The selected tenant is unavailable.</AlertMessage>
+      </main>
+    );
   }
   const formTenantId = selectedTenant.id;
   const selectedSite =
@@ -116,84 +131,135 @@ export function SitesPage() {
       : null;
 
   return (
-    <section className="workspace">
-      <h1>Sites</h1>
-      {tenantState.tenants.length > 1 ? (
-        <>
-          <label htmlFor="tenant-selector">Tenant</label>
-          <select
-            id="tenant-selector"
-            value={selectedTenant.id}
-            onChange={(event) => {
-              const nextTenantId = event.currentTarget.value;
-              setSelectedTenantId(nextTenantId);
-              setSelectedSiteId(null);
-              setSiteState({ status: "loading", tenantId: nextTenantId });
-            }}
-          >
-            {tenantState.tenants.map((tenant) => (
-              <option key={tenant.id} value={tenant.id}>
-                {tenant.name}
-              </option>
-            ))}
-          </select>
-        </>
-      ) : (
-        <h2>{selectedTenant.name}</h2>
-      )}
-
-      <SiteList
-        selectedSiteId={selectedSiteId}
-        selectedTenantId={selectedTenant.id}
-        state={siteState}
-        onSelect={setSelectedSiteId}
-      />
-      {selectedTenant.role === "owner" &&
-      siteState.status === "loaded" &&
-      siteState.tenantId === selectedTenant.id ? (
-        <SiteCreateForm
-          key={selectedTenant.id}
-          tenantId={formTenantId}
-          onCreated={(site) =>
-            setSiteState((current) => {
-              if (
-                current.status !== "loaded" ||
-                current.tenantId !== formTenantId
-              ) {
-                return current;
-              }
-              return {
-                status: "loaded",
-                tenantId: formTenantId,
-                sites: [...current.sites, site],
-              };
-            })
-          }
+    <div className="workspace-shell">
+      <nav className="workspace-navigation" aria-label="Workspace">
+        <div className="tenant-context">
+          {tenantState.tenants.length > 1 ? (
+            <>
+              <label htmlFor="tenant-selector">Tenant</label>
+              <select
+                id="tenant-selector"
+                value={selectedTenant.id}
+                onChange={(event) => {
+                  const nextTenantId = event.currentTarget.value;
+                  setSelectedTenantId(nextTenantId);
+                  setSelectedSiteId(null);
+                  setSiteState({ status: "loading", tenantId: nextTenantId });
+                  setWorkspaceView("pages");
+                }}
+              >
+                {tenantState.tenants.map((tenant) => (
+                  <option key={tenant.id} value={tenant.id}>
+                    {tenant.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <>
+              <span>Tenant</span>
+              <strong>{selectedTenant.name}</strong>
+            </>
+          )}
+        </div>
+        <h2>Sites</h2>
+        <SiteList
+          selectedSiteId={selectedSiteId}
+          selectedTenantId={selectedTenant.id}
+          state={siteState}
+          onSelect={(siteId) => {
+            setSelectedSiteId(siteId);
+            setWorkspaceView("pages");
+          }}
         />
-      ) : null}
-      {selectedTenant.role === "owner" ? (
-        <TenantMembers key={selectedTenant.id} tenantId={selectedTenant.id} />
-      ) : null}
-      {selectedTenant.role === "owner" && selectedSite ? (
-        <SiteSettings
-          key={`${selectedTenant.id}:${selectedSite.id}`}
-          tenantId={selectedTenant.id}
-          siteId={selectedSite.id}
-          onUpdated={(updatedSite) =>
-            setSiteState((current) =>
-              applyUpdatedSite(current, selectedTenant.id, updatedSite),
-            )
-          }
-        />
-      ) : null}
-      {selectedSite ? (
-        <PageList
-          key={`${selectedTenant.id}:${selectedSite.id}`}
-          tenantId={selectedTenant.id}
-          siteId={selectedSite.id}
-        />
-      ) : null}
-    </section>
+        {selectedTenant.role === "owner" &&
+        siteState.status === "loaded" &&
+        siteState.tenantId === selectedTenant.id ? (
+          <SiteCreateForm
+            key={selectedTenant.id}
+            tenantId={formTenantId}
+            onCreated={(site) =>
+              setSiteState((current) => {
+                if (
+                  current.status !== "loaded" ||
+                  current.tenantId !== formTenantId
+                ) {
+                  return current;
+                }
+                return {
+                  status: "loaded",
+                  tenantId: formTenantId,
+                  sites: [...current.sites, site],
+                };
+              })
+            }
+          />
+        ) : null}
+      </nav>
+      <main className="workspace workspace-content">
+        <div className="workspace-context">
+          <span>{workspaceView === "members" ? "Tenant" : "Site"}</span>
+          <h1>
+            {workspaceView === "members" ? selectedTenant.name : selectedSite?.name ?? "Sites"}
+          </h1>
+          {workspaceView !== "members" && selectedSite ? (
+            <p>{selectedSite.hostname}</p>
+          ) : null}
+        </div>
+        <nav className="workspace-views" aria-label="Workspace views">
+          {selectedSite ? (
+            <button
+              type="button"
+              aria-pressed={workspaceView === "pages"}
+              onClick={() => setWorkspaceView("pages")}
+            >
+              Pages
+            </button>
+          ) : null}
+          {selectedTenant.role === "owner" && selectedSite ? (
+            <button
+              type="button"
+              aria-pressed={workspaceView === "settings"}
+              onClick={() => setWorkspaceView("settings")}
+            >
+              Site settings
+            </button>
+          ) : null}
+          {selectedTenant.role === "owner" ? (
+            <button
+              type="button"
+              aria-pressed={workspaceView === "members"}
+              onClick={() => setWorkspaceView("members")}
+            >
+              Tenant members
+            </button>
+          ) : null}
+        </nav>
+        {selectedTenant.role === "owner" && workspaceView === "members" ? (
+          <TenantMembers key={selectedTenant.id} tenantId={selectedTenant.id} />
+        ) : null}
+        {selectedTenant.role === "owner" && selectedSite && workspaceView === "settings" ? (
+          <SiteSettings
+            key={`${selectedTenant.id}:${selectedSite.id}`}
+            tenantId={selectedTenant.id}
+            siteId={selectedSite.id}
+            onUpdated={(updatedSite) =>
+              setSiteState((current) =>
+                applyUpdatedSite(current, selectedTenant.id, updatedSite),
+              )
+            }
+          />
+        ) : null}
+        {selectedSite && workspaceView === "pages" ? (
+          <PageList
+            key={`${selectedTenant.id}:${selectedSite.id}`}
+            tenantId={selectedTenant.id}
+            siteId={selectedSite.id}
+          />
+        ) : null}
+        {!selectedSite && workspaceView === "pages" ? <p>Choose a site.</p> : null}
+      </main>
+    </div>
   );
 }
 
@@ -249,7 +315,8 @@ function SiteList({
           selected={selectedSiteId === site.id}
           onSelect={() => onSelect(site.id)}
         >
-          <strong>{site.name}</strong> — {site.hostname}
+          <strong>{site.name}</strong>
+          <span>{site.hostname}</span>
         </SelectableResourceItem>
       ))}
     </ul>

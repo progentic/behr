@@ -2028,3 +2028,90 @@ closure gates. This record does not declare S2 complete.
 
 S0-F006 tenant-switch duplication and S0-F010 editor-input failure remain OPEN.
 Their behavior has not been changed or hidden. S3–S8 remain unstarted.
+
+---
+
+## Phase S3 — Application Shell
+
+S3 starts from accepted S2 `733a7359fefefd25cbe3927d23332cd066166f97`.
+That candidate passed BeHR CI 35429305856 and received the owner's explicit
+`S2 SHARED UI PRIMITIVES: PASS` verdict. S3 preserves its four shared primitives
+and the S1 palette, typography, control dimensions, and focus foundation.
+
+### Shell and authority
+
+The authenticated header retains BeHR, the authoritative session email, and
+logout. `SitesPage` now owns the labelled Workspace navigation beside one main
+content region. The navigation keeps tenant context, site selection, and the
+existing owner-only site-creation form together. One tenant is plain context;
+multiple tenants use the existing selector. Site names and hostnames wrap
+within the navigation rather than being truncated by custom CSS.
+
+One local `pages | settings | members` value selects the main workspace.
+Native buttons expose the current view with `aria-pressed` and an underline;
+they are not ARIA tabs. A site change returns to Pages. A tenant change clears
+the selected site and resets the view. Existing tenant-keyed site state,
+effect cleanup, functional updates, component resource keys, and role checks
+remain authoritative. Shell view state introduces no resource ID, request,
+router, URL state, browser storage, context, or global store.
+
+Only the current workflow is mounted. Pages and settings identify the selected
+site and hostname. Tenant members instead identifies the tenant in the main
+context header, so membership is not presented as site-scoped. Members receive
+Pages only; owner-only creation, settings, and membership remain unavailable.
+Existing components continue to own their requests, validation, mutations,
+feedback, and transient state. Leaving a workspace unmounts it; unsaved local
+workflow state is not cached or persisted by the shell.
+
+### Layout and deliberate limits
+
+Native CSS Grid uses an 18rem navigation column and a flexible main area.
+The shell replaces equal-weight stacked management cards with an unbordered
+context header, restrained workspace navigation, and one workflow region.
+Forms retain the existing 34rem maximum measure. The sidebar has no card
+wrapper and resource selection reuses `SelectableResourceItem`. Below 60rem,
+the navigation and main content stack in DOM order without a hamburger,
+drawer, hidden panels, or horizontal navigation scrolling. Controls retain
+their 44px minimum and 3px focus treatment. No new visual palette, dependency,
+shared primitive, or shell component framework was introduced.
+
+Site creation remains a visible unchanged form in the navigation region; S3
+does not introduce a modal/disclosure or redesign its workflow. Page creation
+and editor internals remain together under PageList. Tenant creation, feedback
+reconstruction, upload, preview, publishing, and unsaved-edit protection remain
+S4–S8 work. The fresh administrator's zero-tenant dead end remains unresolved.
+
+### Verification and acceptance status
+
+Working-tree browser checks used the actual core runtime with Microsoft Edge
+153.0.4234.32 through Playwright CLI on macOS, disposable PostgreSQL data, real
+owner/member sessions, and API-labelled acceptance fixtures. They exercised
+all three owner workspaces, member Pages, settings save, site and tenant
+switches, a populated static editor, long resource names, and desktop/mobile
+layouts at 1440×900, 390×844, and 320×844. Observed document widths matched
+viewports, representative IDs were unique, one main/header and labelled
+navigation regions remained, native controls measured at least 44px, and
+keyboard focus remained a visible 3px outline. Workspace changes mounted only
+the relevant existing request path; development StrictMode can repeat its
+mount request. URL remained `/` and local/session storage remained empty.
+
+S0-F006: NOT REPRODUCED AFTER SHELL RESTRUCTURE — NO FUNCTIONAL FIX CLAIMED.
+The tenant-switch reproduction produced one site-creation form and one set of
+IDs after the structural change. No root-cause correction or CSS concealment
+was performed, and this does not close the separately governed finding.
+S0-F010 remains OPEN: PageEditor is byte-identical; static fixture presentation
+does not certify interactive editor input.
+
+Local frozen install, admin typecheck and 17 admin tests, full typecheck, all
+121 tests, build, audit, and diff checks passed. Negative searches found no
+router, storage, global state, notification infrastructure, sidebar/tab
+framework, future action placeholders, or out-of-scope runtime changes.
+The complexity review retained only the local view union, native landmarks,
+conditional mounting, and application-local grid/navigation rules. No generic
+shell helpers, configuration maps, future layout tokens, or new dependency was
+needed. Only App, SitesPage, admin CSS, and this history were changed.
+
+These are implementation-stage observations. Final exact-SHA browser evidence,
+CI, and the owner's `S3 APPLICATION SHELL` verdict are separate closure gates;
+Human Product Acceptance is NOT RUN at this record's creation. S3 is not
+declared closed by this documentation, and S4–S8 have not started.
