@@ -2431,3 +2431,13 @@ and beforeunload. The only new behavioral component boundaries are upload and
 preview/publication; no generic operation manager, autosave, dialog framework,
 global notification, router, media library, or external dependency was added.
 S4's no-transient-notification decision remains intact.
+
+### Enlarged-text correction during S6 verification
+
+The first candidate's document-level reflow checks passed, but a closer 320px /
+200% control-bounds measurement found `Remove block` text exceeding its button
+width. A bounded S6 CSS correction reduces narrow section/block padding and
+editor-action inline padding, and permits word wrapping. Text size, semantic
+colors, and minimum 44px interaction height are unchanged. The corrected exact
+candidate must repeat browser acceptance; the earlier candidate is not treated
+as passing this accessibility floor.
