@@ -1,3 +1,4 @@
+import { ActionButton, AlertMessage, StatusMessage } from "@bher/ui";
 import {
   type SiteSettingsResponse,
   type SiteSummary,
@@ -130,13 +131,13 @@ export function SiteSettings({
   }
 
   if (!matchesSettingsIdentity(state, tenantId, siteId)) {
-    return <p role="status">Loading site settings…</p>;
+    return <StatusMessage>Loading site settings…</StatusMessage>;
   }
   if (state.status === "loading") {
-    return <p role="status">Loading site settings…</p>;
+    return <StatusMessage>Loading site settings…</StatusMessage>;
   }
   if (state.status === "error") {
-    return <p role="alert">Site settings could not be loaded.</p>;
+    return <AlertMessage>Site settings could not be loaded.</AlertMessage>;
   }
 
   const saving = state.saveStatus === "saving";
@@ -199,22 +200,22 @@ export function SiteSettings({
           <option value="serif">Serif</option>
         </select>
         {state.saveStatus === "invalid" ? (
-          <p role="alert">Site settings are invalid.</p>
+          <AlertMessage>Site settings are invalid.</AlertMessage>
         ) : null}
         {state.saveStatus === "error" ? (
-          <p role="alert">Site settings could not be saved.</p>
+          <AlertMessage>Site settings could not be saved.</AlertMessage>
         ) : null}
         {state.saveStatus === "saving" ? (
-          <p role="status">Saving site settings…</p>
+          <StatusMessage>Saving site settings…</StatusMessage>
         ) : null}
         {state.saveStatus === "saved" ? (
-          <p className="status-success" role="status">
+          <StatusMessage tone="success">
             Site settings saved.
-          </p>
+          </StatusMessage>
         ) : null}
-        <button type="submit" disabled={saving}>
+        <ActionButton variant="primary" type="submit" disabled={saving}>
           Save settings
-        </button>
+        </ActionButton>
       </form>
     </section>
   );

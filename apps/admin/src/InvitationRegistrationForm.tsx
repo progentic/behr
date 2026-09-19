@@ -1,3 +1,4 @@
+import { ActionButton, StatusMessage } from "@bher/ui";
 import {
   inviteRegistrationRequestSchema,
   inviteRegistrationResponseSchema,
@@ -85,11 +86,11 @@ export function InvitationRegistrationForm() {
           value={password}
           onChange={(event) => setPassword(event.currentTarget.value)}
         />
-        <button type="submit" disabled={submitting}>
+        <ActionButton variant="secondary" type="submit" disabled={submitting}>
           {submitting ? "Registering…" : "Create account"}
-        </button>
+        </ActionButton>
       </form>
-      {message ? <p role="status">{message}</p> : null}
+      {message ? <StatusMessage>{message}</StatusMessage> : null}
     </section>
   );
 }

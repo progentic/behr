@@ -1,3 +1,4 @@
+import { ActionButton, AlertMessage } from "@bher/ui";
 import {
   type CreateSiteRequest,
   type SiteSummary,
@@ -73,10 +74,10 @@ export function SiteCreateForm({
           value={hostname}
           onChange={(event) => setHostname(event.currentTarget.value)}
         />
-        {error ? <p role="alert">{error}</p> : null}
-        <button type="submit" disabled={submitting}>
+        {error ? <AlertMessage>{error}</AlertMessage> : null}
+        <ActionButton variant="primary" type="submit" disabled={submitting}>
           {submitting ? "Creating…" : "Create site"}
-        </button>
+        </ActionButton>
       </form>
     </section>
   );

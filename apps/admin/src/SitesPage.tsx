@@ -1,3 +1,4 @@
+import { AlertMessage, SelectableResourceItem, StatusMessage } from "@bher/ui";
 import {
   type SiteSummary,
   type TenantAccess,
@@ -86,10 +87,10 @@ export function SitesPage() {
   }, [selectedTenantId]);
 
   if (tenantState.status === "loading") {
-    return <p role="status">Loading tenants…</p>;
+    return <StatusMessage>Loading tenants…</StatusMessage>;
   }
   if (tenantState.status === "error") {
-    return <p role="alert">Tenants could not be loaded.</p>;
+    return <AlertMessage>Tenants could not be loaded.</AlertMessage>;
   }
   if (tenantState.tenants.length === 0) {
     return (
@@ -104,7 +105,7 @@ export function SitesPage() {
     tenantState.tenants.find((tenant) => tenant.id === selectedTenantId) ??
     tenantState.tenants[0];
   if (!selectedTenant) {
-    return <p role="alert">The selected tenant is unavailable.</p>;
+    return <AlertMessage>The selected tenant is unavailable.</AlertMessage>;
   }
   const formTenantId = selectedTenant.id;
   const selectedSite =
@@ -232,10 +233,10 @@ function SiteList({
     state.status === "loading" ||
     state.tenantId !== selectedTenantId
   ) {
-    return <p role="status">Loading sites…</p>;
+    return <StatusMessage>Loading sites…</StatusMessage>;
   }
   if (state.status === "error") {
-    return <p role="alert">Sites could not be loaded.</p>;
+    return <AlertMessage>Sites could not be loaded.</AlertMessage>;
   }
   if (state.sites.length === 0) {
     return <p>No sites yet.</p>;
@@ -243,15 +244,13 @@ function SiteList({
   return (
     <ul>
       {state.sites.map((site) => (
-        <li key={site.id}>
-          <button
-            type="button"
-            aria-pressed={selectedSiteId === site.id}
-            onClick={() => onSelect(site.id)}
-          >
-            <strong>{site.name}</strong> — {site.hostname}
-          </button>
-        </li>
+        <SelectableResourceItem
+          key={site.id}
+          selected={selectedSiteId === site.id}
+          onSelect={() => onSelect(site.id)}
+        >
+          <strong>{site.name}</strong> — {site.hostname}
+        </SelectableResourceItem>
       ))}
     </ul>
   );

@@ -1950,3 +1950,81 @@ The S4 review direction is:
 Current accepted semantic palette: blue / red / green. Orange/amber: NOT APPROVED. The default remains local inline feedback. A toast framework is NOT AUTHORIZED; toast stacking and a notification queue are NOT PLANNED. Any later transient notification must satisfy Global Rule 13 resource identity.
 
 This is a required S4 implementation/review question, not current authorization for a toast system.
+
+---
+
+## Phase S2 — Shared UI Primitives
+
+### Implementation and ownership
+
+S2 introduces exactly four React primitives in `@bher/ui`:
+
+- `ActionButton` requires explicit native `type` and `primary | secondary`
+  priority, combines its presentation class with any caller class, and preserves
+  native button attributes and handlers. Authentication, logout, site creation,
+  membership provisioning, site-settings save, and page creation consume it.
+- `AlertMessage` owns a persistent local paragraph with `role="alert"` and an
+  alert presentation identity. Failure lifecycle and translation remain local.
+- `StatusMessage` owns `role="status"` with neutral presentation by default and
+  an explicit confirmed-success tone. Generic membership and invitation
+  messages remain neutral because their existing state mixes outcome meanings.
+- `SelectableResourceItem` owns the existing list-item/native-button structure,
+  `type="button"`, and `aria-pressed`. Site and page callers retain selection
+  state, resource identity, children, and their original selection callbacks.
+
+These patterns recur in real consumers and centralize priority, roles, or
+selection semantics without adding rendered wrappers, labels, or controls.
+No resource, network, authentication, validation, or editor authority enters
+the UI package. React and test-rendering support use versions already pinned
+in the repository. The only new workspace runtime edge is admin → UI. Root
+tests now include the focused UI package tests; lockfile changes are confined
+to the corresponding workspace metadata.
+
+Concrete presentation remains in `apps/admin/src/styles.css`. Primary styling
+now follows explicit priority rather than submit type; selection selectors
+target the resource-item primitive. Native control dimensions, palette,
+typography, focus, and surface geometry remain the accepted S1 foundation.
+Existing role-based feedback styling also continues to serve the unchanged
+editor's local feedback.
+
+### Deliberate deferments and verification status
+
+Field/Label and Select wrappers are deferred to S4 because existing native
+markup and CSS remain clearer without more shared policy. Empty states remain
+S5 workflow decisions. Generic Card/Panel/Surface and navigation abstractions
+are not introduced; the current nested workflow regions are not interchangeable
+cards. Pages remains a semantic region within the selected site. Specialized
+editor controls remain local to S6, and `PageEditor.tsx` is unchanged.
+
+Source review found no changes to request paths, validation timing, caller
+handlers, authorization, async guards, field IDs/error associations, or
+invitation-token state. Focused tests verify native types, caller handlers,
+disabled/ARIA attributes, alert/status roles, explicit success presentation,
+and selected resource structure. The local test gate passed 121 tests, including
+five UI tests; typecheck, build, frozen install, and dependency audit passed.
+Searches found no context/portal, polymorphic slot, notification, route/shell,
+generic surface, or backend/editor dependency additions under the UI package.
+
+Pre-commit browser verification used the installed Homebrew Playwright CLI
+with isolated headless Microsoft Edge against the actual development runtime.
+Login captures at 1440 × 900, 390 × 844, and 320 × 844 were byte-identical to
+captures from a verified checkout of accepted S1 on the same browser and data.
+Owner/member sessions, native submit and selection types, selected site/page
+state, working creation, linked invalid-title feedback and focus, and saved
+settings feedback were exercised. Selection buttons measured 44 CSS pixels
+high; owner views had equal viewport and document widths at 390 and 320 pixels.
+Member views excluded site creation, membership administration, and settings.
+The browser still reproduced two site-creation forms and duplicate IDs after
+tenant switching. These are development observations, not a substitute for
+final exact-commit browser evidence or Human Product Acceptance.
+
+The dedicated complexity review retained only the four required presentation
+policies. Native controls, existing local workflow state, role-based CSS, and
+the existing stylesheet delivery path were reused. No speculative variants,
+form framework, shared surface, or notification lifecycle were retained.
+Human Product Acceptance remains NOT RUN at the implementation-record stage;
+final candidate screenshots, exact-commit CI, and the human verdict are separate
+closure gates. This record does not declare S2 complete.
+
+S0-F006 tenant-switch duplication and S0-F010 editor-input failure remain OPEN.
+Their behavior has not been changed or hidden. S3–S8 remain unstarted.

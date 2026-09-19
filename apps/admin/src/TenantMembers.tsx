@@ -1,3 +1,4 @@
+import { ActionButton, AlertMessage, StatusMessage } from "@bher/ui";
 import {
   type MemberProvisioningResult,
   type TenantMember,
@@ -92,10 +93,10 @@ export function TenantMembers({ tenantId }: Readonly<{ tenantId: string }>) {
     <section aria-labelledby="tenant-members-title">
       <h2 id="tenant-members-title">Members</h2>
       {memberState.status === "loading" ? (
-        <p role="status">Loading members…</p>
+        <StatusMessage>Loading members…</StatusMessage>
       ) : null}
       {memberState.status === "error" ? (
-        <p role="alert">Members could not be loaded.</p>
+        <AlertMessage>Members could not be loaded.</AlertMessage>
       ) : null}
       {memberState.status === "loaded" ? (
         <ul>
@@ -117,12 +118,12 @@ export function TenantMembers({ tenantId }: Readonly<{ tenantId: string }>) {
           value={email}
           onChange={(event) => setEmail(event.currentTarget.value)}
         />
-        <button type="submit" disabled={submitting}>
+        <ActionButton variant="primary" type="submit" disabled={submitting}>
           {submitting ? "Submitting…" : "Add member"}
-        </button>
+        </ActionButton>
       </form>
 
-      {message ? <p role="status">{message}</p> : null}
+      {message ? <StatusMessage>{message}</StatusMessage> : null}
       {invitation ? (
         <section aria-labelledby="membership-invitation-title">
           <h3 id="membership-invitation-title">Membership invitation</h3>

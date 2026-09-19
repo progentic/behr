@@ -91,20 +91,17 @@ html {
   background: #e5e5e5;
 }
 
-.behr-admin button[type="submit"],
 .behr-admin .button-primary {
   border-color: var(--admin-blue);
   color: #ffffff;
   background: var(--admin-blue);
 }
 
-.behr-admin button[type="submit"]:hover:not(:disabled),
 .behr-admin .button-primary:hover:not(:disabled) {
   border-color: var(--admin-blue-hover);
   background: var(--admin-blue-hover);
 }
 
-.behr-admin button[type="submit"]:active:not(:disabled),
 .behr-admin .button-primary:active:not(:disabled) {
   border-color: #043d88;
   background: #043d88;
@@ -212,18 +209,18 @@ html {
   overflow-wrap: anywhere;
 }
 
-.behr-admin li > button {
+.behr-admin .selectable-resource-item > button {
   inline-size: 100%;
   text-align: start;
 }
 
-.behr-admin button[aria-pressed="true"] {
+.behr-admin .selectable-resource-item > button[aria-pressed="true"] {
   border-color: var(--admin-blue);
   color: #064698;
   background: var(--admin-blue-soft);
 }
 
-.behr-admin button[aria-pressed="true"]:hover:not(:disabled) {
+.behr-admin .selectable-resource-item > button[aria-pressed="true"]:hover:not(:disabled) {
   border-color: var(--admin-blue-hover);
   color: #043d88;
   background: #dceaff;
@@ -320,13 +317,13 @@ html {
   color: var(--admin-text-muted);
 }
 
-.auth-invitation button[type="submit"] {
+.behr-admin .button-secondary {
   border-color: var(--admin-border-strong);
   color: var(--admin-text);
   background: var(--admin-surface);
 }
 
-.auth-invitation button[type="submit"]:hover:not(:disabled) {
+.behr-admin .button-secondary:hover:not(:disabled) {
   border-color: var(--admin-text-muted);
   background: var(--admin-surface-muted);
 }

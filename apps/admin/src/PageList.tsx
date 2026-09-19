@@ -1,3 +1,4 @@
+import { AlertMessage, SelectableResourceItem, StatusMessage } from "@bher/ui";
 import {
   type PageSummary,
   pageListResponseSchema,
@@ -66,13 +67,13 @@ export function PageList({ tenantId, siteId }: PageListProperties) {
   }, [tenantId, siteId]);
 
   if (!matchesPageListIdentity(state, tenantId, siteId)) {
-    return <p role="status">Loading pages…</p>;
+    return <StatusMessage>Loading pages…</StatusMessage>;
   }
   if (state.status === "loading") {
-    return <p role="status">Loading pages…</p>;
+    return <StatusMessage>Loading pages…</StatusMessage>;
   }
   if (state.status === "error") {
-    return <p role="alert">Pages could not be loaded.</p>;
+    return <AlertMessage>Pages could not be loaded.</AlertMessage>;
   }
 
   return (
@@ -83,15 +84,13 @@ export function PageList({ tenantId, siteId }: PageListProperties) {
       ) : (
         <ul>
           {state.pages.map((page) => (
-            <li key={page.id}>
-              <button
-                type="button"
-                aria-pressed={state.selectedPageId === page.id}
-                onClick={() => setState((current) => selectPage(current, page.id))}
-              >
-                {page.title} — /{page.slug}
-              </button>
-            </li>
+            <SelectableResourceItem
+              key={page.id}
+              selected={state.selectedPageId === page.id}
+              onSelect={() => setState((current) => selectPage(current, page.id))}
+            >
+              {page.title} — /{page.slug}
+            </SelectableResourceItem>
           ))}
         </ul>
       )}

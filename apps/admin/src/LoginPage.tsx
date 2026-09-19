@@ -1,3 +1,4 @@
+import { ActionButton, AlertMessage } from "@bher/ui";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
@@ -51,10 +52,10 @@ export function LoginPage({ error, onLogin }: LoginPageProps) {
           value={password}
           onChange={(event) => setPassword(event.currentTarget.value)}
         />
-        {error ? <p role="alert">{error}</p> : null}
-        <button type="submit" disabled={submitting}>
+        {error ? <AlertMessage>{error}</AlertMessage> : null}
+        <ActionButton variant="primary" type="submit" disabled={submitting}>
           {submitting ? "Signing in…" : "Sign in"}
-        </button>
+        </ActionButton>
       </form>
       <InvitationRegistrationForm />
     </main>

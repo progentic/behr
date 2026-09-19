@@ -1,3 +1,4 @@
+import { ActionButton, AlertMessage, StatusMessage } from "@bher/ui";
 import type { AuthenticatedSession, SessionResponse } from "@bher/contracts";
 
 import { AuthGuard } from "./AuthGuard";
@@ -17,7 +18,7 @@ function renderAuthenticationView(authentication: AuthenticationState) {
   const { view } = authentication;
   switch (view.status) {
     case "loading":
-      return <p role="status">Checking your BeHR session…</p>;
+      return <StatusMessage>Checking your BeHR session…</StatusMessage>;
     case "unauthenticated":
       return renderSessionView(
         authentication,
@@ -67,11 +68,11 @@ function AuthenticatedShell({
       <header className="app-header">
         <strong>BeHR</strong>
         <span>{user.email}</span>
-        <button type="button" onClick={() => void onLogout()}>
+        <ActionButton variant="secondary" type="button" onClick={() => void onLogout()}>
           Log out
-        </button>
+        </ActionButton>
       </header>
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? <AlertMessage>{error}</AlertMessage> : null}
       <main className="admin-main">
         <SitesPage />
       </main>

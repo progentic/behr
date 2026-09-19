@@ -1,3 +1,4 @@
+import { ActionButton, AlertMessage } from "@bher/ui";
 import {
   type CreatePageRequest,
   type PageSummary,
@@ -143,10 +144,10 @@ export function PageCreateForm({
         {fieldErrors.slug ? (
           <p id={SLUG_ERROR_ID}>{fieldErrors.slug}</p>
         ) : null}
-        {formError ? <p role="alert">{formError}</p> : null}
-        <button type="submit" disabled={submitting}>
+        {formError ? <AlertMessage>{formError}</AlertMessage> : null}
+        <ActionButton variant="primary" type="submit" disabled={submitting}>
           {submitting ? "Creating…" : "Create page"}
-        </button>
+        </ActionButton>
       </form>
     </section>
   );
