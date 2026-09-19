@@ -227,8 +227,26 @@ html {
 }
 
 .behr-admin [role="alert"],
+.behr-admin .field-error,
 .behr-admin [aria-invalid="true"] + p {
   color: var(--admin-red);
+}
+
+.behr-admin .field-help,
+.behr-admin .field-error {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.behr-admin .field-help {
+  color: var(--admin-text-muted);
+}
+
+.behr-admin .invitation-result {
+  display: grid;
+  gap: var(--admin-space-3);
+  max-inline-size: var(--admin-form);
 }
 
 .behr-admin [role="alert"] {

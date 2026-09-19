@@ -2115,3 +2115,112 @@ These are implementation-stage observations. Final exact-SHA browser evidence,
 CI, and the owner's `S3 APPLICATION SHELL` verdict are separate closure gates;
 Human Product Acceptance is NOT RUN at this record's creation. S3 is not
 declared closed by this documentation, and S4–S8 have not started.
+
+---
+
+## Phase S4 — Forms and Feedback Model
+
+S4 starts from `da8e7207aee7f71d8095c176163505d086847fd3`, accepted by BeHR CI
+35443607792 and the owner's `S3 APPLICATION SHELL: PASS` verdict. The shell,
+shared primitives, authentication, contracts, and editor remain unchanged.
+
+### Local feedback and error ownership
+
+Feedback remains at its initiating field, form, or resource. Invitation
+registration and membership previously used one neutral message path for both
+failure and success. They now distinguish persistent `AlertMessage` failures
+from `StatusMessage tone="success"` after validated successful responses.
+Membership's client-known email failure is linked to that input instead of
+being announced as a neutral result. Invitation tokens remain transient in
+their tenant-keyed component, with existing secure-sharing guidance and no
+clipboard, storage, history, or global distribution.
+
+Site creation uses the existing strict request schema to associate name and
+hostname validation with deterministic field IDs and `aria-describedby` /
+`aria-invalid`. Its existing HTTP 409 classification maps only to hostname;
+other request failures remain a form-level alert. No server text is parsed
+for field ownership. Focused tests cover valid normalization, isolated field
+errors, the owned conflict, and an adjacent generic failure. Page creation
+keeps its existing validation timing, title/slug focus, strict request, and
+slug-conflict behavior; only message styling and slug guidance change.
+
+Login already provides a local alert and needs no new abstraction. Settings
+already provides neutral loading/saving and local green confirmed success;
+its state and markup are retained. Existing pending buttons and duplicate-
+submission prevention remain in their components. No new live region, timer,
+spinner, or global progress model was added. Creation remains confirmed by
+the visible new site/page rather than a redundant success banner.
+
+### Helper text and visual policy
+
+Two non-obvious constraints receive concise stable help: the invitation
+password's 12-character minimum and an empty page slug's home-page meaning.
+Native paragraphs use associated IDs, no live-region role, a 0.875rem (14px
+at default settings) size, 1.5 line height, and the existing readable neutral
+gray. Field errors use the same compact scale and existing red. Form errors,
+neutral progress, and confirmed-success surfaces retain the accepted border,
+radius, and blue/red/green foundation. Ordinary guidance does not add blue.
+The invitation result receives a bounded measure and consistent spacing;
+no other workspace structure changes.
+
+Field + Label: keep native local markup. Select: no abstraction. HelperText:
+considered and rejected; these two pieces of stable guidance need only native
+paragraph semantics and shared CSS, not another React policy layer.
+`packages/ui` needs no modification.
+
+### Notification decision
+
+| Workflow | Local feedback available? | Remains useful after action? | Can become stale after navigation? | Global/transient needed? | Decision |
+| --- | --- | --- | --- | --- | --- |
+| Login failure | Login alert | Yes; login remains visible | No resource result | No | Keep local |
+| Invitation registration | Local error or account-created status | Yes; sign-in is the next action | Leaving the entry surface removes it | No | Keep local |
+| Site creation | Field/form error or new site in list | Yes | Tenant switch can outlive request | No | Existing keyed state and guarded callback |
+| Member add | Updated member list and confirmed status | Yes | Tenant/workspace can change | No | Keep in tenant-keyed component |
+| Invitation creation | Success and transient token section | Yes; secure sharing remains local | Leaving tenant/workspace discards token | No | No global token/result transport |
+| Site settings save | Neutral progress, local error/success | Yes | Site/workspace can change | No | Existing identity guards and unmounting |
+| Page creation | Field/form error or selected new page | Yes | Tenant/site/workspace can change | No | Existing scoped callback; no extra success message |
+| Draft save | Existing local saving/error/saved state | Yes | Page/resource can change | No | Existing editor operation identity; reconstruction stays S6 |
+| Session expiry | Subsequent save fails locally; reload resolves login | Failure stays visible before reload | No current-resource success is emitted | No | Record current auth behavior, do not add a toast |
+| Late completion / disappearing initiating control | Existing resource-scoped state | Useful only in original context | Yes | No | Discard stale context; do not relabel completion for new resource |
+
+Transient notification primitive: NOT JUSTIFIED by the exercised current
+workflows. Toast stack, notification queue, and global notification state:
+NOT IMPLEMENTED. This does not pre-decide future workflow evidence. Rule 13
+remains authoritative; no cross-context completion policy was introduced.
+
+### Evidence, limits, and acceptance status
+
+Working-tree checks used the actual core runtime, disposable PostgreSQL data,
+real owner/member identities, and labelled API fixtures in Edge 153.0.4234.32
+on macOS. Checks exercised invalid login, invitation failure/success,
+hostname conflict, injected generic request failure, linked page validation,
+neutral in-flight settings, confirmed save, delayed save across site switch,
+membership validation, member addition, and invitation output (masked in
+screenshots). Reviews used 1440×900, 390×844, and 320×844 viewports; representative
+login, settings, and page errors also used a 200% root-font enlargement.
+
+The session-expiry review explicitly expired an acceptance owner's database
+session while a valid fixture-loaded draft was open. Save then displayed
+`The draft could not be saved.` while retaining the editor. Reload resolved
+the unauthenticated login screen. There is no automatic expiry redirect:
+authentication currently resolves at mount. S4 does not claim otherwise or
+change the authentication boundary. The local failure is retained rather
+than being lost to a transition, so a toast is not justified by this test.
+
+Frozen install, shared UI checks, 19 admin tests, full typecheck, all 123 tests,
+build, audit, and diff checks passed locally. No dependency was added. The
+complexity review retained one site-validation preparation function because
+it owns field attribution from the existing schema; native markup/CSS and
+the accepted feedback primitives cover the remaining needs without a form
+framework or notification system.
+
+S0-F006 retains the S3 disposition: NOT REPRODUCED AFTER SHELL RESTRUCTURE —
+NO FIX CLAIMED. S0-F010 remains OPEN and PageEditor is byte-identical. Static
+draft save evidence is not interactive editor acceptance. Tenant creation,
+membership reconstruction/copy affordance, authoring/publishing, final
+accessibility completion, and integrated product acceptance remain S5–S8.
+
+Final exact-candidate browser evidence, CI, and the owner's
+`S4 FORMS AND FEEDBACK` verdict are separate closure gates. Human Product
+Acceptance is NOT RUN when this implementation record is authored; it does
+not close S4 or begin S5.

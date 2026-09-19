@@ -12,6 +12,8 @@ import { requestApi } from "./lib/api";
 
 const CONFLICT_STATUS = 409;
 
+type SiteFieldErrors = Readonly<{ name?: string; hostname?: string }>;
+
 type SiteCreateFormProps = Readonly<{
   onCreated: (site: SiteSummary) => void;
   tenantId: string;
@@ -25,27 +27,28 @@ export function SiteCreateForm({
   const [hostname, setHostname] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<SiteFieldErrors>({});
 
   async function submitSite(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
-    const request = createSiteRequestSchema.safeParse({ name, hostname });
-    if (!request.success) {
-      setError("Enter a valid site name and hostname.");
+    const preparation = prepareSiteCreation(name, hostname);
+    setFieldErrors(preparation.fieldErrors);
+    if (!preparation.request) {
       return;
     }
     setSubmitting(true);
     try {
-      const site = await requestSiteCreation(tenantId, request.data);
+      const site = await requestSiteCreation(tenantId, preparation.request);
       setName("");
       setHostname("");
       onCreated(site);
     } catch (failure) {
-      setError(
-        failure instanceof SiteHostnameConflictResponseError
-          ? "That hostname is already assigned."
-          : "The site could not be created.",
-      );
+      if (failure instanceof SiteHostnameConflictResponseError) {
+        setFieldErrors({ hostname: "That hostname is already assigned." });
+      } else {
+        setError("The site could not be created.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -62,8 +65,14 @@ export function SiteCreateForm({
           maxLength={200}
           required
           value={name}
-          onChange={(event) => setName(event.currentTarget.value)}
+          aria-invalid={fieldErrors.name ? true : undefined}
+          aria-describedby={fieldErrors.name ? "site-name-error" : undefined}
+          onChange={(event) => {
+            setName(event.currentTarget.value);
+            setFieldErrors((current) => ({ ...current, name: undefined }));
+          }}
         />
+        {fieldErrors.name ? <p className="field-error" id="site-name-error">{fieldErrors.name}</p> : null}
         <label htmlFor="site-hostname">Hostname</label>
         <input
           id="site-hostname"
@@ -72,8 +81,14 @@ export function SiteCreateForm({
           placeholder="www.example.com"
           required
           value={hostname}
-          onChange={(event) => setHostname(event.currentTarget.value)}
+          aria-invalid={fieldErrors.hostname ? true : undefined}
+          aria-describedby={fieldErrors.hostname ? "site-hostname-error" : undefined}
+          onChange={(event) => {
+            setHostname(event.currentTarget.value);
+            setFieldErrors((current) => ({ ...current, hostname: undefined }));
+          }}
         />
+        {fieldErrors.hostname ? <p className="field-error" id="site-hostname-error">{fieldErrors.hostname}</p> : null}
         {error ? <AlertMessage>{error}</AlertMessage> : null}
         <ActionButton variant="primary" type="submit" disabled={submitting}>
           {submitting ? "Creating…" : "Create site"}
@@ -83,9 +98,25 @@ export function SiteCreateForm({
   );
 }
 
-class SiteHostnameConflictResponseError extends Error {}
+export function prepareSiteCreation(
+  name: string,
+  hostname: string,
+): Readonly<{ request: CreateSiteRequest | null; fieldErrors: SiteFieldErrors }> {
+  const parsed = createSiteRequestSchema.safeParse({ name, hostname });
+  if (parsed.success) {
+    return { request: parsed.data, fieldErrors: {} };
+  }
+  const fieldErrors: { name?: string; hostname?: string } = {};
+  for (const issue of parsed.error.issues) {
+    if (issue.path[0] === "name") fieldErrors.name = "Enter a valid site name.";
+    if (issue.path[0] === "hostname") fieldErrors.hostname = "Enter a valid hostname.";
+  }
+  return { request: null, fieldErrors };
+}
 
-async function requestSiteCreation(
+export class SiteHostnameConflictResponseError extends Error {}
+
+export async function requestSiteCreation(
   tenantId: string,
   request: CreateSiteRequest,
 ): Promise<SiteSummary> {

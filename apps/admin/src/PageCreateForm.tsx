@@ -118,7 +118,7 @@ export function PageCreateForm({
           }}
         />
         {fieldErrors.title ? (
-          <p id={TITLE_ERROR_ID}>{fieldErrors.title}</p>
+          <p className="field-error" id={TITLE_ERROR_ID}>{fieldErrors.title}</p>
         ) : null}
         <label htmlFor="page-slug">Slug</label>
         <input
@@ -128,7 +128,7 @@ export function PageCreateForm({
           placeholder="about-us"
           value={slug}
           aria-invalid={fieldErrors.slug ? true : undefined}
-          aria-describedby={fieldErrors.slug ? SLUG_ERROR_ID : undefined}
+          aria-describedby={fieldErrors.slug ? `${SLUG_ERROR_ID} page-slug-help` : "page-slug-help"}
           onBlur={() => validatePageCreationField("slug")}
           onChange={(event) => {
             const nextSlug = event.currentTarget.value;
@@ -142,8 +142,9 @@ export function PageCreateForm({
           }}
         />
         {fieldErrors.slug ? (
-          <p id={SLUG_ERROR_ID}>{fieldErrors.slug}</p>
+          <p className="field-error" id={SLUG_ERROR_ID}>{fieldErrors.slug}</p>
         ) : null}
+        <p className="field-help" id="page-slug-help">Leave empty for the site’s home page.</p>
         {formError ? <AlertMessage>{formError}</AlertMessage> : null}
         <ActionButton variant="primary" type="submit" disabled={submitting}>
           {submitting ? "Creating…" : "Create page"}

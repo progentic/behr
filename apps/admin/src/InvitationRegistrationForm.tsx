@@ -1,4 +1,4 @@
-import { ActionButton, StatusMessage } from "@bher/ui";
+import { ActionButton, AlertMessage, StatusMessage } from "@bher/ui";
 import {
   inviteRegistrationRequestSchema,
   inviteRegistrationResponseSchema,
@@ -13,20 +13,22 @@ export function InvitationRegistrationForm() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [registered, setRegistered] = useState(false);
 
   async function registerInvitation(
     event: FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault();
-    setMessage(null);
+    setError(null);
+    setRegistered(false);
     const request = inviteRegistrationRequestSchema.safeParse({
       token,
       name,
       password,
     });
     if (!request.success) {
-      setMessage("Enter a valid invitation token, name, and password.");
+      setError("Enter a valid invitation token, name, and password.");
       return;
     }
     setSubmitting(true);
@@ -41,9 +43,9 @@ export function InvitationRegistrationForm() {
       inviteRegistrationResponseSchema.parse(await response.json());
       setToken("");
       setPassword("");
-      setMessage("Account created. Sign in normally to continue.");
+      setRegistered(true);
     } catch {
-      setMessage(
+      setError(
         "Registration could not be completed. The invitation may be invalid, expired, or already used.",
       );
     } finally {
@@ -82,15 +84,20 @@ export function InvitationRegistrationForm() {
           type="password"
           minLength={12}
           maxLength={128}
+          aria-describedby="invited-password-help"
           required
           value={password}
           onChange={(event) => setPassword(event.currentTarget.value)}
         />
+        <p className="field-help" id="invited-password-help">Use at least 12 characters.</p>
         <ActionButton variant="secondary" type="submit" disabled={submitting}>
           {submitting ? "Registering…" : "Create account"}
         </ActionButton>
       </form>
-      {message ? <StatusMessage>{message}</StatusMessage> : null}
+      {error ? <AlertMessage>{error}</AlertMessage> : null}
+      {registered ? (
+        <StatusMessage tone="success">Account created. Sign in to continue.</StatusMessage>
+      ) : null}
     </section>
   );
 }

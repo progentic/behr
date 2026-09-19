@@ -29,6 +29,8 @@ export function TenantMembers({ tenantId }: Readonly<{ tenantId: string }>) {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [invitation, setInvitation] = useState<InvitationDisplay | null>(null);
 
   useEffect(() => {
@@ -55,9 +57,11 @@ export function TenantMembers({ tenantId }: Readonly<{ tenantId: string }>) {
     event.preventDefault();
     setInvitation(null);
     setMessage(null);
+    setError(null);
+    setEmailError(null);
     const request = addTenantMemberRequestSchema.safeParse({ email });
     if (!request.success) {
-      setMessage("Enter a valid email address.");
+      setEmailError("Enter a valid email address.");
       return;
     }
     setSubmitting(true);
@@ -65,7 +69,7 @@ export function TenantMembers({ tenantId }: Readonly<{ tenantId: string }>) {
       const result = await requestMemberProvisioning(tenantId, request.data);
       applyProvisioningResult(result);
     } catch {
-      setMessage("The membership request could not be completed.");
+      setError("The membership request could not be completed.");
     } finally {
       setSubmitting(false);
     }
@@ -116,16 +120,23 @@ export function TenantMembers({ tenantId }: Readonly<{ tenantId: string }>) {
           type="email"
           required
           value={email}
-          onChange={(event) => setEmail(event.currentTarget.value)}
+          aria-invalid={emailError ? true : undefined}
+          aria-describedby={emailError ? "member-email-error" : undefined}
+          onChange={(event) => {
+            setEmail(event.currentTarget.value);
+            setEmailError(null);
+          }}
         />
+        {emailError ? <p className="field-error" id="member-email-error">{emailError}</p> : null}
         <ActionButton variant="primary" type="submit" disabled={submitting}>
           {submitting ? "Submitting…" : "Add member"}
         </ActionButton>
       </form>
 
-      {message ? <StatusMessage>{message}</StatusMessage> : null}
+      {error ? <AlertMessage>{error}</AlertMessage> : null}
+      {message ? <StatusMessage tone="success">{message}</StatusMessage> : null}
       {invitation ? (
-        <section aria-labelledby="membership-invitation-title">
+        <section className="invitation-result" aria-labelledby="membership-invitation-title">
           <h3 id="membership-invitation-title">Membership invitation</h3>
           <p>For: {invitation.email}</p>
           <p>Expires: {new Date(invitation.expiresAt).toLocaleString()}</p>

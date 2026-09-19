@@ -2,6 +2,11 @@ import type { SiteSettingsResponse, SiteSummary } from "@bher/contracts";
 
 import { type SiteState, applyUpdatedSite } from "./SitesPage";
 import {
+  prepareSiteCreation,
+  requestSiteCreation,
+  SiteHostnameConflictResponseError,
+} from "./SiteCreateForm";
+import {
   createSiteSettingsUpdateRequest,
   requestSiteSettings,
   requestSiteSettingsUpdate,
@@ -26,6 +31,38 @@ const SITE_B: SiteSummary = {
   name: "Site B",
   hostname: "b.example.com",
 };
+
+test("associates site validation only with the contract-owned fields", () => {
+  expect(prepareSiteCreation(" Coastal Journal ", "JOURNAL.EXAMPLE.TEST")).toEqual({
+    request: { name: "Coastal Journal", hostname: "journal.example.test" },
+    fieldErrors: {},
+  });
+  expect(prepareSiteCreation(" ", "journal.example.test")).toEqual({
+    request: null, fieldErrors: { name: "Enter a valid site name." },
+  });
+  expect(prepareSiteCreation("Journal", "https://journal.example.test")).toEqual({
+    request: null, fieldErrors: { hostname: "Enter a valid hostname." },
+  });
+});
+
+test("only site HTTP conflict receives hostname-specific classification", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const status of [409, 500]) {
+      globalThis.fetch = async () => new Response("untrusted server detail", { status });
+      let failure: unknown;
+      try {
+        await requestSiteCreation(TENANT_A, { name: "Journal", hostname: "journal.example.test" });
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure instanceof Error).toBe(true);
+      expect(failure instanceof SiteHostnameConflictResponseError).toBe(status === 409);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("uses strict credentialed site settings request boundaries", async () => {
   const originalFetch = globalThis.fetch;
