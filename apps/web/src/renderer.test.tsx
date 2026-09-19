@@ -39,10 +39,11 @@ test("maps bounded themes to distinct trusted root styles", () => {
   expect(light).toContain("background-color:#ffffff");
   expect(light).toContain("color:#111111");
   expect(light).toContain("font-family:system-ui");
-  expect(dark).toContain("background-color:#111111");
+  expect(dark).toContain("background-color:#191815");
   expect(dark).toContain("color:#f5f5f5");
   expect(dark).toContain("font-family:Georgia");
   expect(light).not.toContain("background-color:#111111");
+  expect(dark).not.toContain("background-color:#111111");
   expect(dark).not.toContain("background-color:#ffffff");
 });
 

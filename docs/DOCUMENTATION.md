@@ -2520,3 +2520,35 @@ accepted findings retain their dispositions, including F006 NOT REPRODUCED —
 NO FIX CLAIMED and F014 ACCEPTABLE, unless final checks show a regression.
 The target is WCAG 2.2 AA for tested BeHR-owned surfaces, not certification or
 an assertion about arbitrary authored content. S8 has not started.
+
+### S7 human-gate correction — Cocoa Spice
+
+Initial S7 candidate `f02409014821b5f414233a78bfc42830965a2284`
+(`feat(ui): Complete responsive accessibility`) passed the machine gate and
+exact-commit BeHR CI 35467381025. The owner subsequently returned:
+
+**S7 RESPONSIVE AND ACCESSIBILITY: FAIL — public dark-theme background is
+visually too harsh and requires the approved Cocoa Spice #191815 background.**
+
+That candidate is not human-accepted S7. S0-F015 is OPEN — HUMAN-FAILED until
+the corrected public rendering receives a new human verdict. The owner accepted
+the enlarged editor as reflow evidence, not as the ordinary mobile appearance
+target; residual normal-width density remains an S8 review observation, not the
+reason S7 failed. S0-F016 remains RESOLVED subject to correction regression checks.
+
+This first bounded correction changes only the dark background value in the
+existing `readThemeStyle()` authority, from `#111111` to Cocoa Spice `#191815`.
+The existing `#f5f5f5` foreground is preserved: calculated contrast is
+16.2848:1, above the applicable 4.5:1 text requirement. Light colors, sans/serif
+mapping, typography, section widths/spacing, image behavior, public status
+semantics, and preview transport remain unchanged. The renderer test's expected
+dark background is updated and explicitly rejects the former dark canvas.
+No CSS override, theme abstraction, dependency, admin, backend, or infrastructure
+change is introduced.
+
+The corrected exact-SHA public browser matrix and second human verdict are
+separate acceptance gates. At this correction-record stage, re-review is
+NOT RUN; the prior machine PASS does not satisfy the human gate. S8 remains
+NOT STARTED. Unchanged admin and forced-colors surfaces retain their prior
+S7 evidence rather than receiving an unrelated full retest. Screen-reader
+testing remains NOT RUN.

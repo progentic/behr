@@ -37,7 +37,7 @@ function readThemeStyle(theme: ThemeTokens): CSSProperties {
   const colors =
     theme.colorScheme === "light"
       ? { backgroundColor: "#ffffff", color: "#111111" }
-      : { backgroundColor: "#111111", color: "#f5f5f5" };
+      : { backgroundColor: "#191815", color: "#f5f5f5" };
   const fontFamily =
     theme.fontFamily === "sans"
       ? 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
