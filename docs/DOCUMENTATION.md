@@ -2552,3 +2552,145 @@ NOT RUN; the prior machine PASS does not satisfy the human gate. S8 remains
 NOT STARTED. Unchanged admin and forced-colors surfaces retain their prior
 S7 evidence rather than receiving an unrelated full retest. Screen-reader
 testing remains NOT RUN.
+
+---
+
+## Phase S8 — Integrated Usability and Beta-Exit Acceptance
+
+### Accepted runtime and human verdict
+
+The exact S8 beta-exit runtime candidate is
+`896e007907cf7fe91a1eebfa590e399f30088157`
+(`fix(ui): Soften public dark theme`). Exact-commit BeHR CI
+[35469119871](https://github.com/progentic/behr/actions/runs/35469119871)
+completed successfully. S8 machine acceptance is PASS.
+
+On 2026-09-21 the project owner explicitly returned:
+
+**S8 INTEGRATED USABILITY AND BETA EXIT: PASS**
+
+S8 Human Product Acceptance is PASS. S0–S7 remain accepted, Phase S8 is PASS,
+and Phase S is CLOSED under Version 1.19. This records integrated beta-exit
+acceptance, not release certification, upgrade compatibility, final recovery
+certification, tag readiness, or v1.0.0 release readiness. Phase T and Phase U
+remain NOT STARTED.
+
+S7's earlier `f02409014821b5f414233a78bfc42830965a2284` candidate remains
+historically human-failed. The owner separately accepted the Cocoa Spice
+correction at `896e007907cf7fe91a1eebfa590e399f30088157` before S8 began.
+Its dark canvas `#191815` and foreground `#f5f5f5`, measured at approximately
+16.28:1 contrast, remain accepted visual invariants at the existing
+`readThemeStyle()` authority. They must not be casually normalized to pure black
+or another dark neutral during later work.
+
+S8 required zero runtime changes and no corrective implementation commit.
+This documentation-only closure records the accepted runtime; its commit
+identity is distinct from, and does not replace, the runtime candidate above.
+PHASE_PLAN.md remains byte-identical at Version 1.19. S0–S7 historical records
+are preserved rather than rewritten with later verdicts.
+
+### Integrated evidence and provenance
+
+Fresh S8 browser evidence used Microsoft Edge 153.0.4234.48 on macOS 27.0
+(26A428), default 100% browser zoom and DPR 1, against the exact core runtime.
+The owner-approved disposable S8 VM was cloned from the earlier review host;
+only the clone's test database was reset. Existing migrations and the supported
+bootstrap established one owner with zero tenants. Earlier review fixtures
+remained preserved in the original VM. This setup did not recertify Q/R or
+change repository infrastructure.
+
+The machine matrix exercised:
+
+- Fresh owner: login, UI-only first tenant/site/page creation, content entry,
+  manual save, image upload and explicit insertion, preview, publication, and
+  return to the current admin context. No API/SQL resource fixture substituted
+  for these capabilities.
+- Returning owner: multiple tenants/sites/pages, settings, membership,
+  additional creation without selection hijack, and continued authoring.
+- Invited member: visible invitation issuance and transient manual transfer,
+  registration, editing/upload/save/preview, absent owner controls/Publish, and
+  independent tenant ownership without privilege leakage.
+- Authoring integrity: ordinary heading/paragraph/alt typing, explicit save,
+  newer local edits surviving an older save response, dirty preview/publication
+  refusal, and public A → saved draft B/public A → published B/public B.
+- Navigation: cancel and confirm for page, site, tenant, settings, members,
+  logout, and actual browser beforeunload dialogs; clean navigation did not nag.
+- Async/error behavior: delayed creation/upload/preview/publication confinement,
+  validation, real hostname conflict, upload rejection, bounded injected generic
+  failure and stale-publication 409 without retry, and retained work after
+  real session invalidation through normal logout in another tab.
+- Public reading: all light/dark and sans/serif combinations, short/long pages,
+  images, supported section widths/spacing, preview, not-found/unavailable
+  output, exact alt semantics, and Cocoa Spice background continuity.
+
+The Reading study page was an explicitly API-created canonical fixture for
+renderer width/spacing coverage not exposed by editor controls; it is not
+UI-reachability evidence. Uploaded screenshot PNGs were image-file fixtures,
+not reconstructed application evidence. Invitation output was masked and raw
+preview credentials were excluded from retained evidence.
+
+Repository verification passed frozen install, full typecheck, all 137 tests
+(including 33 admin and nine web tests), build, audit, diff checks, and protected
+surface review. No dependency, schema, backend, auth, contract, operational,
+notification, routing, or browser-persistence expansion occurred.
+
+### Human dispositions and remaining polish
+
+The owner issued the integrated PASS after the following three judgment items
+were explicitly presented. No separate item-specific rationale was supplied;
+their current behavior is accepted as-is for beta through that verdict:
+
+- Session recovery wording: session invalidation retains the unsaved draft and
+  shows a generic local save failure. Signing in again in another tab permits
+  saving without draft loss. There is no automatic redirect. Clearer
+  reauthentication guidance remains a possible post-beta polish improvement,
+  not an implemented feature or a closure blocker.
+- Ordinary mobile editor density: normal 320/390px presentation is accepted.
+  Nested boundaries remain a possible refinement, but the larger 200% state is
+  accessibility stress evidence, not a compact visual-composition target.
+- Blue/action hierarchy: the current neutral-dominant presentation, primary
+  Save, quieter preview/publish/upload/reorder actions, and additional primary
+  actions in open creation disclosures are accepted for beta. No palette change
+  or new styling mechanism is authorized by this acceptance.
+
+No demonstrated BLOCKER or unresolved MATERIAL defect prevents the supported
+primary journeys at beta exit. Future findings still require evidence and
+bounded ownership; this verdict is not permission for speculative redesign.
+
+| Finding | Final Phase S disposition |
+| --- | --- |
+| S0-F001 | RESOLVED |
+| S0-F006 | NOT REPRODUCED — NO FIX CLAIMED |
+| S0-F007–S0-F013 | RESOLVED — no integrated regression demonstrated |
+| S0-F014 | ACCEPTABLE |
+| S0-F015 | RESOLVED — HUMAN-CONFIRMED after Cocoa Spice correction |
+| S0-F016 | RESOLVED |
+
+### Accessibility and tooling limits
+
+The executed WCAG 2.2 AA target checks included keyboard operation, visible
+focus, semantic/DOM inspection, labels/descriptions, representative unique IDs,
+approximately 44px primary target geometry, measured contrast, forced-colors
+emulation, image confinement, 1440×900 / 1024×768 / 390×844 / 320×844 reflow,
+and representative 200% root-text enlargement. True 400% browser zoom and
+screen-reader testing are NOT RUN. No screen-reader, full AT, or WCAG
+certification is claimed.
+
+Session testing used real server invalidation through another tab's normal
+logout, not clock-based expiry. Native file selection used browser automation's
+upload operation after keyboard activation; native image selection was
+demonstrated with type-ahead and Tab. Initial harness waits and disclosure/key
+assumptions were corrected and rerun without changing product code.
+
+A harness DNS failure exposed a disposable session cookie in diagnostic output.
+The session was invalidated, diagnostics redacted, forwarding corrected, and
+retained evidence scanned clean. This was an acceptance-harness incident, not a
+BeHR UI leak. It is preserved here rather than hidden or reproduced.
+
+The owner's post-run tooling note records that a local Node execution-timeout
+setting was enabled only after the recorded S8 task and acceptance execution
+had completed. It was NOT active during that run, is NOT S8 verification
+evidence, and no S8 result claims protection from it. Enabling it afterward
+changed no repository file, candidate SHA, or product runtime behavior. S8 was
+not rerun solely because of that setting. If Phase T uses it, Phase T must
+record it in its own execution-environment evidence.
