@@ -1,6 +1,6 @@
 {
   "name": "@bher/api",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,8 +22,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bher/contracts": "workspace:0.1.0",
-    "@bher/db": "workspace:0.1.0",
+    "@bher/contracts": "workspace:1.0.0",
+    "@bher/db": "workspace:1.0.0",
     "better-auth": "1.7.2",
     "hono": "4.13.5"
   },

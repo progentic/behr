@@ -2694,3 +2694,54 @@ evidence, and no S8 result claims protection from it. Enabling it afterward
 changed no repository file, candidate SHA, or product runtime behavior. S8 was
 not rerun solely because of that setting. If Phase T uses it, Phase T must
 record it in its own execution-environment evidence.
+
+---
+
+## Phase T — Release-candidate preparation
+
+Preparation starts from Phase S closure `6f6d5bd6636de7f5b98926252f1b1beb2eb0edbf`
+and preserves accepted runtime `896e007907cf7fe91a1eebfa590e399f30088157`.
+Phase S is CLOSED. Historical Q/R/S evidence is not final-candidate certification.
+
+The root and eight private workspaces move together to 1.0.0, preserving the
+seven existing exact internal dependency edges as `workspace:1.0.0`. No external
+dependency specification, runtime source, migration, test, package script,
+operational executable/configuration, or Phase Plan changes are made.
+
+Bun 1.4.0 did not refresh workspace-only metadata in the existing text lockfile.
+A clean disposable regeneration corrected those fields but also upgraded six
+unrelated packages; that output was rejected and never adopted. The owner
+explicitly approved one deterministic exception for workspace version/reference
+fields only. The original lockfile was preserved outside the repository. A
+byte-level comparison proves all unrelated lockfile content, resolutions and
+integrity values unchanged; frozen installation succeeds. No permanent checker,
+new overrides, dependency upgrade or release framework was introduced.
+
+No existing release-note authority was found. `RELEASE_NOTES.md` establishes the
+bounded v1.0.0 release surface. The declared profile is Ubuntu Server 24.04 LTS
+on aarch64/arm64, systemd/nginx, Bun 1.4.0, local PostgreSQL 16 and local assets;
+desktop Microsoft Edge 153.0.4234.48 on macOS 27.0 at the governed viewports is
+the browser target. The approved fresh host reports Ubuntu 24.04.4/aarch64.
+These claims require frozen-candidate certification; untested architectures,
+browsers, external database topology and native mobile browsers are not implied.
+
+The source model remains an operator-obtained exact clean Git checkout. DNS,
+TLS issuance/renewal, backup scheduling and explicit recovery remain operator
+responsibilities. API boot enablement remains disabled; manual start after reboot
+is documented rather than silently changed. Supported predecessor is NONE;
+predecessor-dependent upgrade gates are NOT APPLICABLE.
+
+README gains installation/support pointers. Current-state architecture prose
+that incorrectly described implemented Phase Q boundaries as future work is
+reconciled. The owner separately authorized correcting the protected nginx
+README's blanket claim that BeHR does not verify certificates: the first-run
+installer validates supplied TLS material without owning issuance or renewal.
+Historical phase records remain intact.
+
+At this preparation-record stage, Phase T certification is NOT RUN. After
+preparation gates and exact-commit CI pass, that exact commit is frozen.
+Certification evidence remains external; there will be no post-certification
+documentation-only commit. Any repository-content correction creates a new
+candidate and resets applicable evidence. Phase U alone may tag/publish the
+exact T-certified SHA with zero repository-content changes. No release is
+created by this preparation.

@@ -101,9 +101,9 @@ flowchart TD
 
 Interpretation:
 
-The admin document is an explicit `/` route, not a universal fallback. nginx
-will eventually reproduce this public topology in Phase Q without changing the
-implemented Hono route paths.
+The development admin document is an explicit `/` route, not a universal
+fallback. The implemented production nginx boundary serves the appropriate
+admin/public static build and proxies the existing Hono route paths.
 
 Admin Panel
 
@@ -547,7 +547,8 @@ worker, cache, or orphan-cleanup process.
 # 5. Request Lifecycle
 
 The following sequence describes the implemented one-origin development path.
-Phase Q will place nginx in front of the same routes without changing them.
+The implemented Phase Q production boundary places nginx in front of the same
+routes without changing them.
 
 ```mermaid
 sequenceDiagram
@@ -656,7 +657,7 @@ Untrusted
 
 Reverse Proxy (Phase Q)
 
-Future network enforcement boundary
+Implemented production network enforcement boundary
 
 API Backend
 
@@ -689,7 +690,7 @@ Security rules:
 
 The Phase C admin entry document includes a restrictive meta-delivered CSP for
 same-origin scripts, connections, and form actions. Clickjacking protection
-must be delivered as an HTTP header by the reverse proxy in Phase Q because
+is delivered as an HTTP header by the Phase Q reverse proxy because
 `frame-ancestors` is not enforced from a meta CSP.
 
 ## 7.1 Server Failure Reporting
@@ -714,9 +715,9 @@ so Bun's contextual development error page is not exposed.
 Both logs use stderr as the v1 sink. They never include query strings, headers,
 cookies, bodies, credentials, tokens, session IDs, physical paths, raw error
 messages, stacks, or causes. Logging is best-effort and cannot replace the safe
-response. No logging dependency, remote collector, client telemetry, or access
-logging is implemented; Phase Q may later own service/journal collection and
-request logging.
+response. No logging dependency, remote collector, or client telemetry is
+implemented. Phase Q provides systemd journal collection and nginx request
+logging; the application error records remain separate from access logs.
 
 ## 7.2 Client Render Failure Boundaries
 
@@ -746,7 +747,9 @@ Local filesystem storage
 
 Optional separation:
 
-PostgreSQL may be hosted externally if operationally justified.
+Phase Q permits operator-provisioned external PostgreSQL where operationally
+justified. That architectural allowance is not a v1.0.0 certification claim;
+the release's certified first-run profile is local PostgreSQL 16.
 
 No horizontal scaling assumptions exist in version 1.
 
@@ -765,6 +768,12 @@ Production paths are fixed:
 root-owned environment through systemd, restarts on process failure, writes
 stdout/stderr to journald, protects the application/system/home trees, and
 grants write access only to the upload root.
+
+The installer/deploy path starts the API but does not enable it for automatic
+boot startup. `Restart=on-failure` applies once the service is running. Following
+a host reboot, the operator verifies PostgreSQL/nginx availability and explicitly
+starts `bhr-api.service`, then verifies health. Automatic boot enablement is not
+part of the accepted deployment behavior.
 
 `deploy.sh` validates the selected clean checkout and host prerequisites,
 builds before service mutation, installs and validates nginx/systemd config,

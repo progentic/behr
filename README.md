@@ -1,4 +1,4 @@
-# BeHR
+# BeHR v1.0.0
 
 <p align="center"><strong>A Modern CMS for Multi-Site Publishing</strong></p>
 
@@ -32,5 +32,28 @@ flowchart TB
     Core --> Media["Media storage"]
 ```
 
-Explore the [project documentation](docs/) for the product vision and system
-design. BeHR is available under the [BSD 3-Clause License](LICENSE).
+## Installation and operations
+
+The v1.0.0 release profile is one Ubuntu Server 24.04 LTS VPS on
+`aarch64`/Ubuntu `arm64`, with systemd, nginx, Bun 1.4.0, local PostgreSQL 16,
+and local filesystem assets. DNS and trusted TLS material/renewal are supplied
+by the operator. Other platforms and external-database deployments are not
+covered by this release's certification profile.
+
+Use an operator-obtained **clean Git checkout**. After Phase U publishes the
+release, clone this repository, check out the exact `v1.0.0` tag, and run
+`sudo ./infra/scripts/install.sh` interactively from that checkout. GitHub
+source ZIP/tarball archives are not supported installer inputs. The installer
+does not select or update your Git revision.
+
+Read [release notes and support boundaries](RELEASE_NOTES.md) and the
+[installer/operator documentation](infra/scripts/README.md) before installation.
+Deployments require a maintenance window. Backup scheduling and explicit
+destructive restore/recovery remain operator responsibilities. The installer
+starts the API but does not enable automatic API startup after a host reboot;
+see the release notes for the manual-start responsibility.
+
+Version metadata alone does not publish a release: Phase T must certify the
+exact candidate and Phase U must perform the zero-content-change release lock.
+Explore the [project documentation](docs/) for architecture and phase history.
+BeHR is available under the [BSD 3-Clause License](LICENSE).

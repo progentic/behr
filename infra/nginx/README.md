@@ -14,7 +14,9 @@ auth/tenant administration paths.
 
 TLS material is operator-managed at `/etc/bhr-cms/tls`. The installed
 certificate must cover the admin hostname and every tenant hostname intended
-for service. BeHR does not issue, renew, or verify certificates.
+for service. BeHR does not issue or renew certificates. The first-run installer
+validates operator-supplied TLS material before installing it; ongoing issuance,
+hostname coverage, and renewal remain operator responsibilities.
 
 The access-log format uses `$uri`, not the query-bearing request target. It does
 not log cookies, authorization, preview/invitation credentials, bodies, or
