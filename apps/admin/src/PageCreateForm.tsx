@@ -95,11 +95,12 @@ export function PageCreateForm({
 
   return (
     <section aria-labelledby="create-page-title">
-      <h3 id="create-page-title">Create page</h3>
+      <h2 id="create-page-title">Create page</h2>
       <form onSubmit={(event) => void submitPage(event)}>
         <label htmlFor="page-title">Title</label>
         <input
           ref={titleInput}
+          autoFocus
           id="page-title"
           maxLength={200}
           value={title}

@@ -1,674 +1,194 @@
 :root {
-  color: #171717;
-  background: #f5f5f5;
-  font-family:
-    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   font-size: 100%;
-  --admin-canvas: #f5f5f5;
-  --admin-surface: #ffffff;
-  --admin-surface-muted: #fafafa;
-  --admin-text: #171717;
-  --admin-text-muted: #525252;
-  --admin-border: #d4d4d4;
-  --admin-border-strong: #8a8a8a;
-  --admin-blue: #0759c7;
-  --admin-blue-hover: #064ba6;
-  --admin-blue-soft: #eaf2ff;
-  --admin-red: #b42318;
-  --admin-red-soft: #fff1f0;
-  --admin-green: #17663a;
-  --admin-green-soft: #edf8f1;
-  --admin-focus: #0759c7;
-  --admin-radius-small: 0.5rem;
-  --admin-radius: 0.75rem;
-  --admin-space-2: 0.5rem;
-  --admin-space-3: 0.75rem;
-  --admin-space-4: 1rem;
-  --admin-space-5: 1.5rem;
-  --admin-space-6: 2rem;
-  --admin-content: 76rem;
-  --admin-form: 34rem;
+  color: #2a3547;
+  background: #f4f7fa;
+  --admin-canvas: #f4f7fa;
+  --admin-surface: #fff;
+  --admin-surface-muted: #f4f7fa;
+  --admin-text: #2a3547;
+  --admin-text-muted: #52647d;
+  --admin-muted-accent: #7c8fac;
+  --admin-blue: #5d87ff;
+  --admin-blue-soft: #ecf2ff;
+  --admin-blue-ink: #294aab;
+  --admin-on-blue: #10213b;
+  --admin-red: #fa896b;
+  --admin-red-soft: #fdede8;
+  --admin-red-ink: #9e321d;
+  --admin-green: #13deb9;
+  --admin-green-soft: #e6fffa;
+  --admin-green-ink: #096650;
+  --admin-warning: #ffae1f;
+  --admin-warning-soft: #fef5e5;
+  --admin-secondary: #49beff;
+  --admin-border: #eaeff4;
+  --admin-border-strong: #7c8a9d;
+  --admin-focus: #294aab;
+  --admin-radius: 12px;
+  --admin-form: 36rem;
   --admin-control-size: 2.75rem;
+  --admin-shadow: 0 4px 24px rgb(0 0 0 / 0.04);
+}
+* { box-sizing: border-box; }
+html { background: var(--admin-canvas); }
+.behr-admin { margin: 0; min-block-size: 100vh; color: var(--admin-text); background: var(--admin-canvas); font-size: .9375rem; line-height: 1.5; }
+.behr-admin button, .behr-admin input, .behr-admin select, .behr-admin textarea {
+  max-inline-size: 100%; min-inline-size: 0; min-block-size: var(--admin-control-size);
+  font: inherit; line-height: 1.4; color: var(--admin-text);
+  border: 1px solid var(--admin-border-strong); border-radius: 8px; background: var(--admin-surface);
+}
+.behr-admin button { min-inline-size: var(--admin-control-size); padding: .55rem .85rem; font-weight: 600; cursor: pointer; overflow-wrap: anywhere; }
+.behr-admin button:hover:not(:disabled) { border-color: var(--admin-blue-ink); background: var(--admin-blue-soft); }
+.behr-admin input, .behr-admin select, .behr-admin textarea { inline-size: 100%; padding: .6rem .75rem; font-size: 1rem; }
+.behr-admin textarea { min-block-size: 7rem; resize: vertical; }
+.behr-admin .button-primary { background: var(--admin-blue); border-color: var(--admin-blue); color: var(--admin-on-blue); }
+.behr-admin .button-primary:hover:not(:disabled) { background: var(--admin-blue); border-color: var(--admin-blue-ink); box-shadow: 0 2px 8px rgb(93 135 255 / .22); }
+.behr-admin .button-danger { color: var(--admin-red-ink); border-color: var(--admin-red-ink); background: var(--admin-red-soft); }
+.behr-admin button:disabled, .behr-admin input:disabled, .behr-admin select:disabled, .behr-admin textarea:disabled {
+  color: var(--admin-text-muted); background: var(--admin-canvas); cursor: not-allowed; border-style: dashed; opacity: 1;
+}
+.behr-admin :focus-visible { outline: 3px solid var(--admin-focus); outline-offset: 3px; }
+.behr-admin h1, .behr-admin h2, .behr-admin h3 { margin: 0; line-height: 1.3; font-weight: 600; letter-spacing: -.015em; overflow-wrap: anywhere; }
+.behr-admin h1 { font-size: 1.5rem; }
+.behr-admin h2 { font-size: 1.125rem; }
+.behr-admin h3 { font-size: 1rem; }
+.behr-admin p, .behr-admin ul, .behr-admin dl { margin: 0; }
+.behr-admin label, .behr-admin dt { font-size: .875rem; font-weight: 600; }
+.behr-admin code, .behr-admin output { font: inherit; overflow-wrap: anywhere; }
+.behr-admin a { color: var(--admin-blue-ink); text-underline-offset: .2em; }
+.behr-admin form { display: grid; gap: .5rem; inline-size: min(100%, var(--admin-form)); }
+.behr-admin form > button { justify-self: start; margin-block-start: .5rem; }
+.behr-admin ul { list-style: none; padding: 0; display: grid; gap: .5rem; }
+.behr-admin li { min-inline-size: 0; overflow-wrap: anywhere; }
+.behr-admin .field-help, .behr-admin .field-error { font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
+.behr-admin .field-help { color: var(--admin-text-muted); }
+.behr-admin [role="alert"], .behr-admin .field-error, .behr-admin [aria-invalid="true"] + p { color: var(--admin-red-ink); }
+.behr-admin [role="alert"] { padding: .75rem 1rem; border-inline-start: 3px solid var(--admin-red); border-radius: 8px; background: var(--admin-red-soft); }
+.behr-admin [role="status"] { color: var(--admin-text-muted); font-size: .875rem; }
+.behr-admin .status-success, .behr-admin .saved { color: var(--admin-green-ink); }
+.behr-admin .status-success { padding: .5rem .75rem; background: var(--admin-green-soft); border-radius: 8px; }
+.behr-admin summary { cursor: pointer; min-block-size: var(--admin-control-size); padding: .65rem .75rem; font-size: .875rem; font-weight: 600; border-radius: 8px; }
+.behr-admin summary:hover { background: var(--admin-surface-muted); }
+.behr-admin input[type="file"]::file-selector-button { display: block; max-inline-size: 100%; min-block-size: var(--admin-control-size); margin-block-end: .5rem; padding: .5rem .75rem; font: inherit; white-space: normal; }
+.auth-page { display: grid; align-content: center; gap: 1rem; inline-size: min(100% - 2rem, 38rem); min-block-size: 100vh; margin-inline: auto; padding-block: 2rem; }
+.auth-page > p { color: var(--admin-text-muted); }
+.auth-page > form, .auth-invitation { inline-size: 100%; padding: 1.5rem; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: var(--admin-shadow); }
+.auth-page > form { border-block-start: 3px solid var(--admin-blue); }
+.auth-invitation { display: grid; gap: 1rem; }
+.auth-invitation form { inline-size: 100%; }
+.admin-shell { display: grid; grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: minmax(70px, auto) minmax(0, 1fr); block-size: 100dvh; }
+.admin-shell-empty { grid-template-columns: minmax(0, 1fr); }
+.app-header { grid-column: 2; display: flex; align-items: center; gap: 1rem; min-inline-size: 0; padding: .75rem 1.5rem; background: var(--admin-surface); border-block-end: 1px solid var(--admin-border); }
+.admin-shell-empty .app-header, .admin-shell-empty .workspace-content { grid-column: 1; }
+.header-brand, .sidebar-brand strong { font-size: 1.375rem; font-weight: 700; }
+.header-context { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .75rem; min-inline-size: 0; overflow-wrap: anywhere; }
+.header-context > span { font-size: .8125rem; color: var(--admin-text-muted); }
+.header-context > strong { font-size: .9375rem; font-weight: 600; }
+.account-controls { margin-inline-start: auto; display: flex; align-items: center; gap: 1rem; min-inline-size: 0; }
+.account-controls span { font-size: .875rem; overflow-wrap: anywhere; }
+.account-menu { margin-inline-start: auto; min-inline-size: 0; }
+.account-menu > summary { display: none; }
+.workspace-sidebar { grid-column: 1; grid-row: 1 / 3; position: static; margin: 0; padding: 0; inline-size: 100%; block-size: 100%; max-inline-size: none; max-block-size: none; border: 0; border-inline-end: 1px solid var(--admin-border); color: var(--admin-text); background: var(--admin-surface); overflow-y: auto; }
+.workspace-sidebar[open] { display: flex; flex-direction: column; }
+.sidebar-brand { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-block-size: 70px; padding: 1rem 1.5rem; border-block-end: 1px solid var(--admin-border); }
+.sidebar-toggle, .sidebar-close { display: none; }
+.workspace-navigation { display: grid; gap: 1.5rem; padding: 1.5rem; overflow-wrap: anywhere; }
+.tenant-context, .site-context { display: grid; gap: .5rem; }
+.workspace-navigation h2 { font-size: .875rem; color: var(--admin-text-muted); }
+.workspace-navigation select { font-size: .875rem; }
+.workspace-views, .workspace-create-actions { display: grid; gap: .25rem; }
+.workspace-create-actions { padding-block-start: 1rem; border-block-start: 1px solid var(--admin-border); }
+.behr-admin .workspace-views button, .behr-admin .workspace-create-actions button { text-align: start; inline-size: 100%; border-color: transparent; background: transparent; font-size: .875rem; }
+.behr-admin .workspace-views button[aria-pressed="true"] { color: var(--admin-blue-ink); background: var(--admin-blue-soft); }
+.selectable-resource-item > button { display: grid; gap: .2rem; inline-size: 100%; text-align: start; }
+.selectable-resource-item > button > span { color: var(--admin-text-muted); font-size: .8125rem; font-weight: 400; overflow-wrap: anywhere; }
+.behr-admin .selectable-resource-item > button { border-color: transparent; font-size: .875rem; }
+.behr-admin .selectable-resource-item > button[aria-pressed="true"] { background: var(--admin-blue-soft); color: var(--admin-blue-ink); border-inline-start: 3px solid var(--admin-blue); }
+.workspace-content { grid-column: 2; min-inline-size: 0; min-block-size: 0; overflow-y: auto; padding: 1.5rem; container-type: size; }
+.workspace-context { display: grid; gap: .25rem; margin-block-end: 1.5rem; overflow-wrap: anywhere; }
+.workspace-context > span, .workspace-context > p { font-size: .875rem; color: var(--admin-text-muted); }
+.creation-result { margin-block-end: 1rem; }
+.task-panel, .active-workspace > section:not(.pages-surface) { position: relative; display: grid; gap: 1rem; padding: 1.5rem; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: var(--admin-shadow); }
+.task-panel > section { display: grid; gap: 1rem; }
+.first-tenant { max-inline-size: 42rem; margin-inline: auto; }
+.behr-admin .task-close { justify-self: end; }
+.pages-surface { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.pages-heading { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.page-creation { grid-column: 1 / -1; }
+.page-management { position: sticky; inset-block-start: 0; min-inline-size: 0; padding: .5rem; background: var(--admin-surface); border-radius: var(--admin-radius); border: 1px solid var(--admin-border); max-block-size: calc(100dvh - 10rem); overflow-y: auto; }
+.page-management summary { color: var(--admin-text-muted); }
+.page-management ul { padding-block: .5rem; }
+.page-editor-slot { min-inline-size: 0; }
+.empty-workspace { padding: 1.5rem; color: var(--admin-text-muted); }
+.editor-surface { display: grid; gap: 1rem; min-inline-size: 0; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: var(--admin-shadow); padding: 1rem; overflow-wrap: anywhere; }
+.editor-command-bar { position: sticky; inset-block-start: -1px; z-index: 5; display: grid; gap: .5rem; margin: -1rem -1rem 0; padding: 1rem; background: var(--admin-surface); border-block-end: 1px solid var(--admin-border); border-radius: var(--admin-radius) var(--admin-radius) 0 0; max-block-size: 45cqh; overflow-y: auto; }
+.editor-page-context { display: grid; gap: .15rem; }
+.editor-page-context h2 { font-size: 1.125rem; }
+.editor-page-context .field-help { font-size: .8125rem; }
+.editor-page-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: start; }
+.page-publication { display: grid; gap: .25rem; flex: 1 1 15rem; min-inline-size: 0; }
+.editor-actions, .editor-add-block { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.behr-admin .publication-feedback { display: flex; flex-wrap: wrap; gap: .2rem .75rem; align-items: center; padding: 0; background: transparent; }
+.publication-feedback a { display: inline-flex; align-items: center; min-block-size: 2.75rem; }
+.editor-save-state { min-block-size: 1.3em; }
+.editor-images > form { margin-block: .5rem; }
+.editor-section { display: grid; gap: .75rem; min-inline-size: 0; border-block-start: 1px solid var(--admin-border); padding-block: .75rem; }
+.section-heading { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: .5rem; }
+.editor-block { display: grid; gap: .5rem; min-inline-size: 0; padding: .75rem 0; border-block-start: 1px solid var(--admin-border); }
+.editor-item-tools { display: flex; align-items: start; justify-content: end; gap: .25rem; min-inline-size: 0; }
+.behr-admin .editor-item-tools > button, .editor-action-disclosure > summary { border-color: transparent; color: var(--admin-text-muted); background: transparent; font-size: .875rem; padding-inline: .5rem; }
+.editor-action-disclosure > .editor-actions { padding-block: .25rem; }
+.behr-admin .editor-actions > button { font-size: .875rem; padding-inline: .65rem; }
+.block-properties { color: var(--admin-text-muted); font-size: .875rem; }
+.block-properties[open] { display: grid; gap: .5rem; }
+.editor-add-block { padding-block-start: .5rem; }
+.editor-add-block > label { margin-inline-start: auto; }
+.editor-add-block > select { inline-size: auto; max-inline-size: 16rem; }
+.editor-block input, .editor-block textarea { scroll-margin-block: .5rem 1rem; }
+.active-workspace dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .5rem 1rem; }
+.active-workspace dd { margin: 0; color: var(--admin-text-muted); overflow-wrap: anywhere; }
+.active-workspace > section > ul > li { padding: .75rem 0; border-block-end: 1px solid var(--admin-border); }
+.invitation-result { display: grid; gap: .75rem; max-inline-size: var(--admin-form); }
+.behr-admin output { display: block; padding: .75rem; border-radius: 8px; background: var(--admin-canvas); }
+@media (max-width: 74.999rem) {
+  .pages-surface { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  .page-management { position: static; max-block-size: none; }
+}
+@media (max-width: 59.999rem) {
+  .admin-shell { grid-template-columns: minmax(0, 1fr); }
+  .app-header, .workspace-content { grid-column: 1; }
+  .app-header { padding: .5rem 1rem; gap: .5rem; }
+  .sidebar-toggle, .sidebar-close { display: block; }
+  .workspace-sidebar { position: fixed; inset: 0 auto 0 0; margin: 0; inline-size: min(22rem, calc(100% - 1.5rem)); block-size: 100dvh; max-block-size: 100dvh; border: 0; box-shadow: 4px 0 24px rgb(0 0 0 / .1); }
+  .workspace-sidebar::backdrop { background: rgb(16 33 59 / .35); }
+  .workspace-content { padding: 1rem; }
+  .header-context { display: grid; gap: 0; }
+  .account-controls { flex-direction: column; align-items: end; gap: .25rem; }
+  .account-controls span { max-inline-size: 10rem; font-size: .8125rem; }
+  .account-menu { position: relative; }
+  .account-menu > summary { display: block; padding-inline: .5rem; border: 1px solid var(--admin-border-strong); }
+  .account-menu[open] > .account-controls { position: absolute; inset-inline-end: 0; inset-block-start: 100%; z-index: 20; padding: 1rem; border: 1px solid var(--admin-border); background: var(--admin-surface); border-radius: 8px; box-shadow: var(--admin-shadow); inline-size: min(18rem, 85vw); }
 }
-
-* {
-  box-sizing: border-box;
-}
-
-html {
-  background: var(--admin-canvas);
-}
-
-.behr-admin {
-  min-block-size: 100vh;
-  margin: 0;
-  color: var(--admin-text);
-  background: var(--admin-canvas);
-  font-size: 0.9375rem;
-  line-height: 1.5;
-}
-
-.behr-admin button,
-.behr-admin input,
-.behr-admin select,
-.behr-admin textarea {
-  max-inline-size: 100%;
-  min-block-size: var(--admin-control-size);
-  border: 1px solid var(--admin-border-strong);
-  border-radius: var(--admin-radius-small);
-  color: var(--admin-text);
-  background: var(--admin-surface);
-  font: inherit;
-  font-size: 1rem;
-  line-height: 1.3;
-}
-
-.behr-admin input,
-.behr-admin select,
-.behr-admin textarea {
-  inline-size: 100%;
-  padding: 0.625rem 0.75rem;
-}
-
-.behr-admin textarea {
-  min-block-size: 6rem;
-  resize: vertical;
-}
-
-.behr-admin input[type="file"]::file-selector-button {
-  display: block;
-  max-inline-size: 100%;
-  min-block-size: var(--admin-control-size);
-  margin: 0 0 var(--admin-space-2);
-  padding: 0.625rem 0.75rem;
-  font: inherit;
-  white-space: normal;
-}
-
-.behr-admin button {
-  inline-size: fit-content;
-  padding: 0.625rem 1rem;
-  cursor: pointer;
-  font-weight: 650;
-}
-
-.behr-admin button:hover:not(:disabled) {
-  border-color: var(--admin-text-muted);
-  background: var(--admin-surface-muted);
-}
-
-.behr-admin button:active:not(:disabled) {
-  background: #e5e5e5;
-}
-
-.behr-admin .button-primary {
-  border-color: var(--admin-blue);
-  color: #ffffff;
-  background: var(--admin-blue);
-}
-
-.behr-admin .button-primary:hover:not(:disabled) {
-  border-color: var(--admin-blue-hover);
-  background: var(--admin-blue-hover);
-}
-
-.behr-admin .button-primary:active:not(:disabled) {
-  border-color: #043d88;
-  background: #043d88;
-}
-
-.behr-admin .button-danger {
-  border-color: var(--admin-red);
-  color: var(--admin-red);
-  background: var(--admin-surface);
-}
-
-.behr-admin .button-danger:hover:not(:disabled) {
-  background: var(--admin-red-soft);
-}
-
-.behr-admin .button-danger:active:not(:disabled) {
-  background: #ffe2df;
-}
-
-.behr-admin button:disabled,
-.behr-admin input:disabled,
-.behr-admin select:disabled,
-.behr-admin textarea:disabled {
-  cursor: not-allowed;
-  opacity: 1;
-  color: var(--admin-text-muted);
-  background: var(--admin-canvas);
-  border-style: dashed;
-}
-
-.behr-admin :focus-visible {
-  outline: 3px solid var(--admin-focus);
-  outline-offset: 3px;
-}
-
-.behr-admin h1,
-.behr-admin h2,
-.behr-admin h3 {
-  margin-block: 0;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.behr-admin h1 {
-  font-size: clamp(1.75rem, 3vw, 2rem);
-  font-weight: 750;
-}
-
-.behr-admin h2 {
-  font-size: 1.25rem;
-  font-weight: 720;
-}
-
-.behr-admin h3 {
-  font-size: 1.0625rem;
-  font-weight: 700;
-}
-
-.behr-admin p,
-.behr-admin dl,
-.behr-admin ul {
-  margin-block: 0;
-}
-
-.behr-admin label,
-.behr-admin dt,
-.behr-admin legend {
-  font-weight: 650;
-}
-
-.behr-admin code,
-.behr-admin output {
-  overflow-wrap: anywhere;
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-}
-
-.behr-admin output {
-  display: block;
-  padding: var(--admin-space-3);
-  border: 1px solid var(--admin-border);
-  border-radius: var(--admin-radius-small);
-  background: var(--admin-surface-muted);
-}
-
-.behr-admin form {
-  display: grid;
-  inline-size: min(100%, var(--admin-form));
-  gap: var(--admin-space-2);
-}
-
-.behr-admin form > button {
-  margin-block-start: var(--admin-space-2);
-}
-
-.behr-admin ul {
-  display: grid;
-  gap: var(--admin-space-2);
-  padding: 0;
-  list-style: none;
-}
-
-.behr-admin li {
-  min-inline-size: 0;
-  padding: var(--admin-space-3);
-  border: 1px solid var(--admin-border);
-  border-radius: var(--admin-radius-small);
-  background: var(--admin-surface-muted);
-  overflow-wrap: anywhere;
-}
-
-.behr-admin .selectable-resource-item > button {
-  inline-size: 100%;
-  text-align: start;
-}
-
-.behr-admin .selectable-resource-item > button[aria-pressed="true"] {
-  border-color: var(--admin-blue);
-  color: #064698;
-  background: var(--admin-blue-soft);
-}
-
-.behr-admin .selectable-resource-item > button[aria-pressed="true"]:hover:not(:disabled) {
-  border-color: var(--admin-blue-hover);
-  color: #043d88;
-  background: #dceaff;
-}
-
-.behr-admin [role="alert"],
-.behr-admin .field-error,
-.behr-admin [aria-invalid="true"] + p {
-  color: var(--admin-red);
-}
-
-.behr-admin .field-help,
-.behr-admin .field-error {
-  font-size: 0.875rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.behr-admin .field-help {
-  color: var(--admin-text-muted);
-}
-
-.behr-admin .invitation-result {
-  display: grid;
-  gap: var(--admin-space-3);
-  max-inline-size: var(--admin-form);
-}
-
-.behr-admin [role="alert"] {
-  padding: var(--admin-space-3) var(--admin-space-4);
-  border-inline-start: 4px solid var(--admin-red);
-  border-radius: var(--admin-radius-small);
-  background: var(--admin-red-soft);
-}
-
-.behr-admin [role="status"] {
-  padding: var(--admin-space-3) var(--admin-space-4);
-  border-inline-start: 4px solid var(--admin-border-strong);
-  border-radius: var(--admin-radius-small);
-  color: var(--admin-text-muted);
-  background: var(--admin-surface-muted);
-}
-
-.behr-admin .status-success {
-  border-inline-start-color: var(--admin-green);
-  color: var(--admin-green);
-  background: var(--admin-green-soft);
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: var(--admin-space-3);
-  padding: var(--admin-space-3) clamp(1rem, 4vw, 2rem);
-  border-block-end: 1px solid var(--admin-border);
-  background: var(--admin-surface);
-}
-
-.app-header strong {
-  margin-inline-end: auto;
-  font-size: 1.125rem;
-  letter-spacing: -0.02em;
-}
-
-.app-header span {
-  min-inline-size: 0;
-  color: var(--admin-text-muted);
-  overflow-wrap: anywhere;
-}
-
-.admin-main {
-  inline-size: min(100%, var(--admin-content));
-  margin-inline: auto;
-  padding: clamp(1rem, 4vw, 2rem);
-}
-
-.auth-page {
-  display: grid;
-  inline-size: min(100% - 2rem, 48rem);
-  min-block-size: 100vh;
-  align-content: center;
-  gap: var(--admin-space-4);
-  margin-inline: auto;
-  padding-block: var(--admin-space-6);
-}
-
-.auth-page > p {
-  max-inline-size: 42rem;
-  color: var(--admin-text-muted);
-  font-size: 1rem;
-}
-
-.auth-page > form,
-.auth-invitation {
-  padding: clamp(1rem, 4vw, 1.5rem);
-  border: 1px solid var(--admin-border);
-  border-radius: var(--admin-radius);
-  background: var(--admin-surface);
-  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 0.06);
-}
-
-.auth-page > form {
-  border-block-start: 4px solid var(--admin-blue);
-}
-
-.auth-invitation {
-  display: grid;
-  gap: var(--admin-space-4);
-}
-
-.auth-invitation > h2 {
-  color: var(--admin-text-muted);
-}
-
-.behr-admin .button-secondary {
-  border-color: var(--admin-border-strong);
-  color: var(--admin-text);
-  background: var(--admin-surface);
-}
-
-.behr-admin .button-secondary:hover:not(:disabled) {
-  border-color: var(--admin-text-muted);
-  background: var(--admin-surface-muted);
-}
-
-.workspace {
-  display: grid;
-  gap: var(--admin-space-5);
-}
-
-.workspace-shell {
-  display: grid;
-  grid-template-columns: 18rem minmax(0, 1fr);
-  min-block-size: calc(100vh - 4.25rem);
-}
-
-.first-tenant {
-  max-inline-size: 42rem;
-}
-
-.tenant-create-disclosure > summary {
-  padding: var(--admin-space-3) 0;
-  min-block-size: var(--admin-control-size);
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.tenant-create-disclosure > form {
-  margin-block-start: var(--admin-space-3);
-}
-
-.workspace-navigation {
-  display: grid;
-  align-content: start;
-  gap: var(--admin-space-4);
-  min-inline-size: 0;
-  padding: var(--admin-space-5);
-  border-inline-end: 1px solid var(--admin-border);
-  background: var(--admin-surface-muted);
-  overflow-wrap: anywhere;
-}
-
-.tenant-context {
-  display: grid;
-  gap: var(--admin-space-2);
-  padding-block-end: var(--admin-space-4);
-  border-block-end: 1px solid var(--admin-border);
-}
-
-.tenant-context > span,
-.workspace-context > span,
-.workspace-context > p {
-  color: var(--admin-text-muted);
-}
-
-.workspace-navigation > section {
-  display: grid;
-  gap: var(--admin-space-4);
-  margin-block-start: var(--admin-space-4);
-  padding-block-start: var(--admin-space-5);
-  border-block-start: 1px solid var(--admin-border);
-}
-
-.workspace-navigation .selectable-resource-item {
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.workspace-navigation .selectable-resource-item > button {
-  display: grid;
-  gap: 0.25rem;
-  overflow-wrap: anywhere;
-}
-
-.workspace-navigation .selectable-resource-item span {
-  color: var(--admin-text-muted);
-  font-size: 0.9375rem;
-  font-weight: 400;
-}
-
-.workspace-content {
-  align-content: start;
-  min-inline-size: 0;
-  padding: clamp(1rem, 3vw, 2rem);
-}
-
-.workspace-context {
-  display: grid;
-  gap: var(--admin-space-2);
-  overflow-wrap: anywhere;
-}
-
-.workspace-views {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--admin-space-2);
-  border-block-end: 1px solid var(--admin-border);
-}
-
-.behr-admin .workspace-views > button {
-  inline-size: auto;
-  border: 0;
-  border-block-end: 3px solid transparent;
-  border-radius: 0;
-  color: var(--admin-text-muted);
-  background: transparent;
-}
-
-.behr-admin .workspace-views > button[aria-pressed="true"] {
-  border-block-end-color: var(--admin-blue);
-  color: var(--admin-blue);
-}
-
-.workspace-content > section[aria-labelledby] {
-  display: grid;
-  min-inline-size: 0;
-  gap: var(--admin-space-4);
-}
-
-.workspace dl {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--admin-space-2) var(--admin-space-4);
-}
-
-.workspace dd {
-  margin: 0;
-  color: var(--admin-text-muted);
-  overflow-wrap: anywhere;
-}
-
-.editor-surface {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--admin-space-4);
-  min-inline-size: 0;
-  align-content: start;
-  overflow-wrap: anywhere;
-}
-
-@media (forced-colors: active) {
-  .behr-admin .selectable-resource-item > button[aria-pressed="true"],
-  .behr-admin .workspace-views > button[aria-pressed="true"] {
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
-  }
-}
-
-.editor-section {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--admin-space-3);
-  min-inline-size: 0;
-  padding: var(--admin-space-4);
-  border: 1px solid var(--admin-border-strong);
-  border-radius: var(--admin-radius);
-  background: var(--admin-surface-muted);
-}
-
-.editor-section legend {
-  padding-inline: var(--admin-space-2);
-}
-
-.editor-section > label,
-.editor-section > select,
-.editor-block {
-  grid-column: 1 / -1;
-}
-
-.editor-block {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--admin-space-3);
-  min-inline-size: 0;
-  padding: var(--admin-space-4);
-  border: 0;
-  border-inline-start: 3px solid var(--admin-border);
-  background: var(--admin-surface);
-}
-
-.workspace-content > .pages-surface {
-  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
-  align-items: start;
-}
-
-.page-management {
-  display: grid;
-  gap: var(--admin-space-4);
-  min-inline-size: 0;
-}
-
-.page-management .selectable-resource-item {
-  border: 0;
-  padding: 0;
-}
-
-.page-management .selectable-resource-item > button {
-  display: grid;
-  gap: 0.25rem;
-}
-
-.page-management .selectable-resource-item span {
-  font-weight: 400;
-  color: var(--admin-text-muted);
-  overflow-wrap: anywhere;
-}
-
-.page-create-disclosure > summary,
-.editor-images > summary,
-.block-properties > summary {
-  min-block-size: var(--admin-control-size);
-  padding-block: var(--admin-space-3);
-  cursor: pointer;
-  font-weight: 650;
-}
-
-.page-create-disclosure > section,
-.editor-images > form,
-.block-properties[open] {
-  display: grid;
-  gap: var(--admin-space-3);
-}
-
-.editor-page-actions,
-.page-publication,
-.prepared-preview,
-.publication-result {
-  display: grid;
-  gap: var(--admin-space-3);
-}
-
-.editor-page-actions {
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: start;
-}
-
-.editor-actions,
-.editor-add-block {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--admin-space-2);
-  align-items: center;
-}
-
-.behr-admin .editor-actions > button,
-.behr-admin .editor-add-block > button {
-  inline-size: auto;
-  padding-inline: var(--admin-space-3);
-  overflow-wrap: anywhere;
-}
-
-.editor-add-block > select,
-.editor-add-block > label {
-  flex-basis: 100%;
-}
-
-.behr-admin .page-publication a {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: var(--admin-control-size);
-  color: var(--admin-blue);
-  overflow-wrap: anywhere;
-}
-
-.editor-block > label,
-.editor-block > input,
-.editor-block > textarea,
-.editor-block > p,
-.editor-block > select {
-  grid-column: 1 / -1;
-}
-
 @media (max-width: 40rem) {
-  .editor-section,
-  .editor-block {
-    padding: var(--admin-space-2);
-  }
-  .app-header {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .admin-main {
-    padding: var(--admin-space-4);
-  }
-
-  .auth-page {
-    align-content: start;
-  }
-
-  .behr-admin button,
-  .behr-admin form {
-    inline-size: 100%;
-  }
-
-  .workspace dl {
-    grid-template-columns: 1fr;
-  }
+  .app-header { flex-wrap: wrap; }
+  .header-context { order: 2; flex: 1 1 100%; display: flex; }
+  .header-context > span { font-size: .75rem; }
+  .header-context > strong { font-size: .8125rem; }
+  .account-controls span { max-inline-size: 8rem; font-size: .75rem; }
+  .account-controls button, .sidebar-toggle { padding-inline: .5rem; font-size: .875rem; }
+  .editor-surface { padding: .75rem; }
+  .editor-command-bar { margin: -.75rem -.75rem 0; padding: .75rem; }
+  .editor-page-context h2 { font-size: 1rem; }
+  .editor-page-actions { gap: .5rem; }
+  .editor-page-actions > button { flex: 1; }
+  .page-publication { flex-basis: 100%; }
+  .editor-section { padding-block: .5rem; }
+  .editor-add-block > label, .editor-add-block > select { flex-basis: 100%; max-inline-size: 100%; margin: 0; }
+  .active-workspace dl { grid-template-columns: minmax(0, 1fr); }
+  .task-panel, .active-workspace > section:not(.pages-surface) { padding: 1rem; }
+  .auth-page { align-content: start; }
 }
-
-@media (max-width: 60rem) {
-  .editor-page-actions {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .workspace-content > .pages-surface {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .workspace-shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .workspace-navigation {
-    border-inline-end: 0;
-    border-block-end: 1px solid var(--admin-border);
-    padding: var(--admin-space-4);
-  }
+@media (forced-colors: active) {
+  .behr-admin [aria-pressed="true"] { text-decoration: underline; text-underline-offset: .2em; }
 }

@@ -56,11 +56,12 @@ export function SiteCreateForm({
 
   return (
     <section aria-labelledby="create-site-title">
-      <h2 id="create-site-title">Create site</h2>
+      <h1 id="create-site-title">Create site</h1>
       <form onSubmit={(event) => void submitSite(event)}>
         <label htmlFor="site-name">Name</label>
         <input
           id="site-name"
+          autoFocus
           name="name"
           maxLength={200}
           required

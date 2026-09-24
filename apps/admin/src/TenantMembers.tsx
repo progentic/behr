@@ -144,6 +144,8 @@ export function TenantMembers({ tenantId }: Readonly<{ tenantId: string }>) {
             Share this token through an appropriately secure external channel.
             Anyone holding it can register the invited account while it is valid.
           </p>
+          <p>Ask the recipient to open <a href={window.location.origin} target="_blank" rel="noopener noreferrer">{window.location.origin}</a>,
+            choose “Register with an invitation”, and enter this token.</p>
           <output aria-label="Invitation token">{invitation.token}</output>
         </section>
       ) : null}

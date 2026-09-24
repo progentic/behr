@@ -48,6 +48,7 @@ export function TenantCreateForm({ onCreated }: Readonly<{
       <label htmlFor="tenant-name">Tenant name</label>
       <input
         ref={nameInput}
+        autoFocus
         id="tenant-name"
         name="name"
         maxLength={200}

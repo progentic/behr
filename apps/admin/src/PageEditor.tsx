@@ -121,6 +121,7 @@ export function PageEditor({
 }: PageEditorProperties) {
   const loadEpoch = useRef(0);
   const saveOperation = useRef(0);
+  const commandBar = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<PageEditorState>({
     status: "loading",
     identity: { tenantId, siteId, pageId, requestEpoch: 0 },
@@ -132,6 +133,17 @@ export function PageEditor({
   });
   const [draggedItem, setDraggedItem] = useState<DraggedEditorItem | null>(null);
   const dirty = isEditorDirty(state);
+
+  useEffect(() => {
+    const bar = commandBar.current;
+    const workspace = bar?.closest("main");
+    if (!bar || !workspace) return;
+    const observer = new ResizeObserver(() => {
+      workspace.style.scrollPaddingBlockStart = `${bar.getBoundingClientRect().height + 8}px`;
+    });
+    observer.observe(bar);
+    return () => { observer.disconnect(); workspace.style.removeProperty("scroll-padding-block-start"); };
+  }, [state.status]);
 
   useEffect(() => {
     onDirtyChange(dirty);
@@ -249,17 +261,23 @@ export function PageEditor({
         preparation.request,
       );
       setState((current) => applySaveSuccess(current, operation.operation));
-    } catch {
-      setState((current) => applySaveError(current, operation.operation));
+    } catch (failure) {
+      setState((current) => applySaveError(current, operation.operation, failure));
     }
   }
 
   return (
     <section className="editor-surface" aria-labelledby="page-editor-title">
-      <h3 id="page-editor-title">Edit {loadedState.page.title}</h3>
-      <p>
-        Path: <code>/{loadedState.page.slug}</code>
-      </p>
+      <div ref={commandBar} className="editor-command-bar">
+      <div className="editor-page-context">
+        <h2 id="page-editor-title">{loadedState.page.title}</h2>
+        <p className="field-help">{hostname}<span>/{loadedState.page.slug}</span></p>
+      </div>
+      <div id="page-save-status" className="editor-save-feedback">
+        {loadedState.save.status === "error" ? <AlertMessage>{loadedState.save.message}</AlertMessage>
+          : loadedState.formError ? <AlertMessage>{loadedState.formError}</AlertMessage>
+          : <p className={`editor-save-state${loadedState.save.status === "saved" ? " saved" : ""}`} role="status">{readEditorSaveLabel(loadedState)}</p>}
+      </div>
       <div className="editor-page-actions">
         <ActionButton type="button" variant="primary" disabled={loadedState.save.status === "saving"} onClick={() => void saveDraft()}>
           {loadedState.save.status === "saving" ? "Saving…" : "Save draft"}
@@ -270,9 +288,7 @@ export function PageEditor({
           hostname={hostname} slug={loadedState.page.slug} role={role} dirty={dirty}
         />
       </div>
-      {loadedState.save.status === "error" ? <AlertMessage>{loadedState.save.message}</AlertMessage> : null}
-      {loadedState.formError ? <AlertMessage>{loadedState.formError}</AlertMessage> : null}
-      {loadedState.save.status === "saved" ? <StatusMessage tone="success">Draft saved.</StatusMessage> : null}
+      </div>
       <details className="editor-images">
         <summary>Site images</summary>
         {visibleAssets.status === "loading" ? <StatusMessage>Loading site assets…</StatusMessage> : null}
@@ -333,7 +349,7 @@ function SectionEditor({
   ) => void;
 }>) {
   return (
-    <fieldset
+    <section role="group" aria-label={`Section ${sectionIndex + 1}`}
       className="editor-section"
       onDragOver={(event) => {
         if (draggedItem?.kind === "section") {
@@ -352,50 +368,15 @@ function SectionEditor({
         setDraggedItem(null);
       }}
     >
-      <legend>Section {sectionIndex + 1}</legend>
-      <div className="editor-actions">
-      <button aria-label="Drag section"
-        type="button"
-        draggable
-        onDragStart={(event) => {
-          setDraggedItem({ kind: "section", sectionId: section.id });
-          initializeDrag(event);
-        }}
-        onDragEnd={() => setDraggedItem(null)}
-      >
-        Drag
-      </button>
-      <button aria-label="Move section up"
-        type="button"
-        disabled={sectionIndex === 0}
-        onClick={() =>
-          transformDocument((document) =>
-            moveSection(document, section.id, sectionIndex - 1),
-          )
-        }
-      >
-        Move up
-      </button>
-      <button aria-label="Move section down"
-        type="button"
-        disabled={sectionIndex === sectionCount - 1}
-        onClick={() =>
-          transformDocument((document) =>
-            moveSection(document, section.id, sectionIndex + 1),
-          )
-        }
-      >
-        Move down
-      </button>
-      <button
-        className="button-danger"
-        type="button"
-        onClick={() =>
-          transformDocument((document) => removeSection(document, section.id))
-        }
-      >
-        Remove section
-      </button>
+      <div className="section-heading">
+        <h3>Section {sectionIndex + 1}</h3>
+        <EditorItemActions kind="section" first={sectionIndex === 0} last={sectionIndex === sectionCount - 1}
+          onDragStart={(event) => { setDraggedItem({ kind: "section", sectionId: section.id }); initializeDrag(event); }}
+          onDragEnd={() => setDraggedItem(null)}
+          onUp={() => transformDocument((document) => moveSection(document, section.id, sectionIndex - 1))}
+          onDown={() => transformDocument((document) => moveSection(document, section.id, sectionIndex + 1))}
+          onRemove={() => transformDocument((document) => removeSection(document, section.id))}
+        />
       </div>
       {section.blocks.map((block, blockIndex) => (
         <BlockEditor
@@ -462,7 +443,7 @@ function SectionEditor({
         </>
       ) : null}
       </div>
-    </fieldset>
+    </section>
   );
 }
 
@@ -520,57 +501,13 @@ function BlockEditor({
         setDraggedItem(null);
       }}
     >
-      <div className="editor-actions">
-      <button aria-label="Drag block"
-        type="button"
-        draggable
-        onDragStart={(event) => {
-          event.stopPropagation();
-          setDraggedItem({ kind: "block", sectionId, blockId: block.id });
-          initializeDrag(event);
-        }}
-        onDragEnd={(event) => {
-          event.stopPropagation();
-          setDraggedItem(null);
-        }}
-      >
-        Drag
-      </button>
-      <button aria-label="Move block up"
-        type="button"
-        disabled={blockIndex === 0}
-        onClick={() =>
-          transformDocument((document) =>
-            moveBlock(document, sectionId, block.id, blockIndex - 1),
-          )
-        }
-      >
-        Move up
-      </button>
-      <button aria-label="Move block down"
-        type="button"
-        disabled={blockIndex === blockCount - 1}
-        onClick={() =>
-          transformDocument((document) =>
-            moveBlock(document, sectionId, block.id, blockIndex + 1),
-          )
-        }
-      >
-        Move down
-      </button>
-      <button
-        className="button-danger"
-        type="button"
-        onClick={() =>
-          transformDocument(
-            (document) => removeBlock(document, sectionId, block.id),
-            block.id,
-          )
-        }
-      >
-        Remove block
-      </button>
-      </div>
+      <EditorItemActions kind="block" first={blockIndex === 0} last={blockIndex === blockCount - 1}
+        onDragStart={(event) => { event.stopPropagation(); setDraggedItem({ kind: "block", sectionId, blockId: block.id }); initializeDrag(event); }}
+        onDragEnd={(event) => { event.stopPropagation(); setDraggedItem(null); }}
+        onUp={() => transformDocument((document) => moveBlock(document, sectionId, block.id, blockIndex - 1))}
+        onDown={() => transformDocument((document) => moveBlock(document, sectionId, block.id, blockIndex + 1))}
+        onRemove={() => transformDocument((document) => removeBlock(document, sectionId, block.id), block.id)}
+      />
       {block.type === "image" ? (
         <ImageBlockFields
           block={block}
@@ -668,6 +605,28 @@ function BlockEditor({
         </>
       )}
 
+    </div>
+  );
+}
+
+export function EditorItemActions({ kind, first, last, onDragStart, onDragEnd, onUp, onDown, onRemove }: Readonly<{
+  kind: "section" | "block"; first: boolean; last: boolean;
+  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  onDragEnd: (event: DragEvent<HTMLButtonElement>) => void;
+  onUp: () => void; onDown: () => void; onRemove: () => void;
+}>) {
+  return (
+    <div className="editor-item-tools">
+      <button type="button" draggable aria-label={`Drag ${kind}`}
+        onDragStart={onDragStart} onDragEnd={onDragEnd}>Drag</button>
+      <details className="editor-action-disclosure">
+        <summary aria-label={`${kind === "section" ? "Section" : "Block"} actions`}>Actions</summary>
+        <div className="editor-actions">
+          <button type="button" aria-label={`Move ${kind} up`} disabled={first} onClick={onUp}>Up</button>
+          <button type="button" aria-label={`Move ${kind} down`} disabled={last} onClick={onDown}>Down</button>
+          <button type="button" className="button-danger" aria-label={`Remove ${kind}`} onClick={onRemove}>Remove</button>
+        </div>
+      </details>
     </div>
   );
 }
@@ -830,13 +789,16 @@ export function applySaveSuccess(
 export function applySaveError(
   state: PageEditorState,
   operation: EditorSaveOperation,
+  failure?: unknown,
 ): PageEditorState {
   if (!matchesSaveOperation(state, operation)) {
     return state;
   }
   return {
     ...state,
-    save: { status: "error", message: "The draft could not be saved." },
+    save: { status: "error", message: failure instanceof DraftSessionExpiredError
+      ? "Your session has expired. Unsaved content remains in this editor. Sign in again in another tab, then return here and retry Save draft."
+      : "The draft could not be saved. Please try again." },
   };
 }
 
@@ -924,6 +886,7 @@ export async function requestDraftSave(
     `/tenants/${tenantId}/sites/${siteId}/pages/${pageId}/versions`,
     { method: "POST", body: JSON.stringify(request) },
   );
+  if (response.status === 401) throw new DraftSessionExpiredError();
   if (!response.ok) {
     throw new Error("Page draft saving failed.");
   }
@@ -932,6 +895,14 @@ export async function requestDraftSave(
     throw new Error("Saved draft identity did not match the request.");
   }
   return draft;
+}
+
+export class DraftSessionExpiredError extends Error {}
+
+export function readEditorSaveLabel(state: Extract<PageEditorState, { status: "loaded" }>): string {
+  if (state.save.status === "saving") return "Saving draft…";
+  if (isEditorDirty(state)) return "Unsaved changes — save to continue.";
+  return state.save.status === "saved" ? "Draft saved." : "No unsaved changes.";
 }
 
 function applyDraftLoadError(

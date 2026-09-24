@@ -4,7 +4,7 @@ import {
   type TenantRole,
   pageListResponseSchema,
 } from "@bher/contracts";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PageCreateForm } from "./PageCreateForm";
 import { PageEditor } from "./PageEditor";
@@ -32,11 +32,24 @@ type PageListProperties = Readonly<{
 }>;
 
 export function PageList({ tenantId, siteId, hostname, role, onDirtyChange }: PageListProperties) {
+  const management = useRef<HTMLDetailsElement>(null);
+  const newPageAction = useRef<HTMLButtonElement>(null);
+  const [creation, setCreation] = useState<{ result?: string } | null>(null);
+  useEffect(() => {
+    if (creation?.result) newPageAction.current?.focus();
+  }, [creation]);
   const [state, setState] = useState<PageListState>({
     status: "loading",
     tenantId,
     siteId,
   });
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 75rem)");
+    const update = () => { if (management.current) management.current.open = media.matches; };
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [state.status]);
   const reportDirty = useCallback((dirty: boolean) => {
     setState((current) => current.status === "loaded" &&
       matchesPageListIdentity(current, tenantId, siteId) && current.editorDirty !== dirty
@@ -90,8 +103,19 @@ export function PageList({ tenantId, siteId, hostname, role, onDirtyChange }: Pa
 
   return (
     <section className="pages-surface" aria-labelledby="pages-title">
-      <div className="page-management">
-      <h2 id="pages-title">Pages</h2>
+      <div className="pages-heading"><div><h1 id="pages-title">Pages</h1>
+        {creation?.result ? <StatusMessage tone="success">{creation.result}</StatusMessage> : null}</div>
+        <button ref={newPageAction} type="button" onClick={() => setCreation({})}>New page</button>
+      </div>
+      {creation && !creation.result ? <div className="task-panel page-creation">
+        <button type="button" className="task-close" onClick={() => { setCreation(null); newPageAction.current?.focus(); }}>Cancel</button>
+        <PageCreateForm tenantId={tenantId} siteId={siteId} onCreated={(page) => {
+          setState((current) => applyCreatedPage(current, tenantId, siteId, page));
+          setCreation((current) => current === creation ? { result: `Created page “${page.title}”.` } : current);
+        }} />
+      </div> : null}
+      <details ref={management} className="page-management">
+      <summary>Choose page</summary>
       {state.pages.length === 0 ? (
         <p>No pages yet.</p>
       ) : (
@@ -103,6 +127,8 @@ export function PageList({ tenantId, siteId, hostname, role, onDirtyChange }: Pa
               onSelect={() => {
                 if (state.selectedPageId === page.id || !confirmEditorNavigation(state.editorDirty)) return;
                 setState((current) => selectPage(current, page.id));
+                setCreation((current) => current?.result ? null : current);
+                if (!window.matchMedia("(min-width: 75rem)").matches && management.current) management.current.open = false;
               }}
             >
               <strong>{page.title}</strong>
@@ -111,19 +137,8 @@ export function PageList({ tenantId, siteId, hostname, role, onDirtyChange }: Pa
           ))}
         </ul>
       )}
-      <details className="page-create-disclosure">
-      <summary>New page</summary>
-      <PageCreateForm
-        tenantId={tenantId}
-        siteId={siteId}
-        onCreated={(page) =>
-          setState((current) =>
-            applyCreatedPage(current, tenantId, siteId, page),
-          )
-        }
-      />
       </details>
-      </div>
+      <div className="page-editor-slot" hidden={creation !== null && !creation.result}>
       {state.selectedPageId ? (
         <PageEditor
           key={`${tenantId}:${siteId}:${state.selectedPageId}`}
@@ -135,6 +150,8 @@ export function PageList({ tenantId, siteId, hostname, role, onDirtyChange }: Pa
           onDirtyChange={reportDirty}
         />
       ) : null}
+      {!state.selectedPageId ? <p className="empty-workspace">Choose a page to edit, or create a new page.</p> : null}
+      </div>
     </section>
   );
 }

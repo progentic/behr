@@ -1,5 +1,7 @@
 import type { AssetListItem, PageDocument, PageDraft } from "@bher/contracts";
 import { addImageBlock, moveBlock, updateBlockText } from "@bher/editor";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   type EditorIdentity,
@@ -18,6 +20,9 @@ import {
   requestSiteAssets,
   isEditorDirty,
   applyUploadedAsset,
+  DraftSessionExpiredError,
+  readEditorSaveLabel,
+  EditorItemActions,
 } from "./PageEditor";
 
 declare function test(name: string, body: () => void | Promise<void>): void;
@@ -36,9 +41,27 @@ const HEADING = "77777777-7777-4777-8777-777777777777";
 const ASSET = "88888888-8888-4888-8888-888888888888";
 const IMAGE = "99999999-9999-4999-8999-999999999999";
 
+test("compact item actions retain native drag, named actions and boundary disabling", () => {
+  const noop = () => {};
+  for (const kind of ["section", "block"] as const) {
+    for (const first of [true, false]) {
+      const markup = renderToStaticMarkup(createElement(EditorItemActions, {
+        kind, first, last: !first, onDragStart: noop, onDragEnd: noop,
+        onUp: noop, onDown: noop, onRemove: noop,
+      }));
+      expect(markup.includes(`draggable="true" aria-label="Drag ${kind}"`)).toBe(true);
+      expect(markup.includes(`aria-label="Move ${kind} up" disabled`)).toBe(first);
+      expect(markup.includes(`aria-label="Move ${kind} down" disabled`)).toBe(!first);
+      expect(markup.includes(`aria-label="Remove ${kind}"`)).toBe(true);
+      expect(/<details[^>]*\sopen(?:\s|=|>)/.test(markup)).toBe(false);
+    }
+  }
+});
+
 test("dirty state tracks matching saves, failures, and newer in-flight edits", () => {
   const clean = loadedState(PAGE_A, 1, document("Initial"));
   expect(isEditorDirty(clean)).toBe(false);
+  expect(readEditorSaveLabel(clean as Extract<PageEditorState, { status: "loaded" }>)).toBe("No unsaved changes.");
   const edited = applyDocumentEdit(clean, (value) => updateBlockText(value, SECTION, PARAGRAPH, "Edit"));
   expect(isEditorDirty(edited)).toBe(true);
   const operation = createEditorSaveOperation(edited, 1);
@@ -48,6 +71,30 @@ test("dirty state tracks matching saves, failures, and newer in-flight edits", (
   expect(isEditorDirty(applySaveError(operation.state, operation.operation))).toBe(true);
   const newer = applyDocumentEdit(operation.state, (value) => updateBlockText(value, SECTION, PARAGRAPH, "Newer"));
   expect(isEditorDirty(applySaveSuccess(newer, operation.operation))).toBe(true);
+});
+
+test("only draft-save HTTP 401 offers session recovery and preserves local content", async () => {
+  const originalFetch = globalThis.fetch;
+  const state = loadedState(PAGE_A, 1, document("Unsaved work"));
+  const operation = createEditorSaveOperation(state, 1);
+  if (!operation) throw new Error("Expected save.");
+  try {
+    for (const status of [401, 403, 500]) {
+      globalThis.fetch = async () => new Response("Untrusted session-expired text", { status });
+      let failure: unknown;
+      try { await requestDraftSave(TENANT, SITE, PAGE_A, { document: operation.operation.submittedDocument }); }
+      catch (error) { failure = error; }
+      expect(failure instanceof DraftSessionExpiredError).toBe(status === 401);
+      const result = applySaveError(operation.state, operation.operation, failure);
+      if (result.status !== "loaded" || result.save.status !== "error") throw new Error("Expected retained failed draft.");
+      expect(result.document).toBe(operation.operation.submittedDocument);
+      expect(isEditorDirty(result)).toBe(true);
+      expect(result.save.message.includes("another tab")).toBe(status === 401);
+      expect(result.save.message.includes("Untrusted")).toBe(false);
+      const otherPage = loadedState(PAGE_B, 1, document("Other page"));
+      expect(applySaveError(otherPage, operation.operation, failure)).toBe(otherPage);
+    }
+  } finally { globalThis.fetch = originalFetch; }
 });
 
 test("uploaded assets append only to the matching loaded site without duplicates", () => {
