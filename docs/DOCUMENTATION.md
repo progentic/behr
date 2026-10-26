@@ -2745,3 +2745,26 @@ documentation-only commit. Any repository-content correction creates a new
 candidate and resets applicable evidence. Phase U alone may tag/publish the
 exact T-certified SHA with zero repository-content changes. No release is
 created by this preparation.
+
+## Post-release — Tenant overview homepage
+
+The owner requested an actual dashboard homepage rather than another restyling
+of the editor. The admin now opens Overview for the current tenant, with four
+light summary cards for sites, pages, images and original-image storage. A site
+content panel opens existing page workspaces; a quieter workspace panel retains
+role context and owner-only member management. Typography weights, shadows and
+spacing were adjusted toward the supplied SnowUI reference without adding mock
+traffic charts, activity feeds, search or unsupported controls.
+
+The overview reuses strict existing page/asset list requests and does not add
+backend authority. Counts refresh when the overview mounts or its site list
+changes. A failed read never becomes a false zero. Reads are sequenced by site,
+with only that site's two list requests concurrent. Tenant changes discard old
+results; owner/member and unsaved-navigation boundaries remain unchanged.
+
+Two focused cases extend the existing page-workspace test file: scoped totals
+including the empty tenant, and failed reads that reject rather than fabricate
+counts. Browser verification additionally exercises real counts, failure/retry,
+delayed tenant responses, owner/member presentation, and dirty-home navigation.
+Evidence stays outside the repository. Human visual acceptance remains a separate
+pending gate; this addition does not change the immutable v1.0.0 release record.

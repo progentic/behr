@@ -287,6 +287,17 @@ appends without replacing a dirty editor; explicit later selection is guarded.
 Domain administration, custom CSS, theme catalogs/frameworks, version history,
 and publication history interfaces remain unimplemented.
 
+The post-release admin Overview is the default workspace after tenant selection.
+It summarizes the selected tenant's site list and the existing per-site page and
+renderable-asset metadata lists. It reports site, page, image and original-image
+byte totals, not visits, analytics, publication state or historical trends.
+Content reads are bounded to one site's two requests at a time; failed reads
+leave totals unavailable with an explicit retry. Tenant-keyed component lifetime
+and effect cleanup prevent late responses from appearing in another workspace.
+Overview links reuse existing site/page and owner-only membership/creation flows;
+returning from a dirty editor uses the existing native confirmation. No endpoint,
+schema, router, browser persistence or new authorization authority is introduced.
+
 ---
 
 ## 4.4 Public Website Renderer — React

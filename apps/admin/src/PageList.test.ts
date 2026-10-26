@@ -1,4 +1,5 @@
 import type { PageSummary } from "@bher/contracts";
+import { getDashboardTotals, loadDashboardSites } from "./DashboardOverview";
 
 import {
   PageSlugConflictResponseError,
@@ -29,6 +30,40 @@ const PAGE_A: PageSummary = {
   title: "About",
   slug: "about",
 };
+
+test("overview totals use the current tenant's existing page and image lists", async () => {
+  const originalFetch = globalThis.fetch;
+  const paths: string[] = [];
+  const site = { id: SITE_X, name: "Journal", hostname: "journal.example.test" };
+  try {
+    globalThis.fetch = async (input) => {
+      const path = String(input);
+      paths.push(path);
+      return Response.json(path.endsWith("/pages") ? { pages: [PAGE_A] } : { assets: [{
+        id: "66666666-6666-4666-8666-666666666666", originalFilename: "cover.png",
+        contentType: "image/png", byteSize: 2048, createdAt: "2026-10-26T12:00:00.000Z",
+      }] });
+    };
+    const content = await loadDashboardSites(TENANT_A, [site]);
+    expect(content[0]?.site).toBe(site);
+    expect(getDashboardTotals(content)).toEqual({ pages: 1, images: 1, bytes: 2048 });
+    expect(paths).toEqual([`/tenants/${TENANT_A}/sites/${SITE_X}/pages`, `/tenants/${TENANT_A}/sites/${SITE_X}/assets`]);
+    expect(getDashboardTotals(await loadDashboardSites(TENANT_A, []))).toEqual({ pages: 0, images: 0, bytes: 0 });
+    expect(paths.length).toBe(2);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("overview refuses failed content reads rather than reporting false zero totals", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (input) => String(input).endsWith("/pages")
+      ? Response.json({ pages: [PAGE_A] }) : new Response(null, { status: 500 });
+    let rejected = false;
+    try { await loadDashboardSites(TENANT_A, [{ id: SITE_X, name: "Journal", hostname: "journal.example.test" }]); }
+    catch { rejected = true; }
+    expect(rejected).toBe(true);
+  } finally { globalThis.fetch = originalFetch; }
+});
 
 test("rejects late page-list results from another site or tenant", () => {
   const currentSite: PageListState = {

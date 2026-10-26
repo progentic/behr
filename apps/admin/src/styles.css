@@ -2,10 +2,10 @@
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   font-size: 100%;
   color: #1c1c1c;
-  background: #f5f5f7;
-  --admin-canvas: #f5f5f7;
+  background: #fff;
+  --admin-canvas: #fff;
   --admin-surface: #fff;
-  --admin-surface-muted: #ededf0;
+  --admin-surface-muted: #f5f6f8;
   --admin-text: #1c1c1c;
   --admin-text-muted: #62626a;
   --admin-muted-accent: #7c8fac;
@@ -28,7 +28,7 @@
   --admin-radius: 24px;
   --admin-form: 36rem;
   --admin-control-size: 2.75rem;
-  --admin-shadow: 0 1px 0 rgb(0 0 0 / .04);
+  --admin-shadow: none;
 }
 * { box-sizing: border-box; }
 html { background: var(--admin-canvas); }
@@ -49,12 +49,13 @@ html { background: var(--admin-canvas); }
   color: var(--admin-text-muted); background: var(--admin-canvas); cursor: not-allowed; border-style: dashed; opacity: 1;
 }
 .behr-admin :focus-visible { outline: 3px solid var(--admin-focus); outline-offset: 3px; }
-.behr-admin h1, .behr-admin h2, .behr-admin h3 { margin: 0; line-height: 1.3; font-weight: 600; letter-spacing: -.015em; overflow-wrap: anywhere; }
-.behr-admin h1 { font-size: 1.5rem; }
+.behr-admin h1, .behr-admin h2, .behr-admin h3 { margin: 0; line-height: 1.3; font-weight: 500; letter-spacing: -.015em; overflow-wrap: anywhere; }
+.behr-admin h1 { font-size: 1.25rem; }
 .behr-admin h2 { font-size: 1.125rem; }
 .behr-admin h3 { font-size: 1rem; }
+.behr-admin strong { font-weight: 500; }
 .behr-admin p, .behr-admin ul, .behr-admin dl { margin: 0; }
-.behr-admin label, .behr-admin dt { font-size: .875rem; font-weight: 500; }
+.behr-admin label, .behr-admin dt { font-size: .875rem; font-weight: 400; }
 .behr-admin code, .behr-admin output { font: inherit; overflow-wrap: anywhere; }
 .behr-admin a { color: var(--admin-blue-ink); text-underline-offset: .2em; }
 .behr-admin form { display: grid; gap: .5rem; inline-size: min(100%, var(--admin-form)); }
@@ -80,10 +81,10 @@ html { background: var(--admin-canvas); }
 .admin-shell-empty { grid-template-columns: minmax(0, 1fr); }
 .app-header { grid-column: 2; display: flex; align-items: center; gap: 1rem; min-inline-size: 0; padding: .75rem 1.5rem; background: var(--admin-canvas); border-block-end: 1px solid var(--admin-border); }
 .admin-shell-empty .app-header, .admin-shell-empty .workspace-content { grid-column: 1; }
-.header-brand, .sidebar-brand strong { font-size: 1.375rem; font-weight: 700; }
+.header-brand, .sidebar-brand strong { font-size: 1.375rem; font-weight: 500; }
 .header-context { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .75rem; min-inline-size: 0; overflow-wrap: anywhere; }
 .header-context > span { font-size: .8125rem; color: var(--admin-text-muted); }
-.header-context > strong { font-size: .9375rem; font-weight: 600; }
+.header-context > strong { font-size: .9375rem; font-weight: 400; }
 .header-context > .context-separator { color: var(--admin-border-strong); }
 .account-controls { margin-inline-start: auto; display: flex; align-items: center; gap: 1rem; min-inline-size: 0; }
 .account-controls span { font-size: .875rem; overflow-wrap: anywhere; }
@@ -100,16 +101,18 @@ html { background: var(--admin-canvas); }
 .workspace-views, .workspace-create-actions { display: grid; gap: .25rem; }
 .workspace-create-actions { padding-block-start: 1rem; border-block-start: 1px solid var(--admin-border); }
 .behr-admin .workspace-views button, .behr-admin .workspace-create-actions button { text-align: start; inline-size: 100%; border-color: transparent; background: transparent; font-size: .875rem; }
-.behr-admin .workspace-views button[aria-pressed="true"] { color: var(--admin-text); background: var(--admin-surface-muted); font-weight: 600; text-decoration: underline; text-underline-offset: .25em; }
+.behr-admin .workspace-views button[aria-pressed="true"] { color: var(--admin-text); background: var(--admin-surface-muted); font-weight: 500; text-decoration: underline; text-underline-offset: .25em; }
+.behr-admin .overview-navigation { text-align: start; border-color: transparent; background: transparent; font-weight: 400; }
+.behr-admin .overview-navigation[aria-pressed="true"] { background: var(--admin-surface-muted); text-decoration: underline; text-underline-offset: .25em; }
 .selectable-resource-item > button { display: grid; gap: .2rem; inline-size: 100%; text-align: start; }
 .selectable-resource-item > button > span { color: var(--admin-text-muted); font-size: .8125rem; font-weight: 400; overflow-wrap: anywhere; }
 .behr-admin .selectable-resource-item > button { border-color: transparent; font-size: .875rem; }
 .behr-admin .selectable-resource-item > button[aria-pressed="true"] { background: var(--admin-surface-muted); color: var(--admin-text); border-inline-start: 3px solid var(--admin-text); }
-.workspace-content { grid-column: 2; min-inline-size: 0; min-block-size: 0; overflow-y: auto; padding: 1.5rem; container-type: size; }
+.workspace-content { grid-column: 2; min-inline-size: 0; min-block-size: 0; overflow-y: auto; padding: 2rem; container-type: size; }
 .workspace-context { display: grid; gap: .25rem; margin-block-end: 1.5rem; overflow-wrap: anywhere; }
 .workspace-context > span, .workspace-context > p { font-size: .875rem; color: var(--admin-text-muted); }
 .creation-result { margin-block-end: 1rem; }
-.task-panel, .active-workspace > section:not(.pages-surface) { position: relative; display: grid; gap: 1rem; padding: 1.5rem; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: var(--admin-shadow); }
+.task-panel, .active-workspace > section:not(.pages-surface):not(.dashboard-overview) { position: relative; display: grid; gap: 1rem; padding: 1.5rem; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: var(--admin-shadow); }
 .task-panel > section { display: grid; gap: 1rem; }
 .first-tenant { max-inline-size: 42rem; margin-inline: auto; }
 .behr-admin .task-close { justify-self: end; }
@@ -140,11 +143,11 @@ html { background: var(--admin-canvas); }
 .behr-admin .editor-item-tools > button, .editor-action-disclosure > summary { border-color: transparent; color: var(--admin-text-muted); background: transparent; font-size: .875rem; padding-inline: .5rem; }
 .editor-action-disclosure > .editor-actions { padding-block: .25rem; }
 .behr-admin .editor-actions > button { font-size: .875rem; padding-inline: .65rem; }
-.block-properties { color: var(--admin-text-muted); font-size: .875rem; border-radius: 16px; background: var(--admin-canvas); }
+.block-properties { color: var(--admin-text-muted); font-size: .875rem; border-radius: 16px; background: var(--admin-surface-muted); }
 .block-properties[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; padding: 0 .75rem .75rem; }
 .block-properties[open] > summary { margin-inline: -.75rem; border-end-start-radius: 0; border-end-end-radius: 0; border-block-end: 1px solid var(--admin-border); color: var(--admin-text); }
 .block-properties > label:not(:first-of-type) { margin-block-start: .5rem; }
-.editor-images[open] { padding: 0 .75rem .75rem; border-radius: 16px; background: var(--admin-canvas); }
+.editor-images[open] { padding: 0 .75rem .75rem; border-radius: 16px; background: var(--admin-surface-muted); }
 .editor-images[open] > summary { margin-inline: -.75rem; border-block-end: 1px solid var(--admin-border); }
 .behr-admin input:hover:not(:disabled), .behr-admin select:hover:not(:disabled), .behr-admin textarea:hover:not(:disabled) { border-color: var(--admin-text-muted); }
 .behr-admin input[aria-invalid="true"], .behr-admin textarea[aria-invalid="true"], .behr-admin select[aria-invalid="true"] { border-color: var(--admin-red-ink); }
@@ -156,15 +159,47 @@ html { background: var(--admin-canvas); }
 .active-workspace dd { margin: 0; color: var(--admin-text-muted); overflow-wrap: anywhere; }
 .active-workspace > section > ul > li { padding: .75rem 0; border-block-end: 1px solid var(--admin-border); }
 .active-workspace .member-list > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; padding: .875rem 1rem; border: 0; border-radius: 16px; }
-.member-list > li:nth-child(odd) { background: var(--admin-canvas); }
+.member-list > li:nth-child(odd) { background: var(--admin-surface-muted); }
 .member-identity { display: grid; gap: .25rem; min-inline-size: 0; overflow-wrap: anywhere; }
 .member-identity > span { color: var(--admin-text-muted); font-size: .875rem; }
 .member-role { flex-shrink: 0; padding: .25rem .75rem; border: 1px solid var(--admin-border-strong); border-radius: 999px; font-size: .8125rem; text-transform: capitalize; }
 .invitation-result { display: grid; gap: .75rem; max-inline-size: var(--admin-form); }
 .behr-admin output { display: block; padding: .75rem; border-radius: 8px; background: var(--admin-canvas); }
+.dashboard-overview { display: grid; gap: 2rem; min-inline-size: 0; }
+.overview-heading, .overview-panel-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; }
+.overview-heading > div { display: grid; gap: .5rem; }
+.overview-heading p { color: var(--admin-text-muted); }
+.active-workspace .overview-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem; }
+.overview-metrics > div { display: grid; gap: .75rem; align-content: start; min-inline-size: 0; padding: 1.5rem; border-radius: 24px; background: #efedfc; }
+.overview-metrics > div:nth-child(even) { background: #e5f1fc; }
+.overview-metrics dt { font-size: 1rem; }
+.overview-metrics dd { color: var(--admin-text); font-size: 2rem; font-weight: 500; line-height: 1.2; }
+.overview-metrics .metric-description { font-size: .8125rem; font-weight: 400; line-height: 1.5; color: var(--admin-text-muted); }
+.overview-columns { display: grid; grid-template-columns: minmax(0, 2.5fr) minmax(14rem, 1fr); gap: 2rem; align-items: start; }
+.overview-panel { display: grid; gap: 1.5rem; min-inline-size: 0; padding: 1.5rem; border-radius: 24px; background: #f8f9fb; }
+.overview-panel-heading > button { background: var(--admin-surface); }
+.overview-site-list { gap: 0; }
+.overview-site-list > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding-block: 1.25rem; border-block-end: 1px solid var(--admin-border); }
+.overview-site-list > li:last-child { border-block-end: 0; }
+.behr-admin .overview-site-link { display: grid; gap: .35rem; text-align: start; border-color: transparent; background: transparent; max-inline-size: 100%; padding: .5rem 0; font-weight: 400; }
+.overview-site-link > span:last-child { color: var(--admin-text-muted); font-size: .875rem; }
+.active-workspace .overview-site-totals { grid-template-columns: repeat(2, minmax(3rem, 1fr)); gap: 1.5rem; }
+.overview-site-totals > div { display: grid; gap: .25rem; }
+.overview-site-totals dt { color: var(--admin-text-muted); font-size: .8125rem; }
+.overview-site-totals dd { color: var(--admin-text); font-size: 1rem; }
+.active-workspace .overview-workspace > dl { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+.overview-workspace dl > div { display: grid; gap: .5rem; }
+.overview-workspace dt { color: var(--admin-text-muted); }
+.overview-workspace dd { color: var(--admin-text); }
+.overview-workspace p { color: var(--admin-text-muted); font-size: .875rem; line-height: 1.7; }
+.overview-workspace > button { justify-self: start; }
+.overview-empty { display: grid; gap: .75rem; padding-block: 2rem; color: var(--admin-text-muted); }
+.overview-error { display: grid; justify-items: start; gap: .75rem; }
 @media (max-width: 74.999rem) {
   .pages-surface { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
   .page-management { position: static; max-block-size: none; }
+  .active-workspace .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .overview-columns { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 59.999rem) {
   .admin-shell { grid-template-columns: minmax(0, 1fr); }
@@ -198,7 +233,12 @@ html { background: var(--admin-canvas); }
   .editor-add-block > label, .editor-add-block > select { flex-basis: 100%; max-inline-size: 100%; margin: 0; }
   .active-workspace dl { grid-template-columns: minmax(0, 1fr); }
   .active-workspace .member-list > li { flex-direction: column; align-items: start; }
-  .task-panel, .active-workspace > section:not(.pages-surface) { padding: 1rem; }
+  .task-panel, .active-workspace > section:not(.pages-surface):not(.dashboard-overview) { padding: 1rem; }
+  .dashboard-overview { gap: 1.5rem; }
+  .active-workspace .overview-metrics { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 1rem; }
+  .overview-metrics > div, .overview-panel { padding: 1rem; border-radius: 20px; }
+  .overview-metrics dd { font-size: 1.5rem; }
+  .overview-metrics .metric-description { font-size: .8125rem; }
   .auth-page { align-content: start; }
 }
 @media (forced-colors: active) {

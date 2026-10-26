@@ -8,6 +8,7 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { AdminShell } from "./AdminShell";
+import { DashboardOverview } from "./DashboardOverview";
 import { PageList } from "./PageList";
 import { SiteCreateForm } from "./SiteCreateForm";
 import { SiteSettings } from "./SiteSettings";
@@ -27,7 +28,7 @@ export type SiteState =
   | Readonly<{ status: "error"; tenantId: string }>
   | Readonly<{ status: "loaded"; tenantId: string; sites: SiteSummary[] }>;
 
-type WorkspaceView = "pages" | "settings" | "members";
+type WorkspaceView = "overview" | "pages" | "settings" | "members";
 
 export function SitesPage({ editorDirty, onDirtyChange, account, error }: Readonly<{
   editorDirty: boolean; onDirtyChange: (dirty: boolean) => void;
@@ -43,7 +44,7 @@ export function SitesPage({ editorDirty, onDirtyChange, account, error }: Readon
   const activeWorkspace = useRef<HTMLDivElement>(null);
   const creationResult = useRef<HTMLDivElement>(null);
   const hadCreation = useRef(false);
-  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("pages");
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("overview");
 
   useEffect(() => {
     if (creation?.result) creationResult.current?.focus();
@@ -160,7 +161,7 @@ export function SitesPage({ editorDirty, onDirtyChange, account, error }: Readon
 
   return (
     <AdminShell account={account}
-      context={<><span>{selectedTenant.name}</span><span aria-hidden="true" className="context-separator">/</span><strong>{workspaceView === "members" ? "Tenant members" : selectedSite?.name ?? "Sites"}</strong></>}
+      context={<><span>{selectedTenant.name}</span><span aria-hidden="true" className="context-separator">/</span><strong>{workspaceView === "overview" ? "Overview" : workspaceView === "members" ? "Tenant members" : selectedSite?.name ?? "Sites"}</strong></>}
       sidebar={(close) => (
         <nav className="workspace-navigation" aria-label="Workspace">
           <div className="tenant-context">
@@ -171,7 +172,7 @@ export function SitesPage({ editorDirty, onDirtyChange, account, error }: Readon
               setSelectedTenantId(nextTenantId);
               setSelectedSiteId(null);
               setSiteState({ status: "loading", tenantId: nextTenantId });
-              setWorkspaceView("pages");
+              setWorkspaceView("overview");
               setCreation(null);
               close();
             }}>
@@ -179,6 +180,8 @@ export function SitesPage({ editorDirty, onDirtyChange, account, error }: Readon
             </select>
             <span className="field-help">{selectedTenant.role === "owner" ? "Owner" : "Member"}</span>
           </div>
+          <button className="overview-navigation" type="button" aria-pressed={workspaceView === "overview"}
+            onClick={() => { if (confirmEditorNavigation(editorDirty)) { setWorkspaceView("overview"); setCreation(null); close(); } }}>Overview</button>
           <div className="site-context">
             <h2>Sites</h2>
             <SiteList selectedSiteId={selectedSiteId} selectedTenantId={selectedTenant.id} state={siteState}
@@ -225,11 +228,20 @@ export function SitesPage({ editorDirty, onDirtyChange, account, error }: Readon
         ) : <StatusMessage>Loading site context…</StatusMessage>}
       </section> : null}
       <div ref={activeWorkspace} tabIndex={-1} hidden={creation !== null && !creation.result} className="active-workspace">
-        {workspaceView !== "pages" ? <div className="workspace-context">
+        {workspaceView !== "pages" && workspaceView !== "overview" ? <div className="workspace-context">
           <span>{workspaceView === "members" ? "Tenant" : "Site"}</span>
           <h1>{workspaceView === "members" ? selectedTenant.name : selectedSite?.name ?? "Sites"}</h1>
           {workspaceView === "settings" && selectedSite ? <p>{selectedSite.hostname}</p> : null}
         </div> : null}
+        {workspaceView === "overview" ? (
+          siteState.status === "loaded" && siteState.tenantId === selectedTenant.id ?
+            <DashboardOverview key={selectedTenant.id} tenant={selectedTenant} sites={siteState.sites}
+              onOpenSite={(siteId) => { setSelectedSiteId(siteId); setWorkspaceView("pages"); }}
+              onNewSite={() => setCreation({ kind: "site" })}
+              onMembers={() => setWorkspaceView("members")} /> :
+            siteState.status === "error" && siteState.tenantId === selectedTenant.id ?
+              <AlertMessage>Sites could not be loaded.</AlertMessage> : <StatusMessage>Loading overview…</StatusMessage>
+        ) : null}
         {selectedTenant.role === "owner" && workspaceView === "members" ? (
           <TenantMembers key={selectedTenant.id} tenantId={selectedTenant.id} />
         ) : null}
