@@ -103,10 +103,14 @@ export function TenantMembers({ tenantId }: Readonly<{ tenantId: string }>) {
         <AlertMessage>Members could not be loaded.</AlertMessage>
       ) : null}
       {memberState.status === "loaded" ? (
-        <ul>
+        <ul className="member-list" aria-label="Tenant members">
           {memberState.members.map((member) => (
             <li key={member.email}>
-              <strong>{member.displayName}</strong> — {member.email} — {member.role}
+              <div className="member-identity">
+                <strong>{member.displayName}</strong>
+                <span>{member.email}</span>
+              </div>
+              <span className="member-role">{member.role}</span>
             </li>
           ))}
         </ul>

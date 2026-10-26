@@ -160,7 +160,7 @@ export function SitesPage({ editorDirty, onDirtyChange, account, error }: Readon
 
   return (
     <AdminShell account={account}
-      context={<><span>{selectedTenant.name}</span><strong>{workspaceView === "members" ? "Tenant members" : selectedSite?.name ?? "Sites"}</strong></>}
+      context={<><span>{selectedTenant.name}</span><span aria-hidden="true" className="context-separator">/</span><strong>{workspaceView === "members" ? "Tenant members" : selectedSite?.name ?? "Sites"}</strong></>}
       sidebar={(close) => (
         <nav className="workspace-navigation" aria-label="Workspace">
           <div className="tenant-context">
