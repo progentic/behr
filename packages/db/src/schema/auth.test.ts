@@ -27,4 +27,7 @@ test("defines the stable BeHR identity fields", () => {
 test("keeps credentials in the provider account model", () => {
   expect(Object.keys(getTableColumns(account))).toContain("password");
   expect(Object.keys(getTableColumns(user))).not.toContain("password");
+  expect(getTableColumns(account).issuer.notNull).toBe(false);
+  expect(getTableColumns(account).providerId.notNull).toBe(true);
+  expect(getTableColumns(account).accountId.notNull).toBe(true);
 });

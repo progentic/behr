@@ -39,7 +39,7 @@ const EXPECTED_APPLICATION_TABLE_NAMES = [
 ];
 const EXPECTED_CATALOG_OBJECTS = new Set([
   "account",
-  "account_issuer_account_id_uidx",
+  "account_provider_account_id_uidx",
   "account_pkey",
   "account_user_id_idx",
   "assets",
@@ -212,6 +212,10 @@ async function verifyDatabaseCatalog(context: IntegrationContext): Promise<void>
 async function verifyDatabaseConstraints(
   context: IntegrationContext,
 ): Promise<void> {
+  const [identity] = await readAccountIdentitySchema(context.observer);
+  expect(identity?.issuerNullable).toBe("YES");
+  expect(identity?.indexDefinition).toContain("UNIQUE INDEX account_provider_account_id_uidx");
+  expect(identity?.indexDefinition).toContain("(provider_id, account_id)");
   const constraints = await listDatabaseConstraints(context.observer);
   expect(constraints).toEqual([
     { name: "account_user_id_user_id_fk", type: "FOREIGN KEY" },
@@ -665,6 +669,15 @@ async function listDatabaseConstraints(
         'user_email_unique'
       )
     ORDER BY constraint_name
+  `;
+}
+
+async function readAccountIdentitySchema(client: DatabaseClient) {
+  return await client.native<Array<{ issuerNullable: string; indexDefinition: string }>>`
+    SELECT
+      (SELECT is_nullable FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'account' AND column_name = 'issuer') AS "issuerNullable",
+      pg_get_indexdef(to_regclass('public.account_provider_account_id_uidx')) AS "indexDefinition"
   `;
 }
 

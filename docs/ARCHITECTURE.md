@@ -364,6 +364,13 @@ Phase C adds four provider-compatible identity tables owned by the BeHR schema:
 * `session` — opaque server-side sessions with bounded expiration
 * `verification` — provider verification records
 
+The post-release Better Auth 1.7.7 upgrade retains the legacy `account.issuer`
+column and its data but permits null values. Account uniqueness is enforced by
+`(provider_id, account_id)`. Forward migration `0011_auth_provider_identity`
+creates that unique index before relaxing the obsolete issuer constraint or
+dropping its old index. Duplicate keys abort migration without merging records.
+The existing email/password-only configuration and session policy are unchanged.
+
 Phase D adds two application tables:
 
 * `tenants` — UUID identity, name, and creation/update timestamps

@@ -2768,3 +2768,24 @@ counts. Browser verification additionally exercises real counts, failure/retry,
 delayed tenant responses, owner/member presentation, and dirty-home navigation.
 Evidence stays outside the repository. Human visual acceptance remains a separate
 pending gate; this addition does not change the immutable v1.0.0 release record.
+
+## Post-release — Better Auth 1.7.7 identity compatibility
+
+The dependency audit identified advisories affecting the pinned Better Auth
+family. The owner authorized upgrading Better Auth and its Drizzle adapter
+together to 1.7.7, then explicitly authorized the required forward schema
+migration after compatibility testing exposed the legacy non-null issuer field.
+
+Migration `0011_auth_provider_identity` preserves the issuer column and existing
+values. It first creates a unique provider/account index, then makes issuer
+nullable and removes the obsolete issuer/account index. PostgreSQL rejects any
+duplicate provider/account pairs before those old constraints are relaxed; no
+identity is merged, reassigned or deleted. Historical migrations are untouched.
+
+Disposable acceptance checks confirmed fresh bootstrap, session and invitation
+lifecycle behavior, existing 1.7.2 password login and session continuity, and
+unchanged existing user/account/session rows across migration. A duplicate-key
+fixture refused migration with its rows, old schema and migration journal intact.
+The existing persistence integration and schema checks were extended only for
+the changed identity key. This is bounded authentication compatibility evidence,
+not a new general release/upgrade certification or a mutation of v1.0.0.

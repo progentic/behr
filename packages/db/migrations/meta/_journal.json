@@ -78,6 +78,13 @@
       "when": 1788226696493,
       "tag": "0010_themes",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793138472655,
+      "tag": "0011_auth_provider_identity",
+      "breakpoints": true
     }
   ]
 }
