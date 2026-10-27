@@ -142,7 +142,7 @@ export function SiteSettings({
 
   const saving = state.saveStatus === "saving";
   return (
-    <section aria-labelledby="site-settings-title">
+    <section className="detail-surface" aria-labelledby="site-settings-title">
       <h2 id="site-settings-title">Site settings</h2>
       <form onSubmit={(event) => void submitSettings(event)}>
         <label htmlFor="site-settings-name">Site name</label>

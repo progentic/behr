@@ -94,7 +94,7 @@ export function TenantMembers({ tenantId }: Readonly<{ tenantId: string }>) {
   }
 
   return (
-    <section aria-labelledby="tenant-members-title">
+    <section className="detail-surface" aria-labelledby="tenant-members-title">
       <h2 id="tenant-members-title">Members</h2>
       {memberState.status === "loading" ? (
         <StatusMessage>Loading members…</StatusMessage>

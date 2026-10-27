@@ -267,7 +267,7 @@ export function PageEditor({
   }
 
   return (
-    <section className="editor-surface" aria-labelledby="page-editor-title">
+    <section className="editor-surface detail-surface" aria-labelledby="page-editor-title">
       <div ref={commandBar} className="editor-command-bar">
       <div className="editor-page-context">
         <h2 id="page-editor-title">{loadedState.page.title}</h2>
