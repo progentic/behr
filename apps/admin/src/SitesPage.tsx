@@ -1,4 +1,4 @@
-import { AlertMessage, SelectableResourceItem, StatusMessage } from "@bher/ui";
+import { AlertMessage, StatusMessage } from "@bher/ui";
 import {
   type SiteSummary,
   type TenantAccess,
@@ -7,7 +7,7 @@ import {
 } from "@bher/contracts";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { AdminShell } from "./AdminShell";
+import { AdminShell, NavigationIcon } from "./AdminShell";
 import { DashboardOverview } from "./DashboardOverview";
 import { PageList } from "./PageList";
 import { SiteCreateForm } from "./SiteCreateForm";
@@ -160,28 +160,30 @@ export function SitesPage({ editorDirty, onDirtyChange, account, error }: Readon
       : null;
 
   return (
-    <AdminShell account={account}
+    <AdminShell account={<>{account}
+      <div className="tenant-context">
+        <label htmlFor="tenant-selector">Switch workspace</label>
+        <select id="tenant-selector" value={selectedTenant.id} onChange={(event) => {
+          const nextTenantId = event.currentTarget.value;
+          if (nextTenantId === selectedTenant.id || !confirmEditorNavigation(editorDirty)) return;
+          setSelectedTenantId(nextTenantId);
+          setSelectedSiteId(null);
+          setSiteState({ status: "loading", tenantId: nextTenantId });
+          setWorkspaceView("overview");
+          setCreation(null);
+          const menu = event.currentTarget.closest("details");
+          if (menu) { menu.open = false; menu.querySelector("summary")?.focus(); }
+        }}>
+          {tenantState.tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+        </select>
+        <span className="field-help">{selectedTenant.role === "owner" ? "Owner" : "Member"}</span>
+      </div>
+    </>}
       context={<><span>{selectedTenant.name}</span><span aria-hidden="true" className="context-separator">/</span><strong>{workspaceView === "overview" ? "Overview" : workspaceView === "members" ? "Tenant members" : selectedSite?.name ?? "Sites"}</strong></>}
       sidebar={(close) => (
         <nav className="workspace-navigation" aria-label="Workspace">
-          <div className="tenant-context">
-            <label htmlFor="tenant-selector">Tenant</label>
-            <select id="tenant-selector" value={selectedTenant.id} onChange={(event) => {
-              const nextTenantId = event.currentTarget.value;
-              if (nextTenantId === selectedTenant.id || !confirmEditorNavigation(editorDirty)) return;
-              setSelectedTenantId(nextTenantId);
-              setSelectedSiteId(null);
-              setSiteState({ status: "loading", tenantId: nextTenantId });
-              setWorkspaceView("overview");
-              setCreation(null);
-              close();
-            }}>
-              {tenantState.tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-            </select>
-            <span className="field-help">{selectedTenant.role === "owner" ? "Owner" : "Member"}</span>
-          </div>
           <button className="overview-navigation" type="button" aria-pressed={workspaceView === "overview"}
-            onClick={() => { if (confirmEditorNavigation(editorDirty)) { setWorkspaceView("overview"); setCreation(null); close(); } }}>Overview</button>
+            onClick={() => { if (confirmEditorNavigation(editorDirty)) { setWorkspaceView("overview"); setCreation(null); close(); } }}><NavigationIcon kind="overview" />Overview</button>
           <div className="site-context">
             <h2>Sites</h2>
             <SiteList selectedSiteId={selectedSiteId} selectedTenantId={selectedTenant.id} state={siteState}
@@ -191,21 +193,25 @@ export function SitesPage({ editorDirty, onDirtyChange, account, error }: Readon
                 setWorkspaceView("pages");
                 setCreation(null);
                 close();
-              }} />
+              }}>
+              <nav className="workspace-views" aria-label="Site views">
+                <button type="button" aria-pressed={workspaceView === "pages"}
+                  onClick={() => { setWorkspaceView("pages"); setCreation(null); close(); }}>Pages</button>
+                {selectedTenant.role === "owner" ? <button type="button" aria-pressed={workspaceView === "settings"}
+                  onClick={() => { if (confirmEditorNavigation(editorDirty)) { setWorkspaceView("settings"); setCreation(null); close(); } }}>Site settings</button> : null}
+              </nav>
+            </SiteList>
           </div>
-          <nav className="workspace-views" aria-label="Workspace views">
-            {selectedSite ? <button type="button" aria-pressed={workspaceView === "pages"}
-              onClick={() => { setWorkspaceView("pages"); setCreation(null); close(); }}>Pages</button> : null}
-            {selectedTenant.role === "owner" && selectedSite ? <button type="button" aria-pressed={workspaceView === "settings"}
-              onClick={() => { if (confirmEditorNavigation(editorDirty)) { setWorkspaceView("settings"); setCreation(null); close(); } }}>Site settings</button> : null}
+          <details className="global-site-settings" key={selectedTenant.id}>
+            <summary><NavigationIcon kind="settings" />Global site settings</summary>
+            <nav className="workspace-views" aria-label="Global site settings">
             {selectedTenant.role === "owner" ? <button type="button" aria-pressed={workspaceView === "members"}
-              onClick={() => { if (confirmEditorNavigation(editorDirty)) { setWorkspaceView("members"); setCreation(null); close(); } }}>Tenant members</button> : null}
-          </nav>
-          <div className="workspace-create-actions">
-            <button type="button" onClick={() => { setCreation({ kind: "tenant" }); close(); }}>New tenant</button>
+              onClick={() => { if (confirmEditorNavigation(editorDirty)) { setWorkspaceView("members"); setCreation(null); close(); } }}>Workspace members</button> : null}
+            <button type="button" onClick={() => { setCreation({ kind: "tenant" }); close(); }}>New workspace</button>
             {selectedTenant.role === "owner" ? <button type="button"
               onClick={() => { setCreation({ kind: "site" }); close(); }}>New site</button> : null}
-          </div>
+            </nav>
+          </details>
         </nav>
       )}>
       {error ? <AlertMessage>{error}</AlertMessage> : null}
@@ -296,11 +302,13 @@ function SiteList({
   selectedSiteId,
   selectedTenantId,
   state,
+  children,
 }: Readonly<{
   onSelect: (siteId: string) => void;
   selectedSiteId: string | null;
   selectedTenantId: string;
   state: SiteState;
+  children: ReactNode;
 }>) {
   if (
     state.status === "idle" ||
@@ -318,14 +326,12 @@ function SiteList({
   return (
     <ul>
       {state.sites.map((site) => (
-        <SelectableResourceItem
-          key={site.id}
-          selected={selectedSiteId === site.id}
-          onSelect={() => onSelect(site.id)}
-        >
-          <strong>{site.name}</strong>
-          <span>{site.hostname}</span>
-        </SelectableResourceItem>
+        <li key={site.id} className="site-navigation-item">
+          <button type="button" aria-pressed={selectedSiteId === site.id} aria-expanded={selectedSiteId === site.id} onClick={() => onSelect(site.id)}>
+            <NavigationIcon kind="site" /><span>{site.name}</span>
+          </button>
+          {selectedSiteId === site.id ? children : null}
+        </li>
       ))}
     </ul>
   );

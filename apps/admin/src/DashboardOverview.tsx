@@ -36,20 +36,20 @@ export function DashboardOverview({ tenant, sites, onOpenSite, onNewSite, onMemb
 
   return (
     <section className="dashboard-overview" aria-labelledby="overview-title">
+      <div className="overview-main">
       <div className="overview-heading">
-        <div><h1 id="overview-title">Overview</h1><p>{tenant.name}</p></div>
-        <span className="field-help">Current tenant · All sites</span>
+        <h1 id="overview-title">Overview</h1>
+        <span className="field-help">All sites</span>
       </div>
       <dl className="overview-metrics" aria-label="Tenant content totals">
-        <div><dt>Sites</dt><dd>{formatCount(sites.length)}</dd><dd className="metric-description">In this workspace</dd></div>
-        <div><dt>Pages</dt><dd>{totals ? formatCount(totals.pages) : "—"}</dd><dd className="metric-description">Across all sites</dd></div>
-        <div><dt>Images</dt><dd>{totals ? formatCount(totals.images) : "—"}</dd><dd className="metric-description">Uploaded assets</dd></div>
-        <div><dt>Image storage</dt><dd>{totals ? formatBytes(totals.bytes) : "—"}</dd><dd className="metric-description">Original image files</dd></div>
+        <div><dt>Sites</dt><dd>{formatCount(sites.length)}</dd></div>
+        <div><dt>Pages</dt><dd>{totals ? formatCount(totals.pages) : "—"}</dd></div>
+        <div><dt>Images</dt><dd>{totals ? formatCount(totals.images) : "—"}</dd></div>
+        <div><dt>Image storage</dt><dd>{totals ? formatBytes(totals.bytes) : "—"}</dd></div>
       </dl>
       {!content && !failed ? <StatusMessage>Loading content overview…</StatusMessage> : null}
       {failed ? <div className="overview-error"><AlertMessage>Content totals could not be loaded. Your sites are still available below.</AlertMessage>
         <button type="button" onClick={() => setAttempt((value) => value + 1)}>Retry overview</button></div> : null}
-      <div className="overview-columns">
         <section className="overview-panel" aria-labelledby="overview-sites-title">
           <div className="overview-panel-heading"><h2 id="overview-sites-title">Your sites</h2>
             {tenant.role === "owner" ? <button type="button" onClick={onNewSite}>New site</button> : null}</div>
@@ -65,14 +65,14 @@ export function DashboardOverview({ tenant, sites, onOpenSite, onNewSite, onMemb
             </ul>
           )}
         </section>
-        <aside className="overview-panel overview-workspace" aria-labelledby="overview-workspace-title">
+      </div>
+        <aside className="overview-workspace" aria-labelledby="overview-workspace-title">
           <h2 id="overview-workspace-title">Workspace</h2>
-          <dl><div><dt>Tenant</dt><dd>{tenant.name}</dd></div><div><dt>Your role</dt><dd>{tenant.role === "owner" ? "Owner" : "Member"}</dd></div></dl>
+          <dl><div><dt>Your role</dt><dd>{tenant.role === "owner" ? "Owner" : "Member"}</dd></div></dl>
           <p>{tenant.role === "owner" ? "Manage sites and people, write content, and publish when it is ready." : "Write content, upload images, and preview saved drafts. An owner handles publication."}</p>
           {tenant.role === "owner" ? <button type="button" onClick={onMembers}>Manage members</button> : null}
-          <p className="field-help">Choose a site to open its pages.</p>
+          <p className="field-help">Totals cover all sites in this tenant. Image storage counts original files.</p>
         </aside>
-      </div>
     </section>
   );
 }

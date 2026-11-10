@@ -70,6 +70,7 @@ function AuthenticatedShell({
     <SitesPage editorDirty={editorDirty} onDirtyChange={setEditorDirty}
       error={error}
       account={<div className="account-controls">
+        <strong>{user.displayName}</strong>
         <span>{user.email}</span>
         <ActionButton variant="secondary" type="button" onClick={() => {
           if (confirmEditorNavigation(editorDirty)) void onLogout();
