@@ -2789,3 +2789,25 @@ fixture refused migration with its rows, old schema and migration journal intact
 The existing persistence integration and schema checks were extended only for
 the changed identity key. This is bounded authentication compatibility evidence,
 not a new general release/upgrade certification or a mutation of v1.0.0.
+
+## Post-release visual authoring and authenticated image reads
+
+Editor.js 2.31.7 replaces the separate block forms with section-local visual
+canvases and a canonical JSON code mode. The adapter retains document/block IDs,
+plain text, heading levels, alignment, section width/spacing and decorative alt
+text. It keeps explicit save, upload-then-insert, owner-only publication, saved
+preview, dirty navigation and resource/revision confinement. Invalid JSON stays
+editable and blocks save and preview; canvas failures retain the last readable
+document. Exact hashes permit the pinned editor's injected styles without an
+unsafe-inline CSP allowance. No arbitrary HTML or new content type is supported.
+
+A membership-authenticated asset-content read returns only renderable images
+belonging to the requested tenant/site. Existing public and preview authorities
+are unchanged. The existing real asset lifecycle integration test now checks
+owner/member reads, bytes and security headers, unauthenticated and cross-scope
+denial, invalid identities, and PDF/SVG rejection (107 assertions). Focused
+editor/API tests cover JSON fidelity, invalid input, manual-save races and asset
+confinement. Browser review covers literal-text editing, JSON recovery, explicit
+save, authenticated images and 320px confinement. Earlier review also exercised
+keyboard image settings/reordering and empty-section insertion. These checks do
+not claim screen-reader certification or a new release acceptance gate.

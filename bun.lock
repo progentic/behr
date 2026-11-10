@@ -15,6 +15,7 @@
         "@bher/contracts": "workspace:1.0.0",
         "@bher/editor": "workspace:1.0.0",
         "@bher/ui": "workspace:1.0.0",
+        "@editorjs/editorjs": "2.31.7",
         "react": "18.3.1",
         "react-dom": "18.3.1",
       },
@@ -146,6 +147,14 @@
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
 
+    "@editorjs/caret": ["@editorjs/caret@1.1.0", "", { "dependencies": { "@editorjs/dom": "^1.1.0" } }, "sha512-dzUjrPV7mtqM0HR/7IwT1/1PfyMxUfe5MRXo9joFmBRDIcrQ5ikbqVxSL9+Hy5tQ+BUWBwqLUgX1UKTJylWW9Q=="],
+
+    "@editorjs/dom": ["@editorjs/dom@1.2.0", "", { "dependencies": { "@editorjs/helpers": "^1.2.2" } }, "sha512-0b7kyM6bKBNqr90JruQCghwoR7zFfXJp1Ysuj2CG8Df1lGBq2/aKGzPnJteXgFHmViykdebAVTICvQsUk9ocHQ=="],
+
+    "@editorjs/editorjs": ["@editorjs/editorjs@2.31.7", "", { "dependencies": { "@editorjs/caret": "^1.0.1", "codex-notifier": "^1.1.2", "codex-tooltip": "^1.0.5" } }, "sha512-te4wI1heK3B8s0pz1asyRPEmOglfkb9ex5nvvCN5OUVDLSnohTszI+yyLI73qOIuUWxenIvJYkOuGHzh/a47Hw=="],
+
+    "@editorjs/helpers": ["@editorjs/helpers@1.2.3", "", { "dependencies": { "codex-tooltip": "^1.1.0" } }, "sha512-8NnWyZhVqfkaDSRTOpayd8oaGkppw00XvOvUIxPB6SZFd9LKgQo31o9v6eDK4XFsbTed8LQt2xmvZFFK9wNTSg=="],
+
     "@esbuild-kit/core-utils": ["@esbuild-kit/core-utils@3.3.2", "", { "dependencies": { "esbuild": "~0.18.20", "source-map-support": "^0.5.21" } }, "sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ=="],
 
     "@esbuild-kit/esm-loader": ["@esbuild-kit/esm-loader@2.6.5", "", { "dependencies": { "@esbuild-kit/core-utils": "^3.3.2", "get-tsconfig": "^4.7.0" } }, "sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA=="],
@@ -267,6 +276,10 @@
     "buffer-from": ["buffer-from@1.1.2", "", {}, "sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ=="],
 
     "bun-types": ["bun-types@1.4.0", "", { "dependencies": { "@types/node": "*" } }, "sha512-iIKw23BspnQQYd3prITOBxeUsxBHnwzX6YJfGMuNOZzeNcMmVqzIIVGRm1l69ogaPQmb4wB6BN8mA5bE9YuC5Q=="],
+
+    "codex-notifier": ["codex-notifier@1.1.2", "", {}, "sha512-DCp6xe/LGueJ1N5sXEwcBc3r3PyVkEEDNWCVigfvywAkeXcZMk9K41a31tkEFBW0Ptlwji6/JlAb49E3Yrxbtg=="],
+
+    "codex-tooltip": ["codex-tooltip@1.1.0", "", {}, "sha512-4AHzIapwZ979nzOPR9YYd8GU+xRAxrc5i5vV6+A6OZRRarLW2ToJZv63E/sYONeJSxUQ1Dyn+PtnVGA3OuoKhA=="],
 
     "csstype": ["csstype@3.2.3", "", {}, "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="],
 

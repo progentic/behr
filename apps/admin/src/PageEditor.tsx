@@ -1,12 +1,9 @@
 import {
   type AssetListItem,
-  type Block,
-  type HeadingBlock,
   type PageDocument,
   type PageDraft,
   type SavePageDraftRequest,
   type Section,
-  type TextAlignToken,
   type TenantRole,
   assetListResponseSchema,
   pageDocumentSchema,
@@ -14,18 +11,9 @@ import {
   savePageDraftRequestSchema,
 } from "@bher/contracts";
 import {
-  addHeadingBlock,
-  addImageBlock,
-  addParagraphBlock,
   addSection,
-  moveBlock,
   moveSection,
-  removeBlock,
   removeSection,
-  updateBlockText,
-  updateHeadingLevel,
-  updateImageAlt,
-  updateTextAlignment,
 } from "@bher/editor";
 import type { DragEvent } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -34,12 +22,13 @@ import { ActionButton, AlertMessage, StatusMessage } from "@bher/ui";
 import { requestApi } from "./lib/api";
 import { AssetUploadForm } from "./AssetUploadForm";
 import { PagePublicationControls } from "./PagePublicationControls";
+import { SectionCanvas } from "./SectionCanvas";
+import { parseEditorJson, replaceSectionBlocks } from "./editor-document";
 
 const INVALID_DOCUMENT_MESSAGE =
   "The page contains invalid content and cannot be saved.";
 const FIX_DOCUMENT_MESSAGE =
   "Fix the highlighted page content before saving.";
-const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
 const DRAG_MARKER = "behr-editor-drag";
 
 export type EditorIdentity = Readonly<{
@@ -132,7 +121,11 @@ export function PageEditor({
     siteId,
   });
   const [draggedItem, setDraggedItem] = useState<DraggedEditorItem | null>(null);
-  const dirty = isEditorDirty(state);
+  const [mode, setMode] = useState<"visual" | "code">("visual");
+  const [jsonText, setJsonText] = useState("");
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [canvasFailed, setCanvasFailed] = useState(false);
+  const dirty = isEditorDirty(state) || jsonError !== null || canvasFailed;
 
   useEffect(() => {
     const bar = commandBar.current;
@@ -169,6 +162,7 @@ export function PageEditor({
     };
     let active = true;
     setState({ status: "loading", identity });
+    setMode("visual"); setJsonText(""); setJsonError(null); setCanvasFailed(false);
     void requestPageDraft(tenantId, siteId, pageId)
       .then((draft) => {
         if (active) {
@@ -229,11 +223,12 @@ export function PageEditor({
     clearFieldError?: string,
   ): void {
     setState((current) =>
-      applyDocumentEdit(current, transform, clearFieldError),
+      matchesEditorIdentity(current.identity, loadedState.identity) ? applyDocumentEdit(current, transform, clearFieldError) : current,
     );
   }
 
   async function saveDraft(): Promise<void> {
+    if (jsonError || canvasFailed) return;
     const preparation = prepareDraftSave(loadedState.document);
     if (!preparation.request) {
       setState((current) =>
@@ -274,12 +269,14 @@ export function PageEditor({
         <p className="field-help">{hostname}<span>/{loadedState.page.slug}</span></p>
       </div>
       <div id="page-save-status" className="editor-save-feedback">
-        {loadedState.save.status === "error" ? <AlertMessage>{loadedState.save.message}</AlertMessage>
+        {jsonError ? <div id="page-json-error"><AlertMessage>{jsonError}</AlertMessage></div>
+          : canvasFailed ? <AlertMessage>The canvas could not be read. Your last readable document is retained; use Code to recover it.</AlertMessage>
+          : loadedState.save.status === "error" ? <AlertMessage>{loadedState.save.message}</AlertMessage>
           : loadedState.formError ? <AlertMessage>{loadedState.formError}</AlertMessage>
           : <p className={`editor-save-state${loadedState.save.status === "saved" ? " saved" : ""}`} role="status">{readEditorSaveLabel(loadedState)}</p>}
       </div>
       <div className="editor-page-actions">
-        <ActionButton type="button" variant="primary" disabled={loadedState.save.status === "saving"} onClick={() => void saveDraft()}>
+        <ActionButton type="button" variant="primary" disabled={loadedState.save.status === "saving" || jsonError !== null || canvasFailed} onClick={() => void saveDraft()}>
           {loadedState.save.status === "saving" ? "Saving…" : "Save draft"}
         </ActionButton>
         <PagePublicationControls
@@ -288,6 +285,16 @@ export function PageEditor({
           hostname={hostname} slug={loadedState.page.slug} role={role} dirty={dirty}
         />
       </div>
+      </div>
+      <div className="editor-mode-actions" role="group" aria-label="Editing mode">
+        <button type="button" aria-pressed={mode === "visual"} disabled={jsonError !== null} onClick={() => setMode("visual")}>Visual</button>
+        <button type="button" aria-pressed={mode === "code"} onClick={() => {
+          if (mode === "code") return;
+          if (canvasFailed && !window.confirm("The last canvas action could not be read. Open the last readable document in Code?")) return;
+          setJsonText(JSON.stringify(loadedState.document, null, 2));
+          setJsonError(parseEditorJson(JSON.stringify(loadedState.document)).error);
+          setCanvasFailed(false); setMode("code");
+        }}>Code · JSON</button>
       </div>
       <details className="editor-images">
         <summary>Site images</summary>
@@ -299,7 +306,20 @@ export function PageEditor({
           } />
         ) : null}
       </details>
-      {loadedState.document.sections.map((section, sectionIndex) => (
+      {mode === "code" ? <div className="json-editor">
+        <label htmlFor="page-json">Page document JSON</label>
+        <p id="page-json-help" className="field-help">Edits update this draft only. Valid JSON is required to return to Visual or save.</p>
+        <textarea id="page-json" spellCheck={false} value={jsonText} aria-invalid={jsonError !== null} aria-describedby={jsonError ? "page-json-help page-json-error" : "page-json-help"}
+          onChange={(event) => {
+            const text = event.currentTarget.value; setJsonText(text);
+            const parsed = parseEditorJson(text); setJsonError(parsed.error);
+            if (parsed.document) transformDocument((current) => JSON.stringify(current) === JSON.stringify(parsed.document) ? current : parsed.document!);
+          }} />
+        {jsonError ? <button type="button" onClick={() => {
+          if (!window.confirm("Discard invalid JSON text and return to the last readable document?")) return;
+          setJsonError(null); setMode("visual");
+        }}>Discard invalid JSON</button> : null}
+      </div> : <div className="visual-page-canvas">{loadedState.document.sections.map((section, sectionIndex) => (
         <SectionEditor
           key={section.id}
           section={section}
@@ -310,6 +330,7 @@ export function PageEditor({
           setDraggedItem={setDraggedItem}
           fieldErrors={loadedState.fieldErrors}
           transformDocument={transformDocument}
+          tenantId={tenantId} siteId={siteId} onFailure={() => setCanvasFailed(true)}
         />
       ))}
       <button
@@ -322,6 +343,7 @@ export function PageEditor({
       >
         Add section
       </button>
+      </div>}
     </section>
   );
 }
@@ -335,6 +357,7 @@ function SectionEditor({
   setDraggedItem,
   fieldErrors,
   transformDocument,
+  tenantId, siteId, onFailure,
 }: Readonly<{
   section: Section;
   sectionIndex: number;
@@ -347,10 +370,13 @@ function SectionEditor({
     transform: DocumentTransform,
     clearFieldError?: string,
   ) => void;
+  tenantId: string; siteId: string; onFailure: () => void;
 }>) {
   return (
     <section role="group" aria-label={`Section ${sectionIndex + 1}`}
-      className="editor-section"
+      className="editor-section visual-section"
+      data-width={section.style?.width ?? "standard"}
+      data-spacing={section.style?.spacing}
       onDragOver={(event) => {
         if (draggedItem?.kind === "section") {
           event.preventDefault();
@@ -378,236 +404,24 @@ function SectionEditor({
           onRemove={() => transformDocument((document) => removeSection(document, section.id))}
         />
       </div>
-      {section.blocks.map((block, blockIndex) => (
-        <BlockEditor
-          key={block.id}
-          block={block}
-          blockIndex={blockIndex}
-          blockCount={section.blocks.length}
-          assets={assets}
-          sectionId={section.id}
-          draggedItem={draggedItem}
-          setDraggedItem={setDraggedItem}
-          fieldError={fieldErrors[block.id]}
-          transformDocument={transformDocument}
-        />
-      ))}
-      <div className="editor-add-block">
-      <button
-        type="button"
-        onClick={() =>
-          transformDocument((document) =>
-            addHeadingBlock(document, section.id, crypto.randomUUID()),
-          )
-        }
-      >
-        Add heading
-      </button>
-      <button
-        type="button"
-        onClick={() =>
-          transformDocument((document) =>
-            addParagraphBlock(document, section.id, crypto.randomUUID()),
-          )
-        }
-      >
-        Add paragraph
-      </button>
-      {assets.length > 0 ? (
-        <>
-          <label htmlFor={`section-${section.id}-asset`}>Add image</label>
-          <select
-            id={`section-${section.id}-asset`}
-            value=""
-            onChange={(event) => {
-              const assetId = event.currentTarget.value;
-              if (assetId.length > 0) {
-                transformDocument((document) =>
-                  addImageBlock(
-                    document,
-                    section.id,
-                    crypto.randomUUID(),
-                    assetId,
-                  ),
-                );
-              }
-            }}
-          >
-            <option value="">Select an asset…</option>
-            {assets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.originalFilename}
-              </option>
-            ))}
-          </select>
-        </>
-      ) : null}
-      </div>
+      <details className="section-layout">
+        <summary>Section layout</summary>
+        <label>Width<select value={section.style?.width ?? "standard"} onChange={(event) => {
+          const width = event.currentTarget.value as "narrow" | "standard" | "wide";
+          transformDocument((document) => ({ ...document, sections: document.sections.map((item) => item.id === section.id ? { ...item, style: { ...item.style, width } } : item) }));
+        }}><option value="narrow">Narrow</option><option value="standard">Standard</option><option value="wide">Wide</option></select></label>
+        <label>Spacing<select value={section.style?.spacing ?? "md"} onChange={(event) => {
+          const spacing = event.currentTarget.value as "none" | "sm" | "md" | "lg";
+          transformDocument((document) => ({ ...document, sections: document.sections.map((item) => item.id === section.id ? { ...item, style: { ...item.style, spacing } } : item) }));
+        }}><option value="none">None</option><option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option></select></label>
+      </details>
+      <SectionCanvas section={section} tenantId={tenantId} siteId={siteId} assets={assets} errors={fieldErrors}
+        onChange={(blocks, changedId) => transformDocument((document) => replaceSectionBlocks(document, section.id, blocks), changedId)}
+        onFailure={onFailure} />
     </section>
   );
 }
 
-function BlockEditor({
-  block,
-  blockIndex,
-  blockCount,
-  assets,
-  sectionId,
-  draggedItem,
-  setDraggedItem,
-  fieldError,
-  transformDocument,
-}: Readonly<{
-  block: Block;
-  blockIndex: number;
-  blockCount: number;
-  assets: AssetListItem[];
-  sectionId: string;
-  draggedItem: DraggedEditorItem | null;
-  setDraggedItem: (item: DraggedEditorItem | null) => void;
-  fieldError: string | undefined;
-  transformDocument: (
-    transform: DocumentTransform,
-    clearFieldError?: string,
-  ) => void;
-}>) {
-  const inputId = `block-${block.id}`;
-  return (
-    <div
-      className="editor-block"
-      role="group"
-      aria-label={`${block.type} block ${blockIndex + 1}`}
-      onDragOver={(event) => {
-        if (draggedItem?.kind === "block") {
-          event.stopPropagation();
-          if (draggedItem.sectionId === sectionId) {
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "move";
-          }
-        }
-      }}
-      onDrop={(event) => {
-        if (draggedItem?.kind !== "block") {
-          return;
-        }
-        event.stopPropagation();
-        if (draggedItem.sectionId !== sectionId) {
-          return;
-        }
-        event.preventDefault();
-        transformDocument((document) =>
-          moveBlock(document, sectionId, draggedItem.blockId, blockIndex),
-        );
-        setDraggedItem(null);
-      }}
-    >
-      <EditorItemActions kind="block" first={blockIndex === 0} last={blockIndex === blockCount - 1}
-        onDragStart={(event) => { event.stopPropagation(); setDraggedItem({ kind: "block", sectionId, blockId: block.id }); initializeDrag(event); }}
-        onDragEnd={(event) => { event.stopPropagation(); setDraggedItem(null); }}
-        onUp={() => transformDocument((document) => moveBlock(document, sectionId, block.id, blockIndex - 1))}
-        onDown={() => transformDocument((document) => moveBlock(document, sectionId, block.id, blockIndex + 1))}
-        onRemove={() => transformDocument((document) => removeBlock(document, sectionId, block.id), block.id)}
-      />
-      {block.type === "image" ? (
-        <ImageBlockFields
-          block={block}
-          sectionId={sectionId}
-          asset={assets.find(({ id }) => id === block.assetId)}
-          transformDocument={transformDocument}
-        />
-      ) : (
-        <>
-          <label htmlFor={inputId}>
-            {block.type === "heading" ? "Heading" : "Paragraph"}
-          </label>
-          {block.type === "heading" ? (
-            <input
-              id={inputId}
-              value={block.text}
-              aria-invalid={fieldError ? true : undefined}
-              aria-describedby={fieldError ? `${inputId}-error` : undefined}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                transformDocument(
-                  (document) =>
-                    updateBlockText(
-                      document,
-                      sectionId,
-                      block.id,
-                      value,
-                    ),
-                  block.id,
-                );
-              }}
-            />
-          ) : (
-            <textarea
-              id={inputId}
-              value={block.text}
-              aria-invalid={fieldError ? true : undefined}
-              aria-describedby={fieldError ? `${inputId}-error` : undefined}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                transformDocument(
-                  (document) =>
-                    updateBlockText(
-                      document,
-                      sectionId,
-                      block.id,
-                      value,
-                    ),
-                  block.id,
-                );
-              }}
-            />
-          )}
-          {fieldError ? <p id={`${inputId}-error`}>{fieldError}</p> : null}
-          <details className="block-properties">
-          <summary>Properties</summary>
-          {block.type === "heading" ? (
-            <>
-              <label htmlFor={`${inputId}-level`}>Level</label>
-              <select
-                id={`${inputId}-level`}
-                value={block.level}
-                onChange={(event) => {
-                  const level = readHeadingLevel(event.currentTarget.value);
-                  transformDocument((document) =>
-                    updateHeadingLevel(document, sectionId, block.id, level),
-                  );
-                }}
-              >
-                {HEADING_LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {level}
-                  </option>
-                ))}
-              </select>
-            </>
-          ) : null}
-          <label htmlFor={`${inputId}-alignment`}>Alignment</label>
-          <select
-            id={`${inputId}-alignment`}
-            value={block.style?.align ?? ""}
-            onChange={(event) => {
-              const alignment = readTextAlignment(event.currentTarget.value);
-              transformDocument((document) =>
-                updateTextAlignment(document, sectionId, block.id, alignment),
-              );
-            }}
-          >
-            <option value="">Default</option>
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
-          </select>
-          </details>
-        </>
-      )}
-
-    </div>
-  );
-}
 
 export function EditorItemActions({ kind, first, last, onDragStart, onDragEnd, onUp, onDown, onRemove }: Readonly<{
   kind: "section" | "block"; first: boolean; last: boolean;
@@ -631,48 +445,6 @@ export function EditorItemActions({ kind, first, last, onDragStart, onDragEnd, o
   );
 }
 
-function ImageBlockFields({
-  block,
-  sectionId,
-  asset,
-  transformDocument,
-}: Readonly<{
-  block: Extract<Block, { type: "image" }>;
-  sectionId: string;
-  asset: AssetListItem | undefined;
-  transformDocument: (
-    transform: DocumentTransform,
-    clearFieldError?: string,
-  ) => void;
-}>) {
-  const inputId = `block-${block.id}-alt`;
-  const hintId = `${inputId}-hint`;
-  return (
-    <>
-      <p>Image: {asset?.originalFilename ?? "Unavailable image"}</p>
-      <label htmlFor={inputId}>Alternative text</label>
-      <input
-        id={inputId}
-        value={block.alt}
-        aria-describedby={hintId}
-        onChange={(event) => {
-          const value = event.currentTarget.value;
-          transformDocument((document) =>
-            updateImageAlt(
-              document,
-              sectionId,
-              block.id,
-              value,
-            ),
-          );
-        }}
-      />
-      <p className="field-help" id={hintId}>
-        Leave empty only for a decorative image.
-      </p>
-    </>
-  );
-}
 
 export function isEditorDirty(state: PageEditorState): boolean {
   return state.status === "loaded" && (
@@ -823,7 +595,7 @@ export function prepareDraftSave(
       typeof sectionIndex !== "number" ||
       blocksKey !== "blocks" ||
       typeof blockIndex !== "number" ||
-      fieldKey !== "text"
+      (fieldKey !== "text" && fieldKey !== "assetId")
     ) {
       continue;
     }
@@ -833,6 +605,9 @@ export function prepareDraftSave(
     }
     if (block?.type === "paragraph") {
       fieldErrors[block.id] = "Paragraph text is required.";
+    }
+    if (block?.type === "image" && fieldKey === "assetId") {
+      fieldErrors[block.id] = "Choose an image in this block’s settings.";
     }
   }
   return {
@@ -1010,17 +785,4 @@ function matchesResourceIdentity(
 function initializeDrag(event: DragEvent<HTMLElement>): void {
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", DRAG_MARKER);
-}
-
-function readHeadingLevel(value: string): HeadingBlock["level"] {
-  const level = Number(value);
-  return HEADING_LEVELS.includes(level as HeadingBlock["level"])
-    ? (level as HeadingBlock["level"])
-    : 2;
-}
-
-function readTextAlignment(value: string): TextAlignToken | undefined {
-  return value === "left" || value === "center" || value === "right"
-    ? value
-    : undefined;
 }

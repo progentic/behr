@@ -64,6 +64,7 @@ test("allows credentialed auth requests only for the configured admin origin", a
     },
     {
       resolveAssetSite: async () => false,
+      resolveSiteAsset: async () => { throw new Error("Image reads are not used by this CORS test."); },
       createAssetMetadata: async () => null,
       listSiteAssets: async () => [],
     },

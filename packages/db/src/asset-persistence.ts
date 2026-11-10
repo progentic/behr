@@ -20,6 +20,7 @@ export type AssetMetadataRecord = Readonly<{
 }>;
 
 export type AssetPersistence = Readonly<{
+  resolveSiteAsset: (tenantId: string, siteId: string, assetId: string) => Promise<{ storageKey: string; contentType: string } | null>;
   resolveAssetSite: (tenantId: string, siteId: string) => Promise<boolean>;
   createAssetMetadata: (
     tenantId: string,
@@ -36,6 +37,7 @@ export function createAssetPersistence(
   client: DatabaseClient,
 ): AssetPersistence {
   return Object.freeze({
+    resolveSiteAsset: (tenantId, siteId, assetId) => resolveSiteAsset(client, tenantId, siteId, assetId),
     resolveAssetSite: (tenantId, siteId) =>
       resolveAssetSite(client, tenantId, siteId),
     createAssetMetadata: (tenantId, siteId, metadata) =>
@@ -43,6 +45,16 @@ export function createAssetPersistence(
     listSiteAssets: (tenantId, siteId) =>
       listSiteAssets(client, tenantId, siteId),
   });
+}
+
+async function resolveSiteAsset(client: DatabaseClient, tenantId: string, siteId: string, assetId: string) {
+  const [record] = await client.drizzle
+    .select({ storageKey: assets.storageKey, contentType: assets.contentType })
+    .from(assets)
+    .innerJoin(sites, eq(sites.id, assets.siteId))
+    .where(and(eq(sites.tenantId, tenantId), eq(sites.id, siteId), eq(assets.id, assetId)))
+    .limit(1);
+  return record ?? null;
 }
 
 async function listSiteAssets(

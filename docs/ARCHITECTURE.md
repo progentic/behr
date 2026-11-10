@@ -231,6 +231,7 @@ The currently implemented public API routes are exactly:
 * `POST /tenants/:tenantId/sites/:siteId/pages/:pageId/publish`
 * `POST /tenants/:tenantId/sites/:siteId/assets`
 * `GET /tenants/:tenantId/sites/:siteId/assets`
+* `GET /tenants/:tenantId/sites/:siteId/assets/:assetId/content`
 * `GET /public/assets/:assetId`
 * `GET /preview/assets/:assetId`
 
@@ -286,6 +287,20 @@ navigation; beforeunload is registered only while unsaved. New-page creation
 appends without replacing a dirty editor; explicit later selection is guarded.
 Domain administration, custom CSS, theme catalogs/frameworks, version history,
 and publication history interfaces remain unimplemented.
+
+The visual authoring surface uses pinned Editor.js through section-local adapters.
+Heading, paragraph and image tools exchange the canonical PageDocument; Editor.js
+output is never a second persistence format. Text remains plain text. Code mode
+edits canonical JSON and blocks save/preview/publication while invalid. Existing
+manual-save revisions and resource identity guards remain authoritative. The
+neutral authoring canvas preserves section width/spacing; saved preview remains
+the authority for the site's light/dark and serif/sans presentation.
+
+Canvas images use the authenticated site-asset content route. It requires a
+session, tenant membership, and a matching tenant/site/asset identity, accepts
+only existing renderable image MIME types, and returns private/no-store,
+nosniff, same-origin responses. It exposes neither storage keys nor credentials.
+Public and preview asset authorization remain separate and unchanged.
 
 The post-release admin Overview is the default workspace after tenant selection.
 It summarizes the selected tenant's site list and the existing per-site page and

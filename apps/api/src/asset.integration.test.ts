@@ -144,6 +144,10 @@ async function verifyAssetLifecycle(): Promise<void> {
       memberCookie,
       tenant.id,
       site.id,
+      outsiderCookie,
+      otherSite.id,
+      outsiderTenant.id,
+      outsiderSite.id,
     );
     await verifyAuthorizationControls(
       application,
@@ -357,6 +361,10 @@ async function verifyAssetListing(
   memberCookie: string,
   tenantId: string,
   siteId: string,
+  outsiderCookie: string,
+  otherSiteId: string,
+  outsiderTenantId: string,
+  outsiderSiteId: string,
 ): Promise<void> {
   const imageResponse = await uploadFile(
     application,
@@ -379,6 +387,7 @@ async function verifyAssetListing(
     new File(["pdf"], "hidden.pdf", { type: "application/pdf" }),
   );
   expect(unsupportedResponse.status).toBe(201);
+  const unsupported = assetUploadResponseSchema.parse(await unsupportedResponse.json());
 
   for (const cookie of [ownerCookie, memberCookie]) {
     const response = await application.app.request(assetRoute(tenantId, siteId), {
@@ -399,7 +408,28 @@ async function verifyAssetListing(
       "id",
       "originalFilename",
     ]);
+    const read = await application.app.request(`${assetRoute(tenantId, siteId)}/${image.id}/content`, { headers: { cookie } });
+    expect(read.status).toBe(200);
+    expect(Array.from(new Uint8Array(await read.arrayBuffer()))).toEqual([1, 2, 3]);
+    expect(read.headers.get("content-type")).toBe("image/png");
+    expect(read.headers.get("cache-control")).toBe("private, no-store");
+    expect(read.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(read.headers.get("cross-origin-resource-policy")).toBe("same-origin");
   }
+  const readPath = `${assetRoute(tenantId, siteId)}/${image.id}/content`;
+  expect((await application.app.request(readPath)).status).toBe(401);
+  expect((await application.app.request(readPath, { headers: { cookie: outsiderCookie } })).status).toBe(404);
+  for (const path of [
+    `${assetRoute(tenantId, otherSiteId)}/${image.id}/content`,
+    `${assetRoute(outsiderTenantId, outsiderSiteId)}/${image.id}/content`,
+    `${assetRoute(tenantId, siteId)}/invalid/content`,
+    `${assetRoute(tenantId, siteId)}/${crypto.randomUUID()}/content`,
+    `${assetRoute(tenantId, siteId)}/${unsupported.id}/content`,
+  ]) expect((await application.app.request(path, { headers: { cookie: ownerCookie } })).status).toBe(404);
+  const svgUpload = await uploadFile(application, origin, ownerCookie, tenantId, siteId,
+    new File(["<svg xmlns='http://www.w3.org/2000/svg'></svg>"], "active.svg", { type: "image/svg+xml" }));
+  const svg = assetUploadResponseSchema.parse(await svgUpload.json());
+  expect((await application.app.request(`${assetRoute(tenantId, siteId)}/${svg.id}/content`, { headers: { cookie: ownerCookie } })).status).toBe(404);
 }
 
 async function verifyMultipartControls(

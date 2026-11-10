@@ -68,6 +68,8 @@ export function createAssetRoutes(
     createRequireAssetSite(assetPersistence),
     (context) => handleListAssets(context, assetPersistence),
   );
+  routes.get("/:assetId/content", createRequireAssetSite(assetPersistence),
+    (context) => handleReadImage(context, assetPersistence, assetStorage));
   routes.post(
     "/",
     createRequireTrustedOrigin(auth),
@@ -79,6 +81,21 @@ export function createAssetRoutes(
     (context) => handleAssetUpload(context, assetPersistence, assetStorage),
   );
   return routes;
+}
+
+async function handleReadImage(context: Context<ApiBindings>, persistence: AssetPersistence, storage: AssetStorage): Promise<Response> {
+  const assetId = assetIdSchema.safeParse(context.req.param("assetId"));
+  if (!assetId.success) return createAssetNotFoundResponse();
+  const record = await persistence.resolveSiteAsset(context.get("tenantAccess").id, context.req.param("siteId") ?? "", assetId.data);
+  const type = renderableAssetContentTypeSchema.safeParse(record?.contentType);
+  if (!record || !type.success) return createAssetNotFoundResponse();
+  const bytes = await storage.readOriginal(record.storageKey);
+  return new Response(bytes, { headers: {
+    "content-type": type.data,
+    "x-content-type-options": "nosniff",
+    "cache-control": "private, no-store",
+    "cross-origin-resource-policy": "same-origin",
+  } });
 }
 
 async function handleListAssets(

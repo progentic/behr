@@ -2,6 +2,7 @@ import type { AssetListItem, PageDocument, PageDraft } from "@bher/contracts";
 import { addImageBlock, moveBlock, updateBlockText } from "@bher/editor";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { parseEditorJson, replaceSectionBlocks } from "./editor-document";
 
 import {
   type EditorIdentity,
@@ -40,6 +41,31 @@ const PARAGRAPH = "66666666-6666-4666-8666-666666666666";
 const HEADING = "77777777-7777-4777-8777-777777777777";
 const ASSET = "88888888-8888-4888-8888-888888888888";
 const IMAGE = "99999999-9999-4999-8999-999999999999";
+
+test("visual/code document roundtrip preserves IDs, literal text, section styles and decorative alt", () => {
+  const value: PageDocument = { schemaVersion: 1, sections: [{ id: SECTION, style: { width: "wide", spacing: "lg" }, blocks: [
+    { id: HEADING, type: "heading", level: 3, text: "<script>literal text</script>", style: { align: "center" } },
+    { id: IMAGE, type: "image", assetId: ASSET, alt: "" },
+  ] }] };
+  expect(parseEditorJson(JSON.stringify(value)).document).toEqual(value);
+  const replacement = [{ id: PARAGRAPH, type: "paragraph" as const, text: "New text" }];
+  const changed = replaceSectionBlocks(value, SECTION, replacement);
+  expect(changed.sections[0]?.style).toEqual(value.sections[0]?.style);
+  expect(changed.sections[0]?.id).toBe(SECTION);
+  expect(changed.sections[0]?.blocks).toEqual(replacement);
+  expect(replaceSectionBlocks(value, "absent", replacement)).toBe(value);
+  expect(replaceSectionBlocks(value, SECTION, value.sections[0]!.blocks)).toBe(value);
+});
+
+test("code mode rejects invalid JSON, unsupported content and duplicate IDs without producing a replacement", () => {
+  const value = document("Retained content");
+  for (const text of ["{", JSON.stringify({ ...value, arbitraryHtml: "<div>unsafe</div>" }),
+    JSON.stringify({ ...value, sections: [value.sections[0], value.sections[0]] })]) {
+    const parsed = parseEditorJson(text);
+    expect(parsed.document).toBe(null);
+    expect(typeof parsed.error).toBe("string");
+  }
+});
 
 test("compact item actions retain native drag, named actions and boundary disabling", () => {
   const noop = () => {};
@@ -206,6 +232,12 @@ test("maps text validation and keeps empty image alt valid", () => {
   expect(validPreparation.fieldErrors).toEqual({});
   expect(validPreparation.formError).toBe(null);
   expect(validPreparation.request?.document).toEqual(validDecorativeImage);
+
+  const missingImage = structuredClone(validDecorativeImage);
+  const image = missingImage.sections[0]!.blocks.find((block) => block.type === "image")!;
+  if (image.type === "image") image.assetId = "";
+  expect(prepareDraftSave(missingImage).fieldErrors[image.id]).toBe("Choose an image in this block’s settings.");
+  expect(prepareDraftSave(missingImage).request).toBe(null);
 
   const unmapped = {
     ...validDecorativeImage,

@@ -41,6 +41,7 @@ describe("asset upload orchestration", () => {
     const routes = createTestApplication(
       {
         resolveAssetSite: async () => true,
+        resolveSiteAsset: async () => null,
         createAssetMetadata: async () => {
           throw new Error("simulated metadata failure");
         },
@@ -63,6 +64,7 @@ describe("asset upload orchestration", () => {
     const routes = createTestApplication(
       {
         resolveAssetSite: async () => true,
+        resolveSiteAsset: async () => null,
         createAssetMetadata: async () => null,
         listSiteAssets: async () => [],
       },
@@ -149,6 +151,7 @@ describe("asset upload orchestration", () => {
     const routes = createTestApplication(
       {
         resolveAssetSite: async () => true,
+        resolveSiteAsset: async () => null,
         createAssetMetadata: async () => null,
         listSiteAssets: async () => [
           {
@@ -265,6 +268,7 @@ function createUploadRequest(
 function createUnusedAssetPersistence(): AssetPersistence {
   return {
     resolveAssetSite: async () => true,
+    resolveSiteAsset: async () => null,
     createAssetMetadata: async () => {
       throw new Error("Metadata is not used by multipart error tests.");
     },

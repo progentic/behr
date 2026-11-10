@@ -227,6 +227,43 @@ html { background: var(--admin-canvas); }
 .overview-workspace > button { justify-self: start; }
 .overview-empty { display: grid; gap: .75rem; padding-block: 2rem; color: var(--admin-text-muted); }
 .overview-error { display: grid; justify-items: start; gap: .75rem; }
+.editor-mode-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.editor-mode-actions [aria-pressed="true"] { text-decoration: underline; text-underline-offset: .25em; background: var(--admin-surface-muted); }
+.json-editor { display: grid; gap: .75rem; }
+.behr-admin .json-editor textarea { min-block-size: 55vh; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .875rem; line-height: 1.6; tab-size: 2; }
+.visual-page-canvas { padding: 1.5rem; background: white; color: #111; }
+.visual-section { margin-inline: auto; inline-size: 100%; max-inline-size: 58rem; border: 0; padding-block: 3rem; }
+.visual-section:first-child:not([data-spacing]) { padding-block-start: 0; }
+.visual-section[data-width="narrow"] { max-inline-size: 42rem; }
+.visual-section[data-width="wide"] { max-inline-size: 76rem; }
+.visual-section[data-spacing="none"] { padding-block: 0; }
+.visual-section[data-spacing="sm"] { padding-block: 1.5rem; }
+.visual-section[data-spacing="lg"] { padding-block: 5rem; }
+.visual-section > .section-heading { color: var(--admin-text-muted); border-block-end: 1px solid var(--admin-border); }
+.section-layout { max-inline-size: 25rem; color: var(--admin-text-muted); }
+.section-layout[open] { display: grid; gap: .75rem; }
+.section-layout label { display: grid; gap: .5rem; }
+.section-canvas { min-inline-size: 0; }
+.section-canvas .ce-block__content, .section-canvas .ce-toolbar__content { max-width: none; }
+.section-canvas .codex-editor__redactor { padding-inline: 3rem 0; }
+.section-canvas .codex-editor--narrow .codex-editor__redactor { margin-right: 0; }
+.canvas-block { min-inline-size: 0; padding-block: .5rem; }
+.canvas-text { min-block-size: 1.75em; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1.0625rem; line-height: 1.72; }
+.canvas-text[data-level="1"] { font-size: 3rem; line-height: 1.2; }
+.canvas-text[data-level="2"] { font-size: 2.25rem; line-height: 1.25; }
+.canvas-text[data-level="3"] { font-size: 1.75rem; line-height: 1.3; }
+.canvas-text[data-level="4"] { font-size: 1.25rem; }
+.canvas-text[data-level="5"] { font-size: 1.125rem; }
+.canvas-text[data-level="6"] { font-size: 1rem; }
+.canvas-text[data-align="center"] { text-align: center; }
+.canvas-text[data-align="right"] { text-align: right; }
+.canvas-block img { display: block; max-inline-size: 100%; block-size: auto; border-radius: .75rem; }
+.canvas-block-settings { display: grid; gap: .75rem; padding: .75rem; max-inline-size: 18rem; }
+.canvas-block-settings label { display: grid; gap: .5rem; }
+.canvas-insert-actions { display: flex; flex-wrap: wrap; gap: .5rem; padding-block: 1rem; }
+.behr-admin .canvas-insert-actions button { border-color: transparent; color: var(--admin-text-muted); }
+.behr-admin .ce-toolbar__plus, .behr-admin .ce-toolbar__settings-btn, .behr-admin .ce-popover-item { min-width: 44px; min-height: 44px; }
+.ce-popover-item__icon:empty { display: none; }
 @media (max-width: 74.999rem) {
   .pages-surface { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
   .page-management { position: static; max-block-size: none; }
@@ -273,6 +310,10 @@ html { background: var(--admin-canvas); }
   .overview-metrics > div, .overview-panel { padding: 1rem; border-radius: 20px; }
   .overview-metrics dd { font-size: 1.5rem; }
   .auth-page { align-content: start; }
+  .visual-page-canvas { padding: .5rem; }
+  .section-canvas .codex-editor__redactor { padding-inline: 0; }
+  .canvas-text[data-level="1"] { font-size: 2rem; }
+  .canvas-text[data-level="2"] { font-size: 1.625rem; }
 }
 @media (forced-colors: active) {
   .behr-admin [aria-pressed="true"] { text-decoration: underline; text-underline-offset: .2em; }
